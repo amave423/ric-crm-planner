@@ -1,0 +1,15 @@
+[
+  {
+    "id": 1,
+    "user_id": 2,
+    "event_id": 1,
+    "project_id": 1,
+    "team_id": 1,
+    "specialization_id": 1,
+    "status_id": 1,
+    "message": "Хочу участвовать",
+    "comment": null,
+    "date_sub": "2025-10-01T14:30:00Z",
+    "created_at": "2025-10-01T14:30:00Z"
+  }
+]

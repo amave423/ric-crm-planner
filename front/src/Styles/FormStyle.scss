@@ -1,0 +1,269 @@
+@import 'Styles/mixins';
+@import 'Styles/variables';
+@import 'Styles/buttons';
+
+.SetupContainer {
+  display: flex;
+  position: relative;
+}
+
+.FormContainer {
+    position: relative;
+    padding: 24px 74px;
+    width: 830px;
+    min-height: 380px;
+    
+    border-radius: $border-radius;
+    background-color: $white;
+    box-shadow: 0px 0px 11.5px 6px #A7A7A740;
+
+
+    .FormHeader {
+      display: flex;
+      justify-content: start;
+      align-items: center;
+      margin-bottom: 24px;
+
+      .ModalCloseButton {
+        cursor: pointer;
+      }
+    }
+
+    .FormStage {
+      margin-bottom: 24px;
+
+      h3 {
+        margin-bottom: 8px;
+      }
+
+      &.DatesFormStage {
+        display: flex;
+        flex-direction: row;
+        gap: 12px;
+        margin-bottom: 0;
+
+        .InputWrapper {
+          flex: 1;
+        }
+      }
+    }
+
+    .FormButtons {
+      display: flex;
+      justify-content: end;
+      gap: 12px;
+
+      .primary-btn {
+        @include primary-btn;
+      }
+    }
+}
+
+.FormField {
+  @include text2;
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  height: 40px;
+  padding: 12px;
+
+  border-radius: $border-radius;
+
+  outline: none;
+  box-shadow: none;
+
+  svg {
+    color: $black;
+  }
+
+  &:focus,
+  &:focus-visible,
+  &:focus-within {
+    outline: none;
+    box-shadow: none;
+  }
+
+  &:hover {
+    box-shadow: none;
+  }
+
+  &::placeholder {
+    opacity: 1;
+  }
+
+}
+
+.Form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    .NameContainer {
+      width: 100%;
+
+      .Name {
+        width: 100%;
+        padding: 12px;
+        border-radius: $border-radius $border-radius 0 0;
+      }
+
+      .Description {
+        width: 100%;
+        padding: 12px;
+        display: block;
+        resize: none;
+        overflow: hidden;
+
+        border-radius: 0 0 $border-radius $border-radius;
+        border-top: none;
+      }
+    }
+
+    .ListField {
+      position: relative;
+
+      cursor: pointer;
+    
+      .DropdownList {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: white;
+
+        border: 1px solid #ccc;
+        border-radius: $border-radius;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        z-index: 10;
+        overflow: hidden;
+    
+        .DropdownItem {
+          padding: 8px;
+          cursor: pointer;
+    
+          &:hover {
+            background-color: $grey;
+          }
+        }
+      }
+    }
+
+    .FormButtons {
+      display: flex;
+      justify-content: end;
+      gap: 12px;
+
+      .primary-btn {
+        @include primary-btn;
+      }
+
+      .secondary-btn {
+        @include secondary-btn;
+      }
+
+      &.navigate {
+        margin-top: 12px;
+      }
+    }
+
+    .InputWrapper {
+      .ant-input, .ant-picker-input, .ant-picker  {
+        font-size: 0.75rem;
+        font-weight: 400;
+        line-height: 0.9375rem;
+        //color: $black !important;
+        font-family: 'Montserrat', sans-serif;
+        font-variant-numeric: lining-nums;
+      
+
+      }
+
+      position: relative;
+      margin-bottom: 0;
+  
+      .FormField {
+          &:focus {
+              outline: none;
+              border-color: $grey;
+          }
+      }
+  
+      .InputText {
+          @include text2;
+          position: absolute;
+          top: -14px;
+          left: 4px;
+      }
+    } 
+
+    .DateRangeContainer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+
+      .InputWrapper {
+        width: 100%;
+        flex: 1;
+        max-width: 288px;
+
+          .DateInput {
+            input {
+              @include text2;
+      
+              background: none;
+              //color: $black;
+              outline: none;
+              position: relative;
+
+              &::placeholder {
+                //color: $black !important;
+                opacity: 1;
+              }
+            }
+        }
+      }
+    }
+} 
+
+.FormButtons.navigate {
+  margin-top: 12px;
+}
+
+
+.DirectionList, .ProjectList {
+  margin-top: 12px;
+  margin-bottom: 12px;
+
+  h3 {
+    margin-bottom: 16px;
+  }
+
+  .SelectedListItem {
+    cursor: pointer;
+
+    &.editing {
+      background-color: #F0DDFF;
+    }
+  }
+}
+
+.EditFormModal .ant-modal-content {
+  width: 600px;
+}
+
+.RequestFormContainer {
+  width: 360px;
+}
+
+:where(.ant-input-outlined.ant-input-disabled),
+:where(.ant-input-outlined[disabled]),
+:where(.css-dev-only-do-not-override-1ct5ng).ant-picker-outlined.ant-picker-disabled {
+  background-color: $white !important;
+}
+
+:where(.css-dev-only-do-not-override-1ct5ng).ant-picker .ant-picker-input >input[disabled] {
+  color: $black;
+  cursor: text;
+}

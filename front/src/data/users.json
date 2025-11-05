@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "email": "admin@example.com",
+    "password": "admin123",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2024-01-01T10:00:00Z",
+    "last_login": "2024-10-01T12:00:00Z",
+    "role": "admin",
+    "profile_id": 1
+  },
+  {
+    "id": 2,
+    "username": "user",
+    "email": "user@example.com",
+    "password": "user123",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2024-02-15T09:30:00Z",
+    "last_login": null,
+    "role": "participant",
+    "profile_id": 2
+  }
+]

@@ -1,0 +1,12 @@
+[
+  {
+    "id": 1,
+    "name": "Frontend",
+    "description": "Разработка интерфейсов"
+  },
+  {
+    "id": 2,
+    "name": "Backend",
+    "description": "Серверная часть"
+  }
+]

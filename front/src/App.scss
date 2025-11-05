@@ -1,0 +1,384 @@
+@use 'Styles/variables' as *;
+@use 'Styles/mixins' as *;
+
+// общий фон страницы
+body {
+  background: $page-bg;
+  color: $black;
+}
+
+// центральный контейнер
+.MainPageContainer {
+  @include container;
+  padding-top: $hero-vertical-padding;
+  padding-bottom: $hero-vertical-padding;
+}
+
+/* --- Герой секция --- */
+.MainInfoContainer {
+  display: flex;
+  gap: $hero-gap;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 64px;
+
+  @media (max-width: $breakpoint-md) {
+    flex-direction: column-reverse;
+    align-items: center;
+    text-align: center;
+  }
+
+  .MainInfoLeftSide {
+    flex: 1;
+    max-width: 58%;
+
+    @media (max-width: $breakpoint-md) {
+      max-width: 100%;
+    }
+
+    .MainIfoTitle {
+      @include h1;
+      color: $cyan;
+      margin-bottom: 18px;
+      line-height: 1.05;
+      letter-spacing: -0.5px;
+    }
+
+    p {
+      @include text1;
+      color: $black;
+      opacity: 0.85;
+      max-width: 70ch;
+    }
+
+    .HeroActions {
+      margin-top: 28px;
+      .PrimaryBtn {
+        @include button();
+      }
+    }
+  }
+
+  img {
+    width: 420px;
+    height: auto;
+    border-radius: 12px;
+    object-fit: cover;
+    box-shadow: 0 14px 30px rgba(0,0,0,0.08);
+
+    @media (max-width: $breakpoint-md) {
+      width: 88%;
+    }
+  }
+}
+
+/* --- Возможности --- */
+.OpportunitiesInfoContainer {
+  margin: 40px 0 72px;
+  text-align: center;
+
+  .OpportunitiesInfoTitle {
+    @include h2;
+    color: $cyan;
+    margin-bottom: 12px;
+  }
+
+  p {
+    @include text2;
+    color: $black;
+    opacity: 0.8;
+    margin-bottom: 28px;
+  }
+
+  .OpportunitiesList {
+    @include card-grid(2, 40px);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+
+    .OpportunitiesListItem {
+      @include card;
+      align-items: center;
+      text-align: center;
+      min-height: 180px;
+
+      .OpportunitiesTitle {
+        @include h3;
+        margin-top: 6px;
+      }
+
+      img {
+        width: 56px;
+        height: 56px;
+      }
+
+      .OpportunitiesDescription {
+        @include text2;
+        color: $black;
+        opacity: 0.8;
+        margin-top: 8px;
+      }
+    }
+  }
+}
+
+/* --- Преимущества --- */
+.AdvantagesInfoContainer {
+  margin-bottom: 80px;
+  text-align: center;
+
+  .AdvantagesInfoTitle {
+    @include h2;
+    color: $cyan;
+    margin-bottom: 28px;
+  }
+
+  .AdvantagesList {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    align-items: start;
+
+    @media (max-width: $breakpoint-md) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    @media (max-width: $breakpoint-sm) {
+      grid-template-columns: 1fr;
+    }
+
+    .AdvantagesListItem {
+      @include card;
+      align-items: center;
+      text-align: center;
+      min-height: 160px;
+
+      img {
+        width: 48px;
+        height: 48px;
+      }
+
+      .AdvantagesTitle {
+        @include h4;
+      }
+
+      .AdvantagesDescription {
+        @include text2;
+        color: $black;
+        opacity: 0.8;
+      }
+    }
+  }
+}
+
+/* --- Мелкие правки --- */
+.MainIfoTitle, .OpportunitiesInfoTitle, .AdvantagesInfoTitle {
+  /* стили заголовков уже заданы через миксины выше */
+}
+
+@media (max-width: $breakpoint-sm) {
+  .OpportunitiesList .OpportunitiesListItem {
+    min-height: auto;
+    padding: 20px;
+  }
+  .AdvantagesList .AdvantagesListItem {
+    padding: 18px;
+  }
+}
+
+// --- Шапка страницы (TopHeader) ---
+.TopHeaderContainer {
+  width: 100%;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+
+  .TopHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .HeaderLeft, .HeaderCenter, .HeaderRight {
+    display: flex;
+    align-items: center;
+  }
+
+  .HeaderLeft, .HeaderRight {
+    width: 120px; // фиксированная ширина для выравнивания центра
+    justify-content: flex-start;
+  }
+
+  .HeaderCenter {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .TopLogo {
+    height: 40px;
+  }
+}
+
+.TopHeader {
+  width: 100%;
+  height: 64px;
+  max-width: $primary-width;
+  background: $white;
+  border-radius: 12px;
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.07);
+  gap: 16px;
+}
+
+/* трёхколоночная структура */
+.TopHeader .HeaderLeft { flex: 1; display: flex; align-items: center; }
+.TopHeader .HeaderCenter { flex: 0 0 auto; display: flex; justify-content: center; align-items: center; }
+.TopHeader .HeaderRight { flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
+
+/* логотип */
+.TopHeader .TopLogo { height: 36px; width: auto; display: block; }
+
+/* общий стиль кнопок (использует миксин button) */
+.HeaderBtn { @include button($btn-bg, $btn-color); padding: 8px 16px; border-radius: 12px; font-size: 0.9rem; box-shadow: 0 8px 20px rgba(167,167,167,0.12); }
+
+/* маленькая версия для варианта logged (по скрину кнопка маленькая справа) */
+.HeaderBtn.small { padding: 6px 12px; height: 34px; }
+
+/* outline кнопка для anon */
+.OutlineBtn {
+  background: transparent;
+  border: 1px solid $grey2;
+  color: $black;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* user pill для anon */
+.UserPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 20px;
+  border: 1px solid #ddd;
+  background: #f7f8fa;
+  cursor: pointer;
+}
+
+/* гамбургер для anon (левый край) */
+.Hamburger {
+  width: 36px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+
+  span {
+    display: block;
+    height: 2px;
+    background: #333;
+    border-radius: 2px;
+    transition: transform 0.2s, opacity 0.2s;
+  }
+
+  &.open span:nth-child(1) {
+    transform: translateY(9px) rotate(45deg);
+  }
+  &.open span:nth-child(2) {
+    opacity: 0;
+  }
+  &.open span:nth-child(3) {
+    transform: translateY(-9px) rotate(-45deg);
+  }
+}
+
+/* ВАРИАНТЫ: если нужно можно добавить отличия через классы .logged / .anon */
+.TopHeader.logged {
+  /* для первого скриншота — центрируем логотип, справа небольшая яркая кнопка (уже наследуется) */
+}
+.TopHeader.anon {
+  /* для второго скриншота — гамбургер слева, outline и user-pill справа (стили выше) */
+}
+
+/* адаптив */
+@media (max-width: $breakpoint-md) {
+  .TopHeader { padding: 10px 12px; }
+  .TopHeader .HeaderLeft { width: 48px; }
+  .TopHeader .TopLogo { height: 32px; }
+}
+
+@media (max-width: $breakpoint-sm) {
+  .TopHeader { flex-direction: column; height: auto; gap: 8px; padding: 12px; }
+  .TopHeader .HeaderRight { justify-content: center; width: 100%; }
+  .HeaderBtn, .OutlineBtn, .UserPill { padding: 8px 12px; }
+}
+
+.AppSidebar {
+  position: fixed;
+  top: 0;
+  left: -320px;
+  width: 320px;
+  height: 100vh;
+  background: #fff;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.08);
+  z-index: 1000;
+  transition: left 0.25s ease;
+
+  &.open { left: 0; }
+
+  .SidebarInner {
+    padding: 20px;
+  }
+
+  .SidebarClose {
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    margin-bottom: 12px;
+  }
+
+  nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+
+    li { margin: 8px 0; }
+
+    a { color: #333; text-decoration: none; }
+  }
+}
+
+/* backdrop — отдельный элемент-сосед, показывается когда .AppSidebar.open (см. Sidebar.tsx) */
+.SidebarBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  z-index: 900;
+}
+
+.AppSidebar.open + .SidebarBackdrop,
+.SidebarBackdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}

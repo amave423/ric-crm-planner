@@ -1,0 +1,203 @@
+@import 'Styles/mixins';
+@import 'Styles/variables';
+@import 'Styles/buttons';
+
+.ListTableContainer {
+    width: 1160px;
+    margin: 0 auto;
+    padding: 0;
+}
+
+.UniversalListTable, .ant-table-wrapper {
+    @include text1;
+    width: 100%;
+
+    table {
+        // Стили для всей таблицы
+        @include text1;
+        padding: 0px 8px;
+        background-color: $grey3;
+        border-radius: $border-radius;
+        border-collapse: separate;
+        border-spacing: 0 8px;
+
+        .ant-table-thead {
+            // Заголовок таблицы
+            tr {
+                th {
+                    padding: 8px;
+                    font-weight: normal;
+                    text-align: center;
+                    background-color: $grey3;
+                    border: none;
+
+                    &:first-child {
+                        text-align: start;
+                    }
+
+                    .HeaderCell {
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                }
+            }
+        }
+
+        .ant-table-tbody {
+            // Стиль для строк таблицы
+            tr {
+                background-color: $white;
+                position: relative;
+                &:not(:last-child) {
+                    margin-bottom: 12px;
+                }
+
+                td {
+                    padding: 12px;
+                    max-width: 200px;
+
+                    * {
+                        word-wrap: break-word;
+                        overflow-wrap: break-word;
+                    }
+
+                    &:not(:first-child, :last-child) {
+                        text-align: center;
+                        border-top: 1px solid $yellow;
+                        border-bottom: 1px solid $yellow;
+                    }
+
+                    .HiglightCell {
+                        @include text2;
+                        display: inline-block;
+                        padding: 8px;
+                        background-color: $blue;
+                        border-radius: $border-radius;
+
+                        &.HighlightGray {
+                            background-color: $grey;
+                        }
+                    }
+
+                    .HiglightCell.blue {
+                        background-color: $blue;
+                    }
+                    .HiglightCell.green {
+                        background-color: $green;
+                    }
+                    .HiglightCell.red {
+                        background-color: $pink;
+                    }
+
+                    &:first-child {
+                        border-radius: $border-radius 0 0 $border-radius;
+                        border: 1px solid $yellow;
+                        border-right: none;
+                        max-width: 300px;
+                    }
+
+                    &:last-child {
+                        border-radius: 0 $border-radius $border-radius 0;
+                        border: 1px solid $yellow;
+                        border-left: none;
+                        max-width: 40px;
+                    }
+
+                    .LinkCell {
+                        text-decoration: none;
+                        color: $black;
+                    }
+
+                    .ThreeDotsButton {
+                        cursor: pointer;
+                    }
+
+                    ul {
+                        list-style: none;
+    
+                        li {
+    
+                            &.HiglightCell {
+                                display: block;
+                                padding: 4px;
+                                margin-bottom: 2px;
+                            }
+    
+                            a {
+                                @include text1;
+                                text-decoration: none;
+                                color: $black;
+                            }
+                        }
+                    }
+                }
+                }
+            }
+
+        }
+
+        svg {
+            cursor: pointer;
+        }
+    }
+
+    .ant-table-thead th.sortable {
+        cursor: pointer;
+    }
+
+    .ant-table-column-sort {
+        background-color: transparent !important;
+    }
+
+
+
+    .NullMessage {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+    }
+
+.PaginationContainer {
+    margin-top: 20px;
+    margin-bottom: 40px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.ant-checkbox .ant-checkbox-inner:after {
+    display: block;
+}
+
+.view-mode-switcher {
+    margin-bottom: 16px;
+}
+
+.view-mode-switcher button {
+    margin-right: 8px;
+}
+
+.table-controls {
+    display: flex;
+    align-items: center;
+}
+
+.table-controls span {
+    margin-left: 8px;
+    font-size: 14px;
+}
+
+.empty-message {
+    padding: 20px;
+    text-align: center;
+    font-style: italic;
+}
+
+.empty-message.for-projectant {
+    font-style: normal;
+    max-width: 500px;
+    margin: 20px auto;
+}
+  

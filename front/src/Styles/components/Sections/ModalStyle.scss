@@ -1,0 +1,61 @@
+@import 'Styles/mixins';
+@import 'Styles/variables';
+
+.ModalContent {
+  display: flex;
+
+  .ModalSide {
+
+    &.ModalLeft {
+      flex: 1.4;
+      padding-right: 18px;
+      min-width: 320px;
+
+      .ListItemWithSelector {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        &.event {
+          > div {
+            max-width: calc(100% - 120px);
+          }
+        }
+
+        &.direction {
+          > div {
+            max-width: calc(100% - 115px);
+          }
+        }
+
+        &.project {
+          > div {
+            max-width: calc(100% - 65px);
+          }
+        }
+
+        > span {
+          margin: 0;
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+
+        > div {
+          height: 22px;
+        }
+      }
+    }
+  
+    &.ModalRight {
+      flex: 1.8;
+      padding-left: 18px;
+    }
+
+    .Buttons {
+      width: 100%;
+      justify-content: end;
+    }
+
+  }
+}

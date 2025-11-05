@@ -1,0 +1,4 @@
+[
+  { "id": 1, "name": "Новый", "description": "Новая заявка", "is_positive": false },
+  { "id": 2, "name": "Принята", "description": "Заявка принята", "is_positive": true }
+]

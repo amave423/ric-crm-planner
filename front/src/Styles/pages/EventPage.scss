@@ -1,0 +1,71 @@
+@import 'Styles/mixins';
+@import 'Styles/variables';
+@import 'Styles/buttons';
+
+.EventContainer {
+    width: 1160px;
+    display: flex;
+    flex-direction: row;
+    gap: 32px;
+    justify-content: space-between;
+    align-items: start;
+
+    .EventInfo {
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-clip: padding-box;
+        flex: 1;
+        padding: 32px;
+
+        .EventDescription {
+            @include text1;
+        }
+
+        .SpecializationsList {
+            list-style: none;
+            display: flex;
+            gap: 12px;
+            justify-content: start;
+            align-items: center;
+
+            li {
+                @include h4;
+                display: inline-block;
+                padding: 8px 12px;
+                border-radius: $border-radius;
+                background-color: $blue;
+            }
+        }
+    }
+
+    .FormContainer {
+        box-shadow: 0px 4px 20px 0px #b2b2b240;
+        padding: 24px 32px;
+        
+        .RequestForm {
+            max-width: 360px;
+
+            .ModalFormHeader {
+                justify-content: center;
+                margin-bottom: 12px;
+            }
+
+            .Message {
+                min-height: 120px;
+                display: block;
+                resize: none;
+                overflow: hidden;
+            }
+
+            .primary-btn {
+                @include primary-btn;
+            }
+        }
+
+        .MessageHeader {
+            margin-bottom: 12px;
+        }
+    }
+    
+}

@@ -1,0 +1,122 @@
+@use 'variables' as *;
+
+@mixin h1 {
+  font-size: 2.5rem;
+  font-weight: 600;
+  line-height: 2.5rem;
+  color: $black;
+}
+
+@mixin h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.5rem;
+  color: $black;
+}
+
+@mixin h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.125rem;
+  color: $black;
+}
+
+@mixin h4 {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 0.9375rem;
+  color: $black;
+}
+
+@mixin text1 {
+  font-size: 0.9375rem;
+  font-weight: 400;
+  line-height: 1rem;
+  color: $black;
+}
+
+@mixin text2 {
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 0.9375rem;
+  color: $black;
+}
+
+@mixin text3 {
+  font-size: 0.625rem;
+  font-weight: 400;
+  line-height: 0.75rem;
+  color: $black;
+}
+
+@mixin no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+// Новые миксины, используемые в App.scss
+@mixin container($max-width: $primary-width, $gap: 24px) {
+  width: 100%;
+  max-width: $max-width;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: $gap;
+  padding-right: $gap;
+}
+
+@mixin button($bg: $btn-bg, $color: $btn-color) {
+  background: $bg;
+  color: $color;
+  border: none;
+  padding: 10px 16px;
+  border-radius: $border-radius;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+  &:hover { filter: brightness(0.98); }
+}
+
+@mixin card-grid($cols, $gap: 20px) {
+  display: grid;
+  grid-template-columns: repeat($cols, 1fr);
+  gap: $gap;
+}
+
+@mixin card($padding: $card-padding, $bg: $white, $radius: $border-radius, $shadow: 0 10px 30px rgba(0,0,0,0.05)) {
+  background: $bg;
+  padding: $padding;
+  border-radius: $radius;
+  box-shadow: $shadow;
+  display: flex;
+  flex-direction: column;
+}
+
+// Миксин для создания контейнеров с накладывающимся фоном
+@mixin backgroundWithBefore($top, $left, $offset, $width, $min-height) {
+  position: relative;
+  
+  &::before {
+      content: '';
+      position: absolute;
+      top: $top;
+      left: $left;
+      width: $width;
+      min-height: $min-height;
+      height: calc(100% + #{$offset * 2});
+
+      background-color: $white;
+      border-radius: $border-radius;
+      z-index: -1;
+
+      box-shadow: 0px 0px 11.5px 6px #A7A7A740;
+  }
+}
+
+

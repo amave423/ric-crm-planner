@@ -1,0 +1,9 @@
+[
+  {
+    "project_id": 1,
+    "name": "Проект Alpha",
+    "description": "Описание проекта Alpha",
+    "direction_id": 1,
+    "curators": [1]
+  }
+]

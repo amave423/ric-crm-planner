@@ -1,0 +1,100 @@
+@import 'Styles/mixins';
+@import 'Styles/variables';
+
+.HeaderPanel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin: 0 auto 24px auto;
+
+    .LeftHeaderPanel {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 4px;
+
+        .lfp-btn {
+            border: none;
+            display: flex;
+            align-items: center;
+    
+            background: none;
+    
+            cursor: pointer;
+
+            &.AddButton {
+                padding: 4px;
+                background-color: $yellow;
+                border-radius: $border-radius;
+                box-sizing: content-box;
+            }
+
+            &:active {
+                opacity: 0.7;
+            }
+        }
+    
+        .HeaderPanelTitle {
+            @include h2;
+            margin-right: 12px;
+        }
+    }
+
+    .RightHeaderPanel {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 16px;
+
+        .SortButton,
+        .SortOptions .SortButton {
+            @include text1;
+            display: flex;
+
+            cursor: pointer;
+
+            .SortIcons {
+                display: flex;
+                align-items: center;
+                margin-left: 4px;
+            
+                .SortIcon {
+                    display: none;
+                    transition: ease 0.2s;
+                
+                    &.active {
+                        display: block;
+                    }
+                }
+            }
+        }
+
+        .FiltersPanel {
+            display: flex;
+            gap: 8px;
+        }
+    }
+
+    .ManageButton {
+        @include text2;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+
+        border: none;
+        border-radius: $border-radius;
+        background-color: $white;
+
+        backdrop-filter: blur(4px);
+        box-shadow: 0px 4px 4px 0px #00000040;
+
+        cursor: pointer;
+
+        &:hover {
+            background-color: $grey;
+        }
+    }
+}
