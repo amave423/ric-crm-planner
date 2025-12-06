@@ -1,0 +1,26 @@
+@import "../../styles/variables.scss";
+
+.table-controls {
+  margin-bottom: 20px;
+  display: flex;
+  gap: 12px;
+
+  input, select {
+    padding: 10px;
+    border: 1px solid $gray;
+    border-radius: 8px;
+  }
+
+  .create-btn {
+    padding: 10px 20px;
+    background: $primary;
+    color: white;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+
+    &:hover {
+      background: $primary-hover;
+    }
+  }
+}

@@ -1,0 +1,68 @@
+@import "./variables.scss";
+
+.profile-page {
+  padding: 20px;
+
+  h1 {
+    margin-bottom: 20px;
+  }
+}
+
+.profile-columns {
+  display: flex;
+  gap: 40px;
+
+  .left, .right {
+    flex: 1;
+    background: white;
+    padding: 20px;
+    border-radius: 14px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.06);
+
+    h3 {
+      font-size: 18px;
+      margin-bottom: 15px;
+      color: $gray-dark;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 12px;
+      border-radius: 10px;
+      border: 1px solid $gray;
+      background: #fafafa;
+      transition: 0.2s;
+
+      &:disabled {
+        color: #555;
+        background: #f0f0f0;
+      }
+
+      &:not(:disabled):focus {
+        border-color: $primary;
+        background: #fff;
+      }
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: none;
+    }
+  }
+}
+
+.edit-btn {
+  margin-top: 20px;
+  padding: 12px 24px;
+  background: $primary;
+  border: none;
+  border-radius: 12px;
+  color: white;
+  cursor: pointer;
+  transition: 0.2s;
+
+  &:hover {
+    background: $primary-hover;
+  }
+}

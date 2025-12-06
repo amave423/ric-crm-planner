@@ -1,0 +1,39 @@
+@import "../../styles/variables.scss";
+
+.custom-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  thead {
+    background: #f8f8f8;
+
+    th {
+      width: 232px;
+      height: 36px;
+
+      padding: 12px;
+      text-align: left;
+
+      line-height: 16px;
+
+      border-bottom: 1px solid #e6e6e6;
+    }
+  }
+
+  tbody {
+    tr {
+      cursor: pointer;
+      height: 48px;
+
+      &:hover {
+        background: #f5f7ff;
+      }
+    }
+
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #ececec;
+
+    }
+  }
+}

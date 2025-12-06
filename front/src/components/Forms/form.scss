@@ -1,0 +1,50 @@
+@import "../../styles/variables.scss";
+
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  label {
+    font-size: 14px;
+    color: #666;
+  }
+
+  input, textarea {
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid $gray;
+    background: #fafafa;
+    font-size: 14px;
+
+    &:focus {
+      border-color: $primary;
+      outline: none;
+      background: white;
+    }
+  }
+
+  textarea {
+    min-height: 80px;
+    resize: none;
+  }
+}
+
+.save-btn {
+  padding: 12px 20px;
+  background: $primary;
+  color: white;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+
+  &:hover {
+    background: $primary-hover;
+  }
+}

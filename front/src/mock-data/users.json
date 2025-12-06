@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "email": "student@mail.ru",
+    "name": "Иван",
+    "surname": "Иванов",
+    "role": "student",
+    "password": "password123"
+  },
+  {
+    "id": 2,
+    "email": "org@mail.ru",
+    "name": "Смирнов",
+    "surname": "Денис",
+    "role": "organizer",
+    "password": "password123"
+  }
+]

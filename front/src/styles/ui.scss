@@ -1,0 +1,41 @@
+@import "./variables.scss";
+
+.ui-button {
+  padding: 10px 18px;
+  background: $primary;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: 0.2s;
+
+  &:hover {
+    background: $primary-hover;
+  }
+}
+
+.ui-input {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid $gray-dark;
+  font-size: 14px;
+  width: 100%;
+
+  &:focus {
+    border-color: $primary;
+    outline: none;
+  }
+}
+
+.ui-select {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid $gray-dark;
+  background: white;
+
+  &:focus {
+    border-color: $primary;
+    outline: none;
+  }
+}

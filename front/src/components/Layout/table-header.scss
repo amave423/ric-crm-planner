@@ -1,0 +1,57 @@
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  gap: 24px;
+
+  .right-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .search-input {
+    width: 243px;
+    height: 40px;
+    border: 1px solid #dcdcdc;
+    border-radius: 8px;
+    padding: 0 12px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    input {
+      border: none;
+      outline: none;
+      width: 100%;
+      background: transparent;
+    }
+
+    img {
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    padding: 2px;
+    height: 40px;
+    border-radius: 8px;
+  }
+
+  .tab {
+    padding: 9px 12px;
+    border-radius: 6px;
+    text-decoration: none;
+    color: #222;
+  }
+
+  .tab.active {
+    background: #6495ed;
+    color: white;
+  }
+}
