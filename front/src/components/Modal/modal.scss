@@ -2,12 +2,18 @@
 
 .modal-bg {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  inset: 0;
   background: rgba(0, 0, 0, 0.45);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 999;
+  z-index: 2000;
+  animation: fade-in .2s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modal {
@@ -15,27 +21,34 @@
   border-radius: 16px;
   width: 500px;
   padding: 25px;
-  box-shadow: 0 0 20px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+  animation: scale-in .2s ease;
+}
 
-  h2 {
-    margin-bottom: 20px;
-    font-size: 22px;
-  }
+@keyframes scale-in {
+  from { transform: scale(.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
 
-  .modal-content {
-    margin-bottom: 25px;
-  }
+.modal-title {
+  margin-bottom: 20px;
+  font-size: 22px;
+  font-weight: 600;
+}
 
-  .close-btn {
-    padding: 10px 20px;
-    background: $primary;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
+.modal-content {
+  margin-bottom: 25px;
+}
 
-    &:hover {
-      background: $primary-hover;
-    }
+.close-btn {
+  padding: 10px 20px;
+  background: $primary;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+
+  &:hover {
+    background: $primary-hover;
   }
 }

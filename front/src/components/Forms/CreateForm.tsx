@@ -9,12 +9,11 @@ export type Field = {
 
 interface Props {
   fields: Field[];
-  initial: any;
-  onSave: (data: any) => void;
+  onCreate: (data: any) => void;
 }
 
-export default function EditForm({ fields, initial, onSave }: Props) {
-  const [form, setForm] = useState<any>(initial || {});
+export default function CreateForm({ fields, onCreate }: Props) {
+  const [form, setForm] = useState<any>({});
 
   const update = (key: string, value: string) =>
     setForm((prev: any) => ({ ...prev, [key]: value }));
@@ -24,7 +23,7 @@ export default function EditForm({ fields, initial, onSave }: Props) {
       className="form-body"
       onSubmit={(e) => {
         e.preventDefault();
-        onSave(form);
+        onCreate(form);
       }}
     >
       {fields.map((f) => (
@@ -34,21 +33,21 @@ export default function EditForm({ fields, initial, onSave }: Props) {
           {f.type === "textarea" ? (
             <textarea
               className="text-regular"
-              value={form[f.key] || ""}
               onChange={(e) => update(f.key, e.target.value)}
             />
           ) : (
             <input
               type={f.type === "date" ? "date" : "text"}
               className="text-regular"
-              value={form[f.key] || ""}
               onChange={(e) => update(f.key, e.target.value)}
             />
           )}
         </div>
       ))}
 
-      <button className="primary-btn text-regular">Сохранить</button>
+      <button className="primary-btn text-regular" type="submit">
+        Создать
+      </button>
     </form>
   );
 }

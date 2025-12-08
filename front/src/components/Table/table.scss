@@ -1,39 +1,69 @@
 @import "../../styles/variables.scss";
 
+.custom-table-container {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  width: 100%;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+}
+
+/* Таблица */
 .custom-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: collapse; /* важно */
+}
 
-  thead {
-    background: #f8f8f8;
+.custom-table thead th {
+  width: 232px;
+  height: 36px;
+  padding: 12px;
+  text-align: left;
+}
 
-    th {
-      width: 232px;
-      height: 36px;
+.custom-table tbody td {
+  width: 232px; /* фиксируем ширину колонок */
+  padding: 12px;
+}
 
-      padding: 12px;
-      text-align: left;
+/* Ряд */
+.table-row {
+  border: 1px solid var(--border-color, #6495ed);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
 
-      line-height: 16px;
+/* Название + иконка */
+.title-with-icon {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
-      border-bottom: 1px solid #e6e6e6;
-    }
-  }
+.info-btn {
+  background: transparent;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
 
-  tbody {
-    tr {
-      cursor: pointer;
-      height: 48px;
+.info-btn img {
+  width: 40px;
+  height: 40px;
+  transition: transform .15s;
+}
 
-      &:hover {
-        background: #f5f7ff;
-      }
-    }
+.info-btn:hover img {
+  transform: scale(1.4);
+}
 
-    td {
-      padding: 12px;
-      border-bottom: 1px solid #ececec;
-
-    }
-  }
+/* Badges */
+.cell-badge {
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #6495ed);
+  background: var(--badge-bg, rgba(100,149,237,0.06));
+  display: inline-block;
 }
