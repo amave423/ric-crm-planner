@@ -8,47 +8,50 @@
   justify-content: center;
   align-items: center;
   z-index: 2000;
-  animation: fade-in .2s ease;
+  animation: modal-fade .18s ease;
 }
 
-@keyframes fade-in {
+@keyframes modal-fade {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
 .modal {
-  background: white;
-  border-radius: 16px;
-  width: 500px;
-  padding: 25px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.25);
-  animation: scale-in .2s ease;
+  background: #fff;
+  border-radius: 12px;
+  width: 560px;
+  max-width: calc(100% - 32px);
+  padding: 22px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+  transform-origin: center;
+  animation: modal-scale .18s ease;
 }
 
-@keyframes scale-in {
-  from { transform: scale(.9); opacity: 0; }
+@keyframes modal-scale {
+  from { transform: scale(.96); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
 
 .modal-title {
-  margin-bottom: 20px;
-  font-size: 22px;
+  margin: 0 0 16px 0;
   font-weight: 600;
+  font-size: 20px;
 }
 
 .modal-content {
-  margin-bottom: 25px;
+  margin-bottom: 18px;
+}
+
+.modal-actions {
+  display:flex;
+  justify-content: flex-end;
 }
 
 .close-btn {
-  padding: 10px 20px;
+  padding: 8px 14px;
   background: $primary;
   color: white;
+  border-radius: 8px;
   border: none;
-  border-radius: 10px;
   cursor: pointer;
-
-  &:hover {
-    background: $primary-hover;
-  }
 }

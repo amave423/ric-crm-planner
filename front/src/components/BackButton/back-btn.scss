@@ -1,0 +1,30 @@
+@import "../../styles/variables.scss";
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  background: transparent;
+  border: none;
+  cursor: pointer;
+
+  padding: 6px 10px;
+
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+
+  transition: opacity .15s ease;
+
+  .icon {
+    width: 18px;
+    height: 18px;
+    transform: rotate(180deg); // делаем стрелку назад
+    opacity: 0.8;
+  }
+
+  &:hover {
+    opacity: 0.6;
+  }
+}

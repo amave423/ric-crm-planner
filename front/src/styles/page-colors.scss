@@ -1,34 +1,17 @@
-/* Events (синий) */
 .page--events {
-  .custom-table-container { border: 1px solid #6495ed10; } /* легкая общая рамка */
-  .custom-table .table-row { border-color: #6495ed; }
-  .page--events .cell-badge {
-    border-color: #6495ed;
-    background: rgba(100,149,237,0.06);
-  }
-  .tab.events.active { background: #6495ed; color: white; }
+  --row-border-color: #6495ed;
+  --badge-bg: rgba(100,149,237,0.08);
+  --table-grid: 355px 365px 365px 360px 232px;
 }
 
-/* Directions (зелёный) */
 .page--directions {
-  .custom-table-container { border: 1px solid #daffce66; }
-  .custom-table .table-row { border-color: #83d34a; } /* чуть насыщеннее */
-  .page--directions .cell-badge {
-    border-color: #83d34a;
-    background: rgba(218,255,206,0.4);
-    color: #155724;
-  }
-  .tab.directions.active { background: #daffce; color: #2b6a0a; }
+  --row-border-color: #83d34a;
+  --badge-bg: rgba(218,255,206,0.45);
+  --table-grid: 480px 290px 290px 290px;
 }
 
-/* Projects (фиолет) */
 .page--projects {
-  .custom-table-container { border: 1px solid #f0ddff66; }
-  .custom-table .table-row { border-color: #b77bdc; }
-  .page--projects .cell-badge {
-    border-color: #b77bdc;
-    background: rgba(240,221,255,0.5);
-    color: #4b1b60;
-  }
-  .tab.projects.active { background: #f0ddff; color: #5b2b7a; }
+  --row-border-color: #b77bdc;
+  --badge-bg: rgba(240,221,255,0.55);
+  --table-grid: 232px 232px 232px 232px 232px;
 }

@@ -1,69 +1,113 @@
 @import "../../styles/variables.scss";
 
 .custom-table-container {
-  background: white;
-  border-radius: 12px;
-  padding: 16px;
   width: 100%;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
 }
 
 /* Таблица */
 .custom-table {
   width: 100%;
-  border-collapse: collapse; /* важно */
+  border-collapse: separate;
+  border-spacing: 0 10px;
 }
 
+/* Заголовок */
 .custom-table thead th {
-  width: 232px;
+  padding: 12px;
   height: 36px;
-  padding: 12px;
   text-align: left;
+  font-weight: 500;
+  color: #333;
 }
 
-.custom-table tbody td {
-  width: 232px; /* фиксируем ширину колонок */
-  padding: 12px;
+/* Вся строка */
+.td-full {
+  padding: 0;
+  border: none;
 }
 
-/* Ряд */
-.table-row {
-  border: 1px solid var(--border-color, #6495ed);
+/* Контейнер строки */
+.row-box {
+  display: grid;
+  grid-template-columns: var(--table-grid);
+  gap: 0;
+  padding: 14px 16px;
+
+  border: 1px solid var(--row-border-color);
   border-radius: 12px;
-  margin-bottom: 8px;
+
+  background: #fff;
+  transition: background 0.15s ease;
 }
 
-/* Название + иконка */
+.row-box:hover {
+  background: rgba(0, 0, 0, 0.03);
+  cursor: pointer;
+}
+
+/*** Ячейки ***/
+.cell {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0; /* фикс для переполнения */
+}
+
+/*** Заголовок + иконка ***/
 .title-with-icon {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.title-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .info-btn {
-  background: transparent;
   border: none;
-  padding: 2px;
+  background: transparent;
+  padding: 4px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
+  flex-shrink: 0;
 }
 
 .info-btn img {
-  width: 40px;
-  height: 40px;
-  transition: transform .15s;
+  width: 20px;
+  height: 20px;
+  transition: transform .15s ease;
 }
 
 .info-btn:hover img {
   transform: scale(1.4);
 }
 
-/* Badges */
+/*** Бейджи ***/
 .cell-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
   padding: 6px 10px;
   border-radius: 12px;
-  border: 1px solid var(--border-color, #6495ed);
-  background: var(--badge-bg, rgba(100,149,237,0.06));
-  display: inline-block;
+  border: 1px solid var(--row-border-color);
+  background: var(--badge-bg);
+
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+/* Пустая строка */
+.empty-row td {
+  text-align: center;
+  padding: 20px;
+  color: #777;
 }

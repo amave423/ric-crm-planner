@@ -1,34 +1,81 @@
 .table-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:20px;
   margin-bottom: 20px;
 }
 
-.left-side { display:flex; gap:12px; align-items:center; }
+.left-side {
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
 
 .create-btn {
-  width: 40px; height: 40px; border-radius: 8px;
-  background: #6495ed; border:none; display:flex; align-items:center; justify-content:center;
+  width:40px;
+  height:40px; 
+  border-radius:8px; 
+  border:none; 
+  display:flex; 
+  align-items:center; 
+  justify-content:center; 
   cursor:pointer;
-  img { width:20px; height:20px; filter: invert(1); }
+  background: #6495ed;
+  img { 
+    width:20px; 
+    height:20px; 
+    filter: invert(1); 
+  }
 }
 
-/* правая часть */
-.right-side { display:flex; gap:16px; align-items:center; }
+.right-side { 
+  display:flex;
+  align-items:center; 
+  gap:14px; 
+}
 
-/* вкладки */
-.tabs { display:flex; gap:8px; padding:2px; }
+.search-box { 
+  width:243px;
+  height:40px; 
+  border:1px solid #e6e6e6; 
+  border-radius:8px; 
+  padding:0 12px; 
+  display:flex; 
+  align-items:center; 
+  justify-content:space-between; 
+}
+.search-box input { 
+  border:none; 
+  outline:none; 
+  width:100%; 
+  background:transparent; 
+}
+
+.tabs { 
+  display:flex; 
+  gap:8px; 
+  padding:2px; 
+}
 
 .tab {
-  padding:9px 12px; border-radius:8px; background:transparent; border:none; cursor:pointer;
+  padding:9px 12px; 
+  border-radius:8px; 
+  border:none; 
+  cursor:pointer; 
+  background:transparent;
 }
 
-/* АКТИВНЫЕ РАСЦВЕТКИ: */
-.tab.events.active { background: #6495ed; color: white; }
-.tab.directions.active { background: #daffce; color: #2b6a0a; } /* зелёная подсветка, тёмный текст */
-.tab.projects.active { background: #f0ddff; color: #5b2b7a; }   /* фиолетовая подсветка */
+.tab.events.active { 
+  background:#6495ed; 
+  color:white; 
 
-.search-box { width:243px; height:40px; border:1px solid #e6e6e6; border-radius:8px; padding:0 12px; display:flex; align-items:center; justify-content:space-between; }
-.search-box input { border:none; outline:none; width:100%; background:transparent; }
-.search-box img { width:20px; height:20px; opacity:0.8; }
+}
+.tab.directions.active { 
+  background:#daffce; 
+  color:#2b6a0a; 
+}
+.tab.projects.active { 
+  background:#f0ddff; 
+  color:#5b2b7a; 
+}

@@ -7,18 +7,31 @@ type Column = { key: string; title: string; width?: string };
 interface Props {
   columns: Column[];
   data: any[];
-  onInfoClick?: (row: any) => void; // открывать модалку по иконке
-  badgeKeys?: string[]; // какие ключи рендерить как бейджи
+  badgeKeys?: string[];
+  onInfoClick?: (row: any) => void;
+  onRowClick?: (row: any) => void;
+  gridColumns?: string;
 }
 
-export default function Table({ columns, data, onInfoClick, badgeKeys = [] }: Props) {
+export default function Table({
+  columns,
+  data,
+  badgeKeys = [],
+  onInfoClick,
+  onRowClick,
+  gridColumns = ""
+}: Props) {
   return (
     <div className="custom-table-container">
       <table className="custom-table">
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key} style={{ width: c.width || "auto" }} className="text-small">
+              <th
+                key={c.key}
+                style={{ width: c.width || undefined }}
+                className="text-small"
+              >
                 {c.title}
               </th>
             ))}
@@ -26,58 +39,70 @@ export default function Table({ columns, data, onInfoClick, badgeKeys = [] }: Pr
         </thead>
 
         <tbody>
-          {data.length === 0 && (
-            <tr><td colSpan={columns.length} className="empty-row text-regular">Пока пусто</td></tr>
-          )}
-
-          {data.map((row, i) => (
-            <tr key={row.id ?? i} className="table-row">
-              {columns.map((c) => {
-                const value = row[c.key];
-
-                // TITLE cell: если это первая колонка (обычно название) — добавляем info icon справа
-                if (c.key === columns[0].key) {
-                  return (
-                    <td key={c.key} className="title-cell text-regular">
-                      <div className="title-with-icon">
-                        <span>{value}</span>
-
-                        {onInfoClick && (
-                          <button
-                            className="info-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onInfoClick(row);
-                            }}
-                            aria-label="Подробнее"
-                            title="Подробнее"
-                          >
-                            <img src={infoIcon} alt="i" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  );
-                }
-
-                // Badge cells
-                if (badgeKeys.includes(c.key)) {
-                  return (
-                    <td key={c.key}>
-                      <span className="cell-badge">{value}</span>
-                    </td>
-                  );
-                }
-
-                // default
-                return (
-                  <td key={c.key} className="text-regular">
-                    {value}
-                  </td>
-                );
-              })}
+          {data.length === 0 ? (
+            <tr className="table-row empty-row">
+              <td colSpan={columns.length} className="text-regular">
+                Пока пусто
+              </td>
             </tr>
-          ))}
+          ) : (
+            data.map((row, idx) => (
+              <tr key={row.id ?? idx} className="table-row">
+                <td colSpan={columns.length} className="td-full">
+                  <div
+                    className="row-box"
+                    onClick={() => onRowClick?.(row)}
+                    style={
+                      { "--table-grid": gridColumns } as React.CSSProperties
+                    }
+                  >
+                    {columns.map((c) => {
+                      const value = row[c.key];
+
+                      // Первая колонка с info-icon
+                      if (c === columns[0]) {
+                        return (
+                          <div key={c.key} className="cell">
+                            <div className="title-with-icon">
+                              <span className="title-text">{value}</span>
+
+                              {onInfoClick && (
+                                <button
+                                  className="info-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onInfoClick(row);
+                                  }}
+                                >
+                                  <img src={infoIcon} alt="info" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Бейджи (даты, статус)
+                      if (badgeKeys.includes(c.key)) {
+                        return (
+                          <div key={c.key} className="cell">
+                            <span className="cell-badge">{value}</span>
+                          </div>
+                        );
+                      }
+
+                      // Обычная ячейка
+                      return (
+                        <div key={c.key} className="cell">
+                          {value}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>
