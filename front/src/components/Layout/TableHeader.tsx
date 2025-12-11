@@ -1,4 +1,3 @@
-// src/components/Layout/TableHeader.tsx
 import plusIcon from "../../assets/icons/plus.svg";
 import searchIcon from "../../assets/icons/search.svg";
 import "../../styles/table-header.scss";
@@ -10,7 +9,7 @@ interface Props {
   search: string;
   onSearch: (v: string) => void;
   onCreate?: () => void;
-  hideCreate?: boolean; // добавлено
+  hideCreate?: boolean;
 }
 
 export default function TableHeader({ title, search, onSearch, onCreate, hideCreate }: Props) {
@@ -33,7 +32,6 @@ export default function TableHeader({ title, search, onSearch, onCreate, hideCre
           <img src={searchIcon} alt="search" />
         </div>
 
-        {/* Показываем кнопку только если организатор, передан onCreate и hideCreate !== true */}
         {user?.role === "organizer" && onCreate && !hideCreate && (
           <button className="create-btn" onClick={onCreate}>
             <img src={plusIcon} alt="+" />

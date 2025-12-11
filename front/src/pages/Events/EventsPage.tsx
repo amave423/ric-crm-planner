@@ -28,7 +28,8 @@ export default function EventsPage() {
         columns={columns}
         data={filtered}
         badgeKeys={["startDate","endDate","status"]}
-        onRowClick={(row: any) => navigate(`/events/${row.id}/directions`)}
+        onRowClick={(row:any) => navigate(`/events/${row.id}/directions`)}
+        onEdit={(row) => navigate(`/events/${row.id}/edit`)}
       />
     </div>
   );

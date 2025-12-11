@@ -59,7 +59,6 @@ export default function Table({
                     {columns.map((c) => {
                       const value = row[c.key];
 
-                      // Первая колонка с info-icon
                       if (c === columns[0]) {
                         return (
                           <div key={c.key} className="cell">
@@ -82,7 +81,6 @@ export default function Table({
                         );
                       }
 
-                      // Бейджи (даты, статус)
                       if (badgeKeys.includes(c.key)) {
                         return (
                           <div key={c.key} className="cell">
@@ -91,7 +89,6 @@ export default function Table({
                         );
                       }
 
-                      // Обычная ячейка
                       return (
                         <div key={c.key} className="cell">
                           {value}

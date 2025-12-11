@@ -4,13 +4,14 @@
     "title": "Хакатон «Цифровой Прорыв»",
     "startDate": "2025-03-12",
     "endDate": "2025-03-14",
-    "organizer": "АНО",
+    "organizer": "АНО «Россия — страна возможностей»",
     "status": "Открыта регистрация",
     "description": "Командный хакатон",
     "directions": [
       {
         "id": 11,
         "title": "Программная инженерия",
+        "organizer": "ИТМО",
         "description": "Направление по ПО",
         "projects": [
           { "id": 111, "title": "Платформа обучения", "curator": "Сколково", "teams": "Alpha" },
@@ -20,6 +21,7 @@
       {
         "id": 12,
         "title": "Цифровая трансформация",
+        "organizer": "Сбера",
         "description": "Направление по цифровым решениям",
         "projects": [
           { "id": 121, "title": "DataHub", "curator": "ИТМО", "teams": "Gamma" }
@@ -38,6 +40,7 @@
       {
         "id": 21,
         "title": "Энергетика",
+        "organizer": "МГТУ",
         "description": "Энергетические решения",
         "projects": [
           { "id": 211, "title": "MicroGrid", "curator": "Росэнерго", "teams": "Delta" }

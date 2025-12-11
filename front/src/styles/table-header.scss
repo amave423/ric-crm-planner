@@ -45,6 +45,7 @@
   align-items:center; 
   justify-content:space-between; 
 }
+
 .search-box input { 
   border:none; 
   outline:none; 
@@ -71,10 +72,12 @@
   color:white; 
 
 }
+
 .tab.directions.active { 
   background:#daffce; 
   color:#2b6a0a; 
 }
+
 .tab.projects.active { 
   background:#f0ddff; 
   color:#5b2b7a; 
