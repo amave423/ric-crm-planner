@@ -1,0 +1,107 @@
+@import "../../styles/variables.scss";
+
+.wizard-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 1000;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.wizard {
+  width: 80vw;
+  height: 80vh;
+  background: #fff;
+  border-radius: 16px;
+
+  display: flex;
+  overflow: hidden;
+}
+
+.wizard-nav {
+  width: 260px;
+  background: #f7f7f7;
+  padding: 20px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  button {
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+
+    &.active {
+      background: var(--accent-color);
+      color: #fff;
+    }
+  }
+}
+
+.wizard-content {
+  flex: 1;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+
+  h2 {
+    margin-bottom: 20px;
+  }
+}
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  input, textarea {
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+  }
+
+  textarea {
+    min-height: 100px;
+    resize: vertical;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+}
+
+.stub {
+  color: #777;
+}
+
+.wizard-actions {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+
+  button {
+    padding: 10px 18px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+  }
+
+  .primary {
+    background: var(--accent-color);
+    color: #fff;
+  }
+
+  .secondary {
+    background: #eee;
+  }
+}

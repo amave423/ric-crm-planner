@@ -1,4 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { useState } from "react";
+
 import { getProjectsByDirection } from "../../api/projects";
 import { getEventById } from "../../api/events";
 import { getDirectionById } from "../../api/directions";
@@ -6,6 +8,7 @@ import { getDirectionById } from "../../api/directions";
 import Table from "../../components/Table/Table";
 import TableHeader from "../../components/Layout/TableHeader";
 import BackButton from "../../components/UI/BackButton";
+import EventWizard from "../../components/EventWizard/EventWizardModal";
 
 import "../../styles/page-colors.scss";
 
@@ -20,6 +23,9 @@ export default function ProjectsPage() {
   const direction = getDirectionById(directionIdNum);
   const projects = getProjectsByDirection(directionIdNum);
 
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [editData, setEditData] = useState<any>(null);
+
   return (
     <div className="page page--projects">
       <TableHeader
@@ -33,7 +39,10 @@ export default function ProjectsPage() {
             {`${event?.title || ""} / ${direction?.title || ""} — Проекты`}
           </>
         }
-        showCreate
+        onCreate={() => {
+          setEditData(null);
+          setWizardOpen(true);
+        }}
       />
 
       <Table
@@ -43,7 +52,21 @@ export default function ProjectsPage() {
           { key: "teams", title: "Команды" }
         ]}
         data={projects}
+        onEdit={(row) => {
+          setEditData(row);
+          setWizardOpen(true);
+        }}
       />
+
+      {wizardOpen && (
+        <EventWizard
+          mode={editData ? "edit" : "create"}
+          initialData={editData}
+          parentId={directionIdNum}
+          entity="project"
+          onClose={() => setWizardOpen(false)}
+        />
+      )}
     </div>
   );
 }
