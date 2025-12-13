@@ -1,58 +1,41 @@
-import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import BackButton from "../../components/BackButton/BackButton";
-import TableHeader from "../../components/Layout/TableHeader";
+import { getDirectionsByEvent } from "../../api/directions";
+import { getEventById } from "../../api/events";
+
 import Table from "../../components/Table/Table";
-import { loadData } from "../../utils/storage";
-import rawEvents from "../../mock-data/events.json";
-import "../../components/BackButton/back-btn.scss";
+import TableHeader from "../../components/Layout/TableHeader";
+import BackButton from "../../components/UI/BackButton";
+
+import "../../styles/page-colors.scss";
 
 export default function DirectionsPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
 
-  const events = loadData("events", rawEvents);
-  const event = events.find((e: any) => String(e.id) === String(eventId));
+  const eventIdNum = Number(eventId);
 
-  const directions = event?.directions || [];
-
-  const filtered = directions.filter((d: any) =>
-    (d.title || "").toLowerCase().includes(search.toLowerCase())
-  );
-
-  const rows = filtered.map((d: any) => ({
-    id: d.id,
-    title: d.title,
-    event: event?.title || "",
-    projects: (d.projects || []).map((p: any) => p.title).join(", "),
-    organizer: d.organizer || "",
-  }));
-
-  const columns = [
-    { key: "title", title: "Название", width: "290px" },
-    { key: "event", title: "Мероприятие", width: "290px" },
-    { key: "projects", title: "Проекты", width: "290px" },
-    { key: "organizer", title: "Организатор", width: "290px" },
-  ];
+  const event = getEventById(eventIdNum);
+  const directions = getDirectionsByEvent(eventIdNum);
 
   return (
     <div className="page page--directions">
-      <BackButton to="/events" label="Мероприятия" />
-
       <TableHeader
-        title={`${event?.title || "Мероприятие"} — Направления`}
-        search={search}
-        onSearch={setSearch}
-        onCreate={() => {
-        }}
+        title={
+          <>
+            <BackButton onClick={() => navigate("/events")} />
+            {`${event?.title || "Мероприятие"} — Направления`}
+          </>
+        }
+        showCreate
       />
 
       <Table
-        columns={columns}
-        data={rows}
-        badgeKeys={["projects"]}
-        onRowClick={(row: any) =>
+        columns={[
+          { key: "title", title: "Название" },
+          { key: "organizer", title: "Организатор" }
+        ]}
+        data={directions}
+        onRowClick={(row) =>
           navigate(`/events/${eventId}/directions/${row.id}/projects`)
         }
       />

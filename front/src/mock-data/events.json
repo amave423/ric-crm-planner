@@ -1,60 +1,10 @@
 [
   {
     "id": 1,
-    "title": "Хакатон «Цифровой Прорыв»",
-    "startDate": "2025-03-12",
-    "endDate": "2025-03-14",
-    "organizer": "АНО «Россия — страна возможностей»",
-    "status": "Открыта регистрация",
-    "description": "Командный хакатон",
-    "directions": [
-      {
-        "id": 11,
-        "title": "Программная инженерия",
-        "organizer": "ИТМО",
-        "description": "Направление по ПО",
-        "projects": [
-          { "id": 111, "title": "Платформа обучения", "curator": "Сколково", "teams": "Alpha" },
-          { "id": 112, "title": "Автономный робот", "curator": "Росмолодёжь", "teams": "Beta" }
-        ]
-      },
-      {
-        "id": 12,
-        "title": "Цифровая трансформация",
-        "organizer": "Сбера",
-        "description": "Направление по цифровым решениям",
-        "projects": [
-          { "id": 121, "title": "DataHub", "curator": "ИТМО", "teams": "Gamma" }
-        ]
-      }
-    ]
-  },
-  {
-    "id": 2,
-    "title": "Инженерный форум молодых специалистов",
-    "startDate": "2025-04-05",
-    "endDate": "2025-04-07",
-    "organizer": "Ростех",
-    "status": "Идет мероприятие",
-    "directions": [
-      {
-        "id": 21,
-        "title": "Энергетика",
-        "organizer": "МГТУ",
-        "description": "Энергетические решения",
-        "projects": [
-          { "id": 211, "title": "MicroGrid", "curator": "Росэнерго", "teams": "Delta" }
-        ]
-      }
-    ]
-  },
-  {
-    "id": 3,
-    "title": "IT-смена Сириус.Лето",
-    "startDate": "2025-06-10",
-    "endDate": "2025-06-20",
-    "organizer": "Сириус",
-    "status": "Подведение итогов",
-    "directions": []
+    "title": "Цифровой прорыв",
+    "startDate": "2025-02-01",
+    "endDate": "2025-02-05",
+    "organizer": "РИЦ",
+    "status": "Активно"
   }
 ]

@@ -1,35 +1,33 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import rawEvents from "../../mock-data/events.json";
-import { loadData } from "../../utils/storage";
-import TableHeader from "../../components/Layout/TableHeader";
+import { getEvents } from "../../api/events";
 import Table from "../../components/Table/Table";
+import TableHeader from "../../components/Layout/TableHeader";
 import "../../styles/page-colors.scss";
 
 export default function EventsPage() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
-  const [events] = useState(loadData("events", rawEvents));
-
-  const filtered = events.filter((e: any) => (e.title || "").toLowerCase().includes(search.toLowerCase()));
-
-  const columns = [
-    { key: "title", title: "Название", width: "232px" },
-    { key: "startDate", title: "Дата начала мероприятия", width: "232px" },
-    { key: "endDate", title: "Дата окончания мероприятия", width: "232px" },
-    { key: "organizer", title: "Организатор", width: "232px" },
-    { key: "status", title: "Статус мероприятия", width: "232px" }
-  ];
+  const events = getEvents();
 
   return (
     <div className="page page--events">
-      <TableHeader title="Мероприятия" search={search} onSearch={setSearch} />
+      <TableHeader
+        title="Мероприятия"
+        showCreate
+      />
+
       <Table
-        columns={columns}
-        data={filtered}
-        badgeKeys={["startDate","endDate","status"]}
-        onRowClick={(row:any) => navigate(`/events/${row.id}/directions`)}
-        onEdit={(row) => navigate(`/events/${row.id}/edit`)}
+        columns={[
+          { key: "title", title: "Название" },
+          { key: "startDate", title: "Дата начала" },
+          { key: "endDate", title: "Дата окончания" },
+          { key: "organizer", title: "Организатор" },
+          { key: "status", title: "Статус" }
+        ]}
+        data={events}
+        badgeKeys={["startDate", "endDate", "status"]}
+        onRowClick={(row) =>
+          navigate(`/events/${row.id}/directions`)
+        }
       />
     </div>
   );

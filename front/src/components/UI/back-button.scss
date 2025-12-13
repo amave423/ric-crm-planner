@@ -1,0 +1,11 @@
+.back-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  margin-right: 10px;
+
+  img {
+    width: 22px;
+    transform: scaleX(-1);
+  }
+}

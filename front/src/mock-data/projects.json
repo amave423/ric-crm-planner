@@ -1,20 +1,16 @@
 [
   {
-    "id": 1,
-    "title": "Цифровая образовательная платформа",
-    "event": "IT-смена Сириус.Лето",
-    "direction": "Программная инженерия",
-    "curator": "Сколково",
-    "teams": "Команда Alpha",
-    "status": "Разрабатывается"
+    "id": 1001,
+    "title": "Hackaton App",
+    "curator": "Иванов",
+    "teams": 5,
+    "directionId": 101
   },
   {
-    "id": 2,
-    "title": "Молодежная карта",
-    "event": "Хакатон «Цифровой Прорыв»",
-    "direction": "Инженерные направления",
-    "curator": "Росмолодёжь",
-    "teams": "Команда Beta",
-    "status": "Готов"
+    "id": 1002,
+    "title": "Market Analyzer",
+    "curator": "Петров",
+    "teams": 3,
+    "directionId": 101
   }
 ]
