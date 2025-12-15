@@ -1,17 +1,23 @@
 .page--events {
   --row-border-color: #6495ed;
   --badge-bg: rgba(100,149,237,0.08);
-  --table-grid: 310px 390px 465px 390px 200px;
+  --table-grid: 305px 375px 455px 380px 200px;
 }
 
 .page--directions {
   --row-border-color: #83d34a;
   --badge-bg: rgba(218,255,206,0.45);
-  --table-grid: 810px 50px;
+  --table-grid: 790px 50px;
 }
 
 .page--projects {
   --row-border-color: #b77bdc;
   --badge-bg: rgba(240,221,255,0.55);
-  --table-grid: 635px 560px 560px;
+  --table-grid: 620px 545px 560px;
+}
+
+:root {
+  --event-color: #6495ed;
+  --directions-color: #83d34a;
+  --projects-color: #b77bdc;
 }

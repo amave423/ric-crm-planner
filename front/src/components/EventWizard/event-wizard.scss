@@ -1,107 +1,199 @@
 @import "../../styles/variables.scss";
 
+.wizard-tab--event {
+  --wizard-accent: var(--event-color, #6495ed);
+}
+
+.wizard-tab--directions {
+  --wizard-accent: var(--directions-color, #83d34a);
+}
+
+.wizard-tab--projects {
+  --wizard-accent: var(--projects-color, #b77bdc);
+}
+
+
 .wizard-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.45);
-  z-index: 1000;
-
+  background: rgba(0, 0, 0, 0.45);
   display: flex;
   justify-content: center;
   align-items: center;
+  z-index: 1000;
+  --wizard-accent: #6495ed;
 }
 
 .wizard {
-  width: 80vw;
-  height: 80vh;
+  width: 80%;
+  height: 80%;
   background: #fff;
-  border-radius: 16px;
-
+  border-radius: 20px;
   display: flex;
   overflow: hidden;
+  animation: fade-in .50s ease;
+  transition:
+    background-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .wizard-nav {
   width: 260px;
-  background: #f7f7f7;
+  border-right: 1px solid #eee;
   padding: 20px;
-
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
 
-  button {
-    padding: 12px;
-    border-radius: 10px;
-    border: none;
-    background: transparent;
-    text-align: left;
-    cursor: pointer;
+.wizard-nav .wizard-nav-btn {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: #333;
 
-    &.active {
-      background: var(--accent-color);
-      color: #fff;
-    }
-  }
+  transition:
+    background 0.25s ease,
+    color 0.25s ease,
+    transform 0.2s ease;
+}
+
+.wizard-nav .wizard-nav-btn.active {
+  background: var(--wizard-accent);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+  transform: translateX(4px);
 }
 
 .wizard-content {
   flex: 1;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
+  padding: 30px;
+  overflow-y: auto;
 
-  h2 {
-    margin-bottom: 20px;
-  }
-}
-
-.form-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-
-  input, textarea {
+  input, textarea, select {
+    width: 100%;
+    margin-bottom: 12px;
     padding: 10px;
-    border-radius: 8px;
+    border-radius: 10px;
     border: 1px solid #ddd;
+    color: #222;
+    background: #fff;
   }
 
-  textarea {
-    min-height: 100px;
-    resize: vertical;
-  }
-
-  .row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-  }
-}
-
-.stub {
-  color: #777;
+  .row { display: flex; gap: 10px; }
 }
 
 .wizard-actions {
-  margin-top: auto;
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 10px;
+  margin-top: 20px;
+}
 
-  button {
-    padding: 10px 18px;
-    border-radius: 10px;
-    border: none;
-    cursor: pointer;
-  }
+.wizard-actions .primary {
+  background: var(--wizard-accent) !important;
+  color: #fff !important;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+}
 
-  .primary {
-    background: var(--accent-color);
-    color: #fff;
-  }
+.wizard-actions .secondary {
+  background: transparent;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
 
-  .secondary {
-    background: #eee;
-  }
+.tags { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.tag { background:#f3f3f3; padding:6px 10px; border-radius:8px; display:flex; gap:6px; align-items:center; }
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+input,
+textarea,
+select {
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--row-border-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--row-border-color) 20%, transparent);
+}
+
+.date-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.date-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.date-field .date-input {
+  position: relative;
+}
+
+.date-field .calendar-btn {
+  position: absolute;
+  right: 12px;
+  top: 40%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.date-field .calendar-btn img {
+  width: 25px;
+  height: 25px;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.date-field .calendar-btn:hover img {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px;
+  border: 1px solid #e1e1e1;
+  border-radius: 12px;
+}
+
+.tag {
+  border-radius: 10px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tag button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 20px;
 }

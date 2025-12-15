@@ -6,7 +6,7 @@
 }
 
 .app-header {
-  width: 100%;
+  margin: 10px 15px;
   padding: 12px 20px;
   border-radius: 16px;
   background: #ffffff;
@@ -34,6 +34,9 @@
 .header-logo {
   width: 60px;
   height: 44px;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
 }
 
 .head-btn {

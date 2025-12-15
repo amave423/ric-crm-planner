@@ -1,126 +1,146 @@
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import "./event-wizard.scss";
 
-type Mode = "create" | "edit";
-type Step = "event" | "directions" | "projects";
+import EventForm from "./forms/EventForm";
+import DirectionForm from "./forms/DirectionForm";
+import ProjectForm from "./forms/ProjectForm";
+
+import type {
+  WizardContextState,
+  WizardMode,
+  WizardPage,
+  WizardTab,
+  DirectionModel
+} from "./types";
+
+export interface WizardLaunchContext {
+  type?: string;
+  eventId?: number;
+  directionId?: number;
+  projectId?: number;
+}
 
 interface Props {
-  mode: Mode;
-  initialData?: any;
+  mode: WizardMode;
+  page?: WizardPage;
+  context?: WizardLaunchContext;
+  initialEventId?: number;
+  initialDirectionId?: number;
   onClose: () => void;
 }
 
-export default function EventWizard({ mode, initialData, onClose }: Props) {
-  const [step, setStep] = useState<Step>("event");
+export const WizardContext = createContext<WizardContextState | null>(null);
 
-  const [form, setForm] = useState({
-    title: initialData?.title || "",
-    description: initialData?.description || "",
-    startDate: initialData?.startDate || "",
-    endDate: initialData?.endDate || "",
-    applyDeadline: initialData?.applyDeadline || "",
-    organizerId: initialData?.organizerId || null,
-    specializations: initialData?.specializations || [],
-    chatLink: initialData?.chatLink || ""
-  });
+export function useWizard() {
+  const ctx = useContext(WizardContext);
+  if (!ctx) throw new Error("useWizard must be used inside WizardContext");
+  return ctx;
+}
 
-  const update = (key: string, value: any) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
+export default function EventWizardModal({
+  mode,
+  page,
+  context,
+  initialEventId,
+  initialDirectionId,
+  onClose
+}: Props) {
+    const resolvedPage: WizardPage =
+    page ??
+    (context?.type === "event"
+      ? "events"
+      : context?.type === "direction"
+      ? "directions"
+      : context?.type === "projects" || context?.type === "project"
+      ? "projects"
+      : "events");
+
+  const initialTab: WizardTab =
+    resolvedPage === "projects" ? "projects" : resolvedPage === "directions" ? "directions" : "event";
+
+  const [activeTab, setActiveTab] = useState<WizardTab>(initialTab);
+
+  const [isEventSaved, setIsEventSaved] = useState(false);
+  const [savedEvent, setSavedEvent] = useState<any>(null);
+
+  const [savedDirections, setSavedDirections] = useState<DirectionModel[]>([]);
+  const [isDirectionsSaved, setIsDirectionsSaved] = useState(false);
+
+  const saveEvent = (data: any) => {
+    setSavedEvent(data);
+    setIsEventSaved(true);
+  };
+
+  const saveDirections = (dirs: DirectionModel[]) => {
+    setSavedDirections(dirs);
+    setIsDirectionsSaved(dirs.length > 0);
+  };
+
+  const ctxValue: WizardContextState = {
+    mode,
+    activeTab,
+    page: resolvedPage,
+    eventId: initialEventId ?? context?.eventId,
+    directionId: initialDirectionId ?? context?.directionId,
+    setActiveTab,
+
+    isEventSaved,
+    saveEvent,
+    savedEvent,
+
+    savedDirections,
+    isDirectionsSaved,
+    saveDirections
+  };
 
   return (
-    <div className="wizard-overlay">
-      <div className="wizard">
-        <aside className="wizard-nav">
-          <button
-            className={step === "event" ? "active" : ""}
-            onClick={() => setStep("event")}
+    <WizardContext.Provider value={ctxValue}>
+      <div className="wizard-overlay" onClick={onClose}>
+        <div
+          className={`wizard wizard-tab--${activeTab}`}
+          onClick={(e) => e.stopPropagation()}
           >
-            Настройка мероприятия
-          </button>
+          <aside className="wizard-nav">
+            <NavButton tab="event" label="Настройка мероприятия" />
+            <NavButton tab="directions" label="Настройка направлений" />
+            <NavButton tab="projects" label="Настройка проектов" />
+          </aside>
 
-          <button
-            className={step === "directions" ? "active" : ""}
-            onClick={() => setStep("directions")}
-          >
-            Настройка направлений
-          </button>
-
-          <button
-            className={step === "projects" ? "active" : ""}
-            onClick={() => setStep("projects")}
-          >
-            Настройка проектов
-          </button>
-        </aside>
-
-        <div className="wizard-content">
-          <h2>
-            {step === "event" &&
-              (mode === "create"
-                ? "Добавление мероприятия"
-                : "Редактирование мероприятия")}
-
-            {step === "directions" && "Добавление направлений"}
-            {step === "projects" && "Добавление проектов"}
-          </h2>
-
-          {step === "event" && (
-            <div className="form-grid">
-              <input
-                placeholder="Название мероприятия"
-                value={form.title}
-                onChange={(e) => update("title", e.target.value)}
-              />
-
-              <textarea
-                placeholder="Описание"
-                value={form.description}
-                onChange={(e) => update("description", e.target.value)}
-              />
-
-              <div className="row">
-                <input
-                  type="date"
-                  value={form.startDate}
-                  onChange={(e) => update("startDate", e.target.value)}
-                />
-                <input
-                  type="date"
-                  value={form.endDate}
-                  onChange={(e) => update("endDate", e.target.value)}
-                />
-                <input
-                  type="date"
-                  value={form.applyDeadline}
-                  onChange={(e) => update("applyDeadline", e.target.value)}
-                />
-              </div>
-
-              <input
-                placeholder="Ссылка на орг. чат"
-                value={form.chatLink}
-                onChange={(e) => update("chatLink", e.target.value)}
-              />
-            </div>
-          )}
-
-          {step !== "event" && (
-            <div className="stub">
-              Контент шага «{step}»
-            </div>
-          )}
-
-          <div className="wizard-actions">
-            <button className="secondary" onClick={onClose}>
-              Закрыть
-            </button>
-
-            <button className="primary">
-              Сохранить настройки
-            </button>
-          </div>
+          <section className="wizard-content">
+            {activeTab === "event" && <EventForm />}
+            {activeTab === "directions" && <DirectionForm />}
+            {activeTab === "projects" && <ProjectForm />}
+          </section>
         </div>
       </div>
-    </div>
+    </WizardContext.Provider>
+  );
+}
+
+function NavButton({ tab, label }: { tab: WizardTab; label: string }) {
+  const { activeTab, setActiveTab, mode, isEventSaved, isDirectionsSaved, eventId, directionId } = useWizard();
+
+  const handleClick = () => {
+    if (mode === "create") {
+      if ((tab === "directions" || tab === "projects") && !isEventSaved && !eventId) {
+        alert("Сначала сохраните настройки мероприятия.");
+        return;
+      }
+      if (tab === "projects" && !isDirectionsSaved && !directionId) {
+        alert("Добавьте и сохраните хотя бы одно направление перед переходом к проектам.");
+        return;
+      }
+    }
+    setActiveTab(tab);
+  };
+
+  return (
+    <button
+      type="button"
+      className={`wizard-nav-btn ${activeTab === tab ? "active" : ""} wizard-nav-btn--${tab}`}
+      onClick={handleClick}
+    >
+      {label}
+    </button>
   );
 }

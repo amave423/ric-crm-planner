@@ -1,17 +1,35 @@
 import { useNavigate } from "react-router-dom";
 import { getEvents } from "../../api/events";
 import { useState } from "react";
+
 import Table from "../../components/Table/Table";
 import TableHeader from "../../components/Layout/TableHeader";
+import EventWizardModal, { type WizardLaunchContext } from "../../components/EventWizard/EventWizardModal";
+
 import "../../styles/page-colors.scss";
-import EventWizard from "../../components/EventWizard/EventWizardModal";
 
 export default function EventsPage() {
   const navigate = useNavigate();
-  const events = getEvents();
+
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [editData, setEditData] = useState<any>(null);
+  const [wizardContext, setWizardContext] = useState<WizardLaunchContext | null>(null);
+  const [mode, setMode] = useState<"create" | "edit">("create");
   const [search, setSearch] = useState("");
+
+  const allEvents = getEvents();
+  const events = !search.trim()
+    ? allEvents
+    : allEvents.filter(e =>
+        (e.title || "")
+          .toLowerCase()
+          .includes(search.toLowerCase()) ||
+        (e.organizer || "")
+          .toLowerCase()
+          .includes(search.toLowerCase()) ||
+        (e.status || "")
+          .toLowerCase()
+          .includes(search.toLowerCase())
+      );
 
   return (
     <div className="page page--events">
@@ -20,8 +38,9 @@ export default function EventsPage() {
         search={search}
         onSearch={setSearch}
         onCreate={() => {
-            setEditData(null);
-            setWizardOpen(true);
+          setMode("create");
+          setWizardContext({ type: "event" });
+          setWizardOpen(true);
         }}
       />
 
@@ -39,17 +58,19 @@ export default function EventsPage() {
           navigate(`/events/${row.id}/directions`)
         }
         onEdit={(row) => {
-            setEditData(row);
-            setWizardOpen(true);
+          setMode("edit");
+          setWizardContext({ type: "event", eventId: row.id });
+          setWizardOpen(true);
         }}
       />
-      {wizardOpen && (
-        <EventWizard
-            mode={editData ? "edit" : "create"}
-            initialData={editData}
-            onClose={() => setWizardOpen(false)}
+
+      {wizardOpen && wizardContext && (
+        <EventWizardModal
+          mode={mode}
+          context={wizardContext}
+          onClose={() => setWizardOpen(false)}
         />
-        )}
+      )}
     </div>
   );
 }

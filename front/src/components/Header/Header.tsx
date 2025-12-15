@@ -26,7 +26,9 @@ export default function Header() {
       </div>
 
       <div className="header-center">
-        <img src="/src/assets/LogoIcon.svg" alt="logo" className="header-logo" />
+        <button className="header-logo" onClick={() => navigate("/")}>
+          <img src="/src/assets/LogoIcon.svg" alt="logo" className="header-logo" />
+        </button>
       </div>
 
       <div className="header-right">

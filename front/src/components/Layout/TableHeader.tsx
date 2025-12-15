@@ -5,7 +5,7 @@ import { AuthContext } from "../../context/AuthContext";
 import searchIcon from "../../assets/icons/search.svg";
 
 interface Props {
-  title: string;
+  title: React.ReactNode;
   search?: string;
   onSearch?: (v: string) => void;
   onCreate?: () => void;
