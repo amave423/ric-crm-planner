@@ -1,29 +1,28 @@
-import React from "react";
-import "./table.scss";
-import penIcon from "../../assets/icons/pen.svg";
-import { useContext } from "react";
+import React, { useContext } from "react";
 import { AuthContext } from "../../context/AuthContext";
+import editIcon from "../../assets/icons/edit.svg";
+import "./table.scss";
 
 type Column = { key: string; title: string; width?: string };
 
-interface Props {
+interface Props<T> {
   columns: Column[];
-  data: any[];
+  data: T[];
   badgeKeys?: string[];
-  onInfoClick?: (row: any) => void;
-  onRowClick?: (row: any) => void;
-  onEdit?: (row: any) => void;
+  onInfoClick?: (row: T) => void;
+  onRowClick?: (row: T) => void;
+  onEdit?: (row: T) => void;
   gridColumns?: string;
 }
 
-export default function Table({
+export default function Table<T>({
   columns,
   data,
   badgeKeys = [],
   onRowClick,
   onEdit,
   gridColumns = ""
-}: Props) {
+}: Props<T>) {
   const { user } = useContext(AuthContext);
   const isOrganizer = user?.role === "organizer";
 
@@ -43,53 +42,57 @@ export default function Table({
 
         <tbody>
           {data.length === 0 ? (
-            <tr className="empty-row">
-              <td colSpan={columns.length + 1}>Пока пусто</td>
+            <tr>
+              <td colSpan={columns.length + 1} className="td-full">
+                <div className="table-placeholder">Нет данных</div>
+              </td>
             </tr>
           ) : (
             data.map((row, idx) => (
-              <tr key={row.id ?? idx}>
+              <tr key={(row as any).id ?? idx}>
                 <td colSpan={columns.length + 1} className="td-full">
                   <div
                     className="row-box"
                     style={{ "--table-grid": gridColumns } as React.CSSProperties}
                     onClick={() => onRowClick?.(row)}
                   >
-                    {columns.map((c) => {
-                      const value = row[c.key];
-
-                      if (c === columns[0]) {
+                    {columns.map((col) => {
+                      if (col.key === "status") {
+                        const statusRaw = (row as Record<string, unknown>)[col.key];
+                        const isActive = String(statusRaw ?? "").toLowerCase() === "активно";
                         return (
-                          <div key={c.key} className="cell title-with-icon">
-                            <span className="title-text">{value}</span>
+                          <div key={col.key} className="cell status-cell" style={{ width: col.width }}>
+                            <span className={`cell-badge status-${isActive ? "active" : "inactive"}`}>
+                              {String(statusRaw ?? "—")}
+                            </span>
                           </div>
                         );
                       }
 
-                      if (badgeKeys.includes(c.key)) {
-                        return (
-                          <div key={c.key} className="cell">
-                            <span className="cell-badge">{value}</span>
-                          </div>
-                        );
-                      }
+                      const raw = (row as Record<string, unknown>)[col.key];
+                      const isBadge = badgeKeys.includes(col.key);
+                      const display = raw == null ? "—" : Array.isArray(raw) ? (raw as any[]).map((x) => String(x)).join(", ") : String(raw);
 
                       return (
-                        <div key={c.key} className="cell">{value}</div>
+                        <div key={col.key} className="cell" style={{ width: col.width }}>
+                          {isBadge ? <span className="cell-badge">{display}</span> : <div className="title-text">{display}</div>}
+                        </div>
                       );
                     })}
 
-                    {isOrganizer && (
-                      <button
-                        className="edit-btn-icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEdit?.(row);
-                        }}
-                      >
-                        <img src={penIcon} alt="edit" />
-                      </button>
-                    )}
+                    <div className="cell" style={{ width: 60 }}>
+                      {isOrganizer && onEdit && (
+                        <button
+                          className="edit-btn-icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEdit(row);
+                          }}
+                        >
+                          <img src={editIcon} alt="edit" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </td>
               </tr>

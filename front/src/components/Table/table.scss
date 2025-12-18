@@ -146,3 +146,17 @@
     opacity: 1;
   }
 }
+
+.cell-badge.status-active {
+  color: var(--event-color);
+  background: var(--badge-bg);
+  border: 1px solid rgba(100,149,237,0.25);
+}
+
+.cell-badge.status-inactive {
+  color: #c53030;
+  background: rgba(245, 110, 110, 0.06);
+  border: 1px solid rgba(197, 75, 75, 0.18);
+}
+
+.status-cell { text-align: left; vertical-align: middle; }

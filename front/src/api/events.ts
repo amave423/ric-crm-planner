@@ -1,18 +1,40 @@
-import rawEvents from "../mock-data/events.json";
+import { getEvents as _getEvents, getEventById as _getEventById } from "../storage/storage";
+import { getAllUsers } from "../storage/storage";
+import type { Event } from "../types/event";
+import { saveEvent as _saveEvent } from "../storage/storage";
 
-export interface EventItem {
-  id: number;
-  title: string;
-  startDate: string;
-  endDate: string;
-  organizer: string;
-  status: string;
+function computeStatus(endDate?: string) {
+  if (!endDate) return "Неактивно";
+  const end = new Date(endDate);
+  return end >= new Date() ? "Активно" : "Неактивно";
 }
 
-export function getEvents(): EventItem[] {
-  return rawEvents;
+function resolveOrganizer(e: any) {
+  if (e.organizer) return e.organizer;
+  const users = getAllUsers();
+  const leaderId = e.leader;
+  if (leaderId == null) return undefined;
+  const u = users.find((x) => String(x.id) === String(leaderId));
+  if (!u) return String(leaderId);
+  return `${u.surname} ${u.name}`;
 }
 
-export function getEventById(id: number) {
-  return rawEvents.find(e => e.id === id);
+export function getEvents(): Event[] {
+  return _getEvents().map((e: any) => ({
+    ...e,
+    status: computeStatus(e.endDate),
+    organizer: resolveOrganizer(e),
+  }));
 }
+
+export function getEventById(id: number): Event | undefined {
+  const e = _getEventById(id);
+  if (!e) return undefined;
+  return {
+    ...e,
+    status: computeStatus(e.endDate),
+    organizer: resolveOrganizer(e),
+  };
+}
+
+export function saveEvent(data: Event) { return _saveEvent({ ...data }); }

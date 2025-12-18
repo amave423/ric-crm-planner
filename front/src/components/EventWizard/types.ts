@@ -7,7 +7,17 @@ export interface DirectionModel {
   id: number;
   title: string;
   description?: string;
+  organizer?: string;
   projects?: any[];
+}
+
+export interface ProjectModel {
+  id: number;
+  title?: string;
+  description?: string;
+  curator?: string;
+  teams?: number;
+  directionId?: number | string;
 }
 
 export interface WizardContextState {

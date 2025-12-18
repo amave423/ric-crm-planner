@@ -35,22 +35,27 @@ export default function Header() {
         <div className="profile-box" onClick={() => navigate("/profile")}>
           <img src={userIcon} alt="user" className="profile-icon" />
           <div className="profile-text">
-              <div className="role">{user?.role === "organizer" ? "Организатор" : "Студент"}</div>
-              <div className="name">{user?.name ? `${user.name} ${user.surname || ""}` : "Гость"}</div>
+            <div className="role">{user?.role === "organizer" ? "Организатор" : "Проектант"}</div>
+            <div className="name">{user?.name ? `${user.name} ${user.surname || ""}` : "Гость"}</div>
           </div>
         </div>
 
-
-        <button
-          className="head-btn head-btn--danger"
-          onClick={() => {
-            logout?.();
-            navigate("/login");
-          }}
-        >
-          <img src={exitIcon} alt="exit" />
-          <span>Выйти</span>
-        </button>
+        {user ? (
+          <button
+            className="head-btn head-btn--danger"
+            onClick={() => {
+              logout?.();
+              navigate("/login");
+            }}
+          >
+            <img src={exitIcon} alt="exit" />
+            <span>Выйти</span>
+          </button>
+        ) : (
+          <button className="head-btn head-btn--login" onClick={() => navigate("/login")}>
+            <span>Войти</span>
+          </button>
+        )}
       </div>
     </header>
   );

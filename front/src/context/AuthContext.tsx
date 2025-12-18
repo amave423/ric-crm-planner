@@ -15,6 +15,7 @@ interface AuthContextType {
   login: (email: string, password: string) => boolean;
   register: (u: Omit<User, "id">) => boolean;
   logout: () => void;
+  updateProfile: (u: Partial<User> & { id?: number }) => void;
 }
 
 export const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -35,9 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = (email: string, password: string) => {
     const users = getAllUsers();
     const found = users.find((u) => u.email === email && u.password === password);
-
     if (!found) return false;
-
     setUser(found);
     localStorage.setItem("currentUser", JSON.stringify(found));
     return true;
@@ -45,15 +44,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = (u: Omit<User, "id">) => {
     const newUser = { ...u, id: Date.now() };
-
     const stored = JSON.parse(localStorage.getItem("users") || "[]");
     stored.push(newUser);
-
     localStorage.setItem("users", JSON.stringify(stored));
     localStorage.setItem("currentUser", JSON.stringify(newUser));
-
     setUser(newUser);
     return true;
+  };
+
+  const updateProfile = (u: Partial<User> & { id?: number }) => {
+    if (!user) return;
+    const updated = { ...user, ...u };
+    setUser(updated);
+    localStorage.setItem("currentUser", JSON.stringify(updated));
+    const stored = JSON.parse(localStorage.getItem("users") || "[]");
+    const idx = stored.findIndex((s: any) => s.id === updated.id);
+    if (idx >= 0) stored[idx] = updated;
+    else stored.push(updated);
+    localStorage.setItem("users", JSON.stringify(stored));
   };
 
   const logout = () => {
@@ -62,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout }}>
+    <AuthContext.Provider value={{ user, login, register, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

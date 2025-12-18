@@ -6,7 +6,7 @@ interface Props {
   onSelect: (date: string) => void;
 }
 
-export default function Calendar({ value, onSelect }: Props) {
+export default function Calendar({ onSelect }: Props) {
   const today = new Date();
   const [current, setCurrent] = useState(today);
 

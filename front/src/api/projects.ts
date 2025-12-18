@@ -1,13 +1,10 @@
-import rawProjects from "../mock-data/projects.json";
+import { getProjectsByDirection as _getProjectsByDirection, saveProjectsForDirection as _saveProjectsForDirection } from "../storage/storage";
+import type { Project } from "../types/project";
 
-export interface ProjectItem {
-  id: number;
-  title: string;
-  curator: string;
-  teams: number;
-  directionId: number;
+export function getProjectsByDirection(directionId: number): Project[] {
+  return _getProjectsByDirection(directionId);
 }
 
-export function getProjectsByDirection(directionId: number): ProjectItem[] {
-  return rawProjects.filter(p => p.directionId === directionId);
+export function saveProjectsForDirection(directionId: number, projects: Project[]) {
+  return _saveProjectsForDirection(directionId, projects);
 }

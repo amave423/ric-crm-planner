@@ -1,16 +1,14 @@
-import rawDirections from "../mock-data/directions.json";
+import { getDirectionsByEvent as _getDirectionsByEvent, getDirectionById as _getDirectionById, saveDirectionsForEvent as _saveDirectionsForEvent } from "../storage/storage";
+import type { Direction } from "../types/direction";
 
-export interface DirectionItem {
-  id: number;
-  title: string;
-  organizer: string;
-  eventId: number;
+export function getDirectionsByEvent(eventId: number): Direction[] {
+  return _getDirectionsByEvent(eventId);
 }
 
-export function getDirectionsByEvent(eventId: number): DirectionItem[] {
-  return rawDirections.filter(d => d.eventId === eventId);
+export function getDirectionById(id: number): Direction | undefined {
+  return _getDirectionById(id);
 }
 
-export function getDirectionById(id: number) {
-  return rawDirections.find(d => d.id === id);
+export function saveDirectionsForEvent(eventId: number, dirs: Direction[]) {
+  return _saveDirectionsForEvent(eventId, dirs);
 }

@@ -1,29 +1,30 @@
 import { useState, useEffect } from "react";
 import { useWizard } from "../EventWizardModal";
 import { getDirectionsByEvent } from "../../../api/directions";
-import { getProjectsByDirection } from "../../../api/projects";
+import { getProjectsByDirection, saveProjectsForDirection } from "../../../api/projects";
+import users from "../../../mock-data/users.json";
 
 interface Project {
   id: number;
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
   directionId?: string;
+  curator?: string;
+  teams?: number;
 }
 
 export default function ProjectForm() {
   const { eventId, savedDirections, directionId: ctxDirectionId } = useWizard();
 
-  const directions: any[] =
-    savedDirections && savedDirections.length > 0
-      ? savedDirections
-      : getDirectionsByEvent(eventId ?? 0);
+  const directions: any[] = savedDirections && savedDirections.length > 0 ? savedDirections : getDirectionsByEvent(eventId ?? 0);
 
-  const [directionId, setDirectionId] = useState<string>(
-    ctxDirectionId ? String(ctxDirectionId) : directions[0]?.id ? String(directions[0].id) : ""
-  );
+  const [directionId, setDirectionId] = useState<string>(ctxDirectionId ? String(ctxDirectionId) : directions[0]?.id ? String(directions[0].id) : "");
   const [projects, setProjects] = useState<Project[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [curator, setCurator] = useState("");
+  const [teams, setTeams] = useState<number | "">("");
+  const usersList = users;
 
   useEffect(() => {
     if (ctxDirectionId) {
@@ -37,21 +38,18 @@ export default function ProjectForm() {
     }
   }, [directions]);
 
-  // load existing projects for selected direction (from savedDirections or API)
   useEffect(() => {
     if (!directionId) {
       setProjects([]);
       return;
     }
-
     const dirFromSaved = (savedDirections || []).find((d: any) => String(d.id) === String(directionId));
     if (dirFromSaved && dirFromSaved.projects && dirFromSaved.projects.length > 0) {
       setProjects(dirFromSaved.projects.map((p: any) => ({ ...p, directionId: String(directionId) })));
       return;
     }
-
     const apiProjects = getProjectsByDirection(Number(directionId));
-    setProjects(apiProjects.map(p => ({ id: p.id, title: p.title, description: (p as any).description ?? "", directionId: String(directionId) })));
+    setProjects(apiProjects.map((p) => ({ id: p.id, title: p.title ?? "", description: (p as any).description ?? "", directionId: String(directionId), curator: (p as any).curator ?? "", teams: (p as any).teams ?? 0 })));
   }, [directionId, savedDirections]);
 
   const addProject = () => {
@@ -59,18 +57,42 @@ export default function ProjectForm() {
       alert("Выберите направление и введите название проекта");
       return;
     }
-
-    setProjects([
-      ...projects,
-      { id: Date.now(), title: title.trim(), description: description.trim(), directionId }
-    ]);
-
+    if (!curator) {
+      alert("Выберите куратора проекта");
+      return;
+    }
+    if (teams === "" || Number(teams) < 0) {
+      alert("Укажите количество команд (0 или больше)");
+      return;
+    }
+    setProjects([...projects, { id: Date.now(), title: title.trim(), description: description.trim(), directionId, curator, teams: typeof teams === "number" ? teams : Number(teams) }]);
     setTitle("");
     setDescription("");
+    setCurator("");
+    setTeams("");
   };
 
   const removeProject = (id: number) => {
-    setProjects(projects.filter(p => p.id !== id));
+    setProjects(projects.filter((p) => p.id !== id));
+  };
+
+  const handleSave = () => {
+    if (!directionId) {
+      alert("Выберите направление");
+      return;
+    }
+    for (const p of projects) {
+      if (!p.title || !p.title.trim()) {
+        alert("У одного из проектов нет названия");
+        return;
+      }
+      if (!p.curator || !p.curator.trim()) {
+        alert("У одного из проектов не выбран куратор");
+        return;
+      }
+    }
+    saveProjectsForDirection(Number(directionId), projects as any);
+    alert("Проекты сохранены");
   };
 
   return (
@@ -79,11 +101,10 @@ export default function ProjectForm() {
 
       <label className="text-small">
         Выберите направление
-        <select
-          value={directionId ?? ""}
-          onChange={(e) => setDirectionId(String(e.target.value))}
-        >
-          <option value="" disabled>Выберите направление</option>
+        <select value={directionId ?? ""} onChange={(e) => setDirectionId(String(e.target.value))}>
+          <option value="" disabled>
+            Выберите направление
+          </option>
           {directions.map((d: any) => (
             <option key={d.id} value={d.id}>
               {d.title}
@@ -94,29 +115,39 @@ export default function ProjectForm() {
 
       <label className="text-small">
         Название проекта
-        <input
-          placeholder="Введите название проекта и нажмите Enter"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && addProject()}
-        />
+        <input placeholder="Введите название проекта и нажмите Enter" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addProject()} />
+      </label>
+
+      <label className="text-small">
+        Куратор
+        <select value={curator ?? ""} onChange={(e) => setCurator(e.target.value)}>
+          <option value="">-- выбрать куратора --</option>
+          {usersList.map((u) => (
+            <option key={u.id} value={`${u.surname} ${u.name}`}>
+              {u.surname} {u.name} ({u.role})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="text-small">
+        Команд
+        <input type="number" min={0} value={teams as any} onChange={(e) => setTeams(e.target.value === "" ? "" : Number(e.target.value))} />
       </label>
 
       <label className="text-small">
         Описание
-        <textarea
-          value={description}
-          onChange={e => setDescription(e.target.value)}
-          placeholder="Краткое описание проекта (необязательно)"
-        />
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Краткое описание проекта (необязательно)" />
       </label>
 
       <div className="tags" style={{ marginTop: 12 }}>
-        {projects.map(p => (
+        {projects.map((p) => (
           <div key={p.id} className="tag">
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
               <strong style={{ lineHeight: 1 }}>{p.title}</strong>
               {p.description && <span className="text-small" style={{ opacity: 0.8 }}>{p.description}</span>}
+              {p.curator && <span className="text-small" style={{ opacity: 0.8 }}>Куратор: {p.curator}</span>}
+              {typeof p.teams !== "undefined" && <span className="text-small" style={{ opacity: 0.8 }}>Команд: {p.teams}</span>}
             </div>
             <button onClick={() => removeProject(p.id)}>×</button>
           </div>
@@ -124,7 +155,9 @@ export default function ProjectForm() {
       </div>
 
       <div className="wizard-actions">
-        <button className="primary" type="button">Сохранить настройки проекта</button>
+        <button className="primary" type="button" onClick={handleSave}>
+          Сохранить настройки проекта
+        </button>
       </div>
     </div>
   );

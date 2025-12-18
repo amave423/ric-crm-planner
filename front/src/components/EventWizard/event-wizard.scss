@@ -197,3 +197,17 @@ select:focus {
   cursor: pointer;
   font-size: 20px;
 }
+
+.field-wrap.error input,
+.field-wrap.error textarea,
+.field-wrap.error select {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239,68,68,0.06);
+}
+
+.field-error {
+  color: #7f1d1d;
+  font-size: 13px;
+  margin-top: 6px;
+  font-weight: 600;
+}
