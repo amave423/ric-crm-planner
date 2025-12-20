@@ -1,13 +1,18 @@
+import { useState, useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getProjectsByDirection } from "../../api/projects";
 import { getEventById } from "../../api/events";
 import { getDirectionById } from "../../api/directions";
-import { useState } from "react";
 
 import Table from "../../components/Table/Table";
 import TableHeader from "../../components/Layout/TableHeader";
 import BackButton from "../../components/UI/BackButton";
 import EventWizardModal, { type WizardLaunchContext } from "../../components/EventWizard/EventWizardModal";
+import ApplyModal from "../../components/Requests/ApplyModal";
+import { AuthContext } from "../../context/AuthContext";
+import { saveRequest } from "../../api/requests";
+import { useToast } from "../../components/Toast/ToastProvider";
+import { getRequests } from "../../api/requests";
 
 import "../../styles/page-colors.scss";
 
@@ -26,6 +31,12 @@ export default function ProjectsPage() {
   const [wizardContext, setWizardContext] = useState<WizardLaunchContext | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [search, setSearch] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [applyOpen, setApplyOpen] = useState(false);
+  const { showToast } = useToast();
+
+  const { user } = useContext(AuthContext);
+  const isStudent = user?.role === "student";
 
   const filteredProjects = !search.trim()
     ? projects
@@ -73,7 +84,17 @@ export default function ProjectsPage() {
           });
           setWizardOpen(true);
         }}
+        onRowClick={(row) => setSelectedProjectId(row.id)}
+        selectedId={selectedProjectId ?? undefined}
       />
+
+      {isStudent && selectedProjectId && (
+        <div className="apply-container">
+          <div className="apply-box" onClick={() => setApplyOpen(true)}>
+            <h1 className="h1">Подать заявку</h1>
+          </div>
+        </div>
+      )}
 
       {wizardOpen && wizardContext && (
         <EventWizardModal
@@ -82,6 +103,28 @@ export default function ProjectsPage() {
           onClose={() => setWizardOpen(false)}
         />
       )}
+
+      <ApplyModal
+        isOpen={applyOpen}
+        onClose={() => setApplyOpen(false)}
+        projectId={selectedProjectId ?? undefined}
+        projectTitle={projects.find((p) => p.id === selectedProjectId)?.title}
+        eventId={eventIdNum}
+        specializations={event?.specializations || []}
+        onSubmit={(req) => {
+          const ownerId = user?.id;
+          if (ownerId) (req as any).ownerId = ownerId;
+
+          const existing = getRequests().find(r => r.ownerId === ownerId && r.projectId === req.projectId);
+          if (existing) {
+              showToast("error", "Вы уже отправляли заявку на этот проект");
+              return;
+          }
+
+          saveRequest(req);
+          showToast("success", "Заявка отправлена");
+        }}
+      />
     </div>
   );
 }

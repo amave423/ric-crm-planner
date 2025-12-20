@@ -55,3 +55,94 @@
   border: none;
   cursor: pointer;
 }
+
+.apply-form {
+  background: #fff;
+  padding: 18px;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+}
+
+.apply-header {
+  margin-bottom: 12px;
+}
+
+.apply-project {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-field input,
+.form-field textarea,
+.form-field select {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid $gray;
+  background: #fafafa;
+  width: 100%;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.apply-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirm-body {
+  background: #fff;
+  padding: 16px;
+  border-radius: 10px;
+}
+
+.confirm-text {
+  color: #333;
+}
+
+.confirm-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-cancel {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #e53935; /* red */
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background .12s ease;
+}
+
+.btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-send {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #7b4bdc;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background .12s ease;
+}
+
+.btn-send:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

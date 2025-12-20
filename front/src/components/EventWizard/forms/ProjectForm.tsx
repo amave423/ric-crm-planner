@@ -3,6 +3,7 @@ import { useWizard } from "../EventWizardModal";
 import { getDirectionsByEvent } from "../../../api/directions";
 import { getProjectsByDirection, saveProjectsForDirection } from "../../../api/projects";
 import users from "../../../mock-data/users.json";
+import { useToast } from "../../Toast/ToastProvider";
 
 interface Project {
   id: number;
@@ -24,6 +25,7 @@ export default function ProjectForm() {
   const [description, setDescription] = useState("");
   const [curator, setCurator] = useState("");
   const [teams, setTeams] = useState<number | "">("");
+  const { showToast } = useToast();
   const usersList = users;
 
   useEffect(() => {
@@ -54,15 +56,15 @@ export default function ProjectForm() {
 
   const addProject = () => {
     if (!title.trim() || !directionId) {
-      alert("Выберите направление и введите название проекта");
+      showToast("error", "Выберите направление и введите название проекта");
       return;
     }
     if (!curator) {
-      alert("Выберите куратора проекта");
+      showToast("error", "Выберите куратора проекта");
       return;
     }
     if (teams === "" || Number(teams) < 0) {
-      alert("Укажите количество команд (0 или больше)");
+      showToast("error", "Укажите количество команд (0 или больше)");
       return;
     }
     setProjects([...projects, { id: Date.now(), title: title.trim(), description: description.trim(), directionId, curator, teams: typeof teams === "number" ? teams : Number(teams) }]);
@@ -78,21 +80,21 @@ export default function ProjectForm() {
 
   const handleSave = () => {
     if (!directionId) {
-      alert("Выберите направление");
+      showToast("error", "Выберите направление");
       return;
     }
     for (const p of projects) {
       if (!p.title || !p.title.trim()) {
-        alert("У одного из проектов нет названия");
+        showToast("error", "У одного из проектов нет названия");
         return;
       }
       if (!p.curator || !p.curator.trim()) {
-        alert("У одного из проектов не выбран куратор");
+        showToast("error", "У одного из проектов не выбран куратор");
         return;
       }
     }
     saveProjectsForDirection(Number(directionId), projects as any);
-    alert("Проекты сохранены");
+    showToast("success", "Проекты сохранены");
   };
 
   return (

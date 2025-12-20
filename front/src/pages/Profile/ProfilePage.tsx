@@ -2,10 +2,12 @@ import { useState, useEffect, useContext } from "react";
 import "../../styles/profile.scss";
 import { AuthContext } from "../../context/AuthContext";
 import { getProfile, saveProfile } from "../../storage/storage";
+import { useToast } from "../../components/Toast/ToastProvider";
 
 export default function ProfilePage() {
   const { user, updateProfile } = useContext(AuthContext);
   const [editing, setEditing] = useState(false);
+  const { showToast } = useToast();
 
   const [profile, setProfile] = useState({
     name: "Имя",
@@ -52,7 +54,7 @@ export default function ProfilePage() {
       vk: profile.vk,
     });
     setEditing(false);
-    alert("Профиль сохранён");
+    showToast("success", "Профиль сохранён");
   };
 
   return (

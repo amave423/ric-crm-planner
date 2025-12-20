@@ -1,10 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useWizard } from "../EventWizardModal";
 import calendarIcon from "../../../assets/icons/calendar.svg";
 import users from "../../../mock-data/users.json";
 import Calendar from "../../UI/Calendar";
 import { getEventById, saveEvent as persistEvent } from "../../../api/events";
 import type { Event } from "../../../types/event";
+import { removeEvent } from "../../../api/events";
+import Modal from "../../Modal/Modal";
+import { useToast } from "../../../components/Toast/ToastProvider";
 
 interface Specialization {
   id: number;
@@ -14,47 +17,64 @@ interface Specialization {
 export default function EventForm() {
   const { mode, saveEvent, savedEvent, eventId } = useWizard();
 
-  const [title, setTitle] = useState("");
   const se = savedEvent as Event | undefined;
+  const titleRef = useRef<HTMLInputElement | null>(null);
+  const specInputRef = useRef<HTMLInputElement | null>(null);
+
   const [description, setDescription] = useState<string>(se?.description ?? "");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [applyDeadline, setApplyDeadline] = useState("");
   const [leader, setLeader] = useState("");
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
-  const [specInput, setSpecInput] = useState("");
-
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const { showToast } = useToast();
 
   const organizers = users.filter((u) => u.role === "organizer");
 
   useEffect(() => {
     if (se) {
-      setTitle(se.title || "");
+      if (titleRef.current) titleRef.current.value = se.title || "";
       setDescription(se.description || "");
       setStartDate(se.startDate || "");
       setEndDate(se.endDate || "");
       setApplyDeadline(se.applyDeadline || "");
       setLeader(se.leader ?? "");
       setSpecializations(se.specializations || []);
+      setTitle(se.title || "");
     } else if (mode === "edit" && eventId) {
       const e = getEventById(Number(eventId));
-        if (e) {
-        setTitle(e.title || "");
+      if (e) {
+        if (titleRef.current) titleRef.current.value = e.title || "";
         setDescription(e.description || "");
         setStartDate(e.startDate || "");
         setEndDate(e.endDate || "");
         setApplyDeadline(e.applyDeadline || "");
         setLeader(e.leader ?? "");
         setSpecializations(e.specializations || []);
+        setTitle(e.title || "");
+      }
+    } else {
+      if (!se && mode === "create") {
+        if (titleRef.current) titleRef.current.value = "";
+        setDescription("");
+        setStartDate("");
+        setEndDate("");
+        setApplyDeadline("");
+        setLeader("");
+        setTitle("");
+        setSpecializations([]);
       }
     }
   }, [se, mode, eventId]);
 
   const addSpec = () => {
-    if (!specInput.trim()) return;
-    setSpecializations([...specializations, { id: Date.now(), title: specInput.trim() }]);
-    setSpecInput("");
+    const val = specInputRef.current?.value || "";
+    if (!val.trim()) return;
+    setSpecializations((prev) => [...prev, { id: Date.now(), title: val.trim() }]);
+    if (specInputRef.current) specInputRef.current.value = "";
   };
 
   const removeSpec = (id: number) => {
@@ -63,7 +83,8 @@ export default function EventForm() {
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!title.trim()) e.title = "Вы пропустили поле";
+    const curTitle = (title || "").trim();
+    if (!curTitle) e.title = "Вы пропустили поле";
     if (!startDate) e.startDate = "Вы пропустили поле";
     if (!endDate) e.endDate = "Вы пропустили поле";
     if (!applyDeadline) e.applyDeadline = "Вы пропустили поле";
@@ -82,7 +103,7 @@ export default function EventForm() {
     })();
 
     const payload: any = {
-      title: title.trim(),
+      title: (title || "").trim(),
       description: description.trim(),
       startDate,
       endDate,
@@ -94,6 +115,7 @@ export default function EventForm() {
     if (mode === "edit" && eventId) payload.id = eventId;
     const saved = persistEvent(payload);
     saveEvent?.(saved);
+    showToast("success", "Мероприятие сохранено");
   };
 
   const FieldWrap = ({ name, children }: { name: string; children: React.ReactNode }) => (
@@ -110,7 +132,7 @@ export default function EventForm() {
       <FieldWrap name="title">
         <label className="text-small">
           Название мероприятия
-          <input value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} autoComplete="off" spellCheck={false} />
         </label>
       </FieldWrap>
 
@@ -151,10 +173,12 @@ export default function EventForm() {
         <label className="text-small">
           Специализации
           <input
-            value={specInput}
-            onChange={(e) => setSpecInput(e.target.value)}
+            ref={specInputRef}
+            defaultValue=""
             onKeyDown={(e) => e.key === "Enter" && addSpec()}
             placeholder="Введите специализацию и нажмите Enter"
+            autoComplete="off"
+            spellCheck={false}
           />
         </label>
       </FieldWrap>
@@ -169,6 +193,11 @@ export default function EventForm() {
       </div>
 
       <div className="wizard-actions">
+        {mode === "edit" && (
+          <button className="danger-outline" onClick={() => setConfirmOpen(true)} style={{ marginRight: "auto" }}>
+          Удалить
+          </button>
+        )}
         <button
           className="primary"
           onClick={handleSave}
@@ -177,6 +206,28 @@ export default function EventForm() {
           Сохранить мероприятие
         </button>
       </div>
+      <Modal isOpen={confirmOpen} onClose={() => setConfirmOpen(false)} title="Подтвердите">
+        <div style={{ padding: 8 }}>
+            <div>Вы уверены, что хотите удалить мероприятие? Действие необратимо.</div>
+            <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button className="close-btn" onClick={() => setConfirmOpen(false)}>Отмена</button>
+            <button
+                className="danger-outline"
+                onClick={() => {
+                if (eventId) {
+                    showToast("success", "Мероприятие успешно удалено");
+                    removeEvent(Number(eventId));
+                    window.location.reload();
+                } else {
+                    showToast("error", "Невозможно удалить: id мероприятия не найден");
+                }
+                }}
+            >
+                Удалить
+            </button>
+            </div>
+        </div>
+      </Modal>
     </div>
   );
 }

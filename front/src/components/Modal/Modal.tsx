@@ -5,6 +5,7 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
+  hideActions?: boolean;
 }
 
 export default function Modal({ isOpen, onClose, title, children }: ModalProps) {
@@ -15,9 +16,6 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         {title && <h2 className="modal-title">{title}</h2>}
         <div className="modal-content">{children}</div>
-        <div className="modal-actions">
-          <button className="close-btn" onClick={onClose}>Закрыть</button>
-        </div>
       </div>
     </div>
   );

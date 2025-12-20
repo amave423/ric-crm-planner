@@ -160,3 +160,42 @@
 }
 
 .status-cell { text-align: left; vertical-align: middle; }
+
+.apply-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.apply-box {
+  width: 400px;
+  height: 50px;
+  background: #ffffff;
+  border: 2px solid var(--projects-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+  border-radius: 10px;
+}
+
+.apply-box:hover {
+  background: var(--projects-color);
+  color: #fff;
+  border-color: var(--projects-color);
+}
+
+.row-box.selected {
+  box-shadow: 0 6px 20px rgba(183,123,220,0.18);
+  border-radius: 12px;
+  outline: 2px solid rgba(183,123,220,0.12);
+}
+
+.status-select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid $gray;
+  background: white;
+  font-size: 14px;
+}

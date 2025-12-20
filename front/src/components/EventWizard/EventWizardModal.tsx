@@ -4,6 +4,7 @@ import "./event-wizard.scss";
 import EventForm from "./forms/EventForm";
 import DirectionForm from "./forms/DirectionForm";
 import ProjectForm from "./forms/ProjectForm";
+import { useToast } from "../Toast/ToastProvider";
 
 import type {
   WizardContextState,
@@ -65,10 +66,12 @@ export default function EventWizardModal({
 
   const [savedDirections, setSavedDirections] = useState<DirectionModel[]>([]);
   const [isDirectionsSaved, setIsDirectionsSaved] = useState(false);
+  const [eventIdState, setEventIdState] = useState<number | undefined>(initialEventId ?? context?.eventId);
 
   const saveEvent = (data: any) => {
     setSavedEvent(data);
     setIsEventSaved(true);
+    if (data?.id) setEventIdState(Number(data.id));
   };
 
   const saveDirections = (dirs: DirectionModel[]) => {
@@ -80,7 +83,7 @@ export default function EventWizardModal({
     mode,
     activeTab,
     page: resolvedPage,
-    eventId: initialEventId ?? context?.eventId,
+    eventId: eventIdState,
     directionId: initialDirectionId ?? context?.directionId,
     setActiveTab,
 
@@ -119,15 +122,16 @@ export default function EventWizardModal({
 
 function NavButton({ tab, label }: { tab: WizardTab; label: string }) {
   const { activeTab, setActiveTab, mode, isEventSaved, isDirectionsSaved, eventId, directionId } = useWizard();
+  const { showToast } = useToast();
 
   const handleClick = () => {
     if (mode === "create") {
       if ((tab === "directions" || tab === "projects") && !isEventSaved && !eventId) {
-        alert("Сначала сохраните настройки мероприятия.");
+        showToast("error", "Сначала сохраните настройки мероприятия.");
         return;
       }
       if (tab === "projects" && !isDirectionsSaved && !directionId) {
-        alert("Добавьте и сохраните хотя бы одно направление перед переходом к проектам.");
+        showToast("error", "Добавьте и сохраните хотя бы одно направление перед переходом к проектам.");
         return;
       }
     }

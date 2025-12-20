@@ -27,6 +27,7 @@ export interface WizardContextState {
 
   eventId?: number;
   directionId?: number;
+  projectId?: number;
 
   setActiveTab: (tab: WizardTab) => void;
 

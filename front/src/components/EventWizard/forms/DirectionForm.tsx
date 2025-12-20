@@ -5,6 +5,7 @@ import { getDirectionsByEvent } from "../../../api/directions";
 import { saveDirectionsForEvent as persistDirections } from "../../../api/directions";
 import { getEventById } from "../../../api/events";
 import users from "../../../mock-data/users.json";
+import { useToast } from "../../Toast/ToastProvider";
 
 export default function DirectionForm() {
   const { saveDirections, eventId, savedDirections } = useWizard();
@@ -14,6 +15,7 @@ export default function DirectionForm() {
   const [input, setInput] = useState("");
   const organizers = users.filter((u) => u.role === "organizer");
   const [selectedOrganizer, setSelectedOrganizer] = useState<string>("");
+  const { showToast } = useToast();
 
   useEffect(() => {
     if (savedDirections && savedDirections.length > 0) {
@@ -45,11 +47,11 @@ export default function DirectionForm() {
 
   const addDirection = () => {
     if (!input.trim()) {
-      alert("Введите название направления");
+      showToast("error", "Введите название направления");
       return;
     }
     if (!selectedOrganizer) {
-      alert("Выберите организатора направления");
+      showToast("error", "Выберите организатора направления");
       return;
     }
     setDirections((prev) => [
@@ -80,26 +82,22 @@ export default function DirectionForm() {
 
   const handleSave = () => {
     if (!eventId) {
-      alert("Сохраните сначала мероприятие (первая вкладка).");
-      return;
-    }
-    if (directions.length === 0) {
-      alert("Добавьте хотя бы одно направление перед сохранением");
+      showToast("error", "Сохраните сначала мероприятие (первая вкладка).");
       return;
     }
     for (const d of directions) {
       if (!d.title || !d.title.trim()) {
-        alert("У одного из направлений нет названия");
+        showToast("error", "У одного из направлений нет названия");
         return;
       }
       if (!d.organizer || !d.organizer.trim()) {
-        alert("У одного из направлений не выбран организатор");
+        showToast("error", "У одного из направлений не выбран организатор");
         return;
       }
     }
     const saved = persistDirections(Number(eventId), directions as any);
     saveDirections?.(saved as any);
-    alert("Направления сохранены");
+    showToast("success", "Направления сохранены");
   };
 
   return (

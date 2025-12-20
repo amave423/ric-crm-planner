@@ -14,15 +14,19 @@ export default function Header() {
   return (
     <header className="app-header">
       <div className="header-left">
-        <button className="head-btn head-btn--muted" onClick={() => navigate("/requests")}>
-          <img src={requestsIcon} alt="requests" />
-          <span>Заявки</span>
-        </button>
+        {user && (
+            <>
+            <button className="head-btn head-btn--muted" onClick={() => navigate("/requests")}>
+                <img src={requestsIcon} alt="requests" />
+                <span>{user?.role === "student" ? "Мои заявки" : "Заявки"}</span>
+            </button>
 
-        <button className="head-btn head-btn--muted" onClick={() => navigate("/planner")}>
-          <img src={plannerIcon} alt="planner" />
-          <span>Планировщик</span>
-        </button>
+            <button className="head-btn head-btn--muted" onClick={() => navigate("/planner")}>
+                <img src={plannerIcon} alt="planner" />
+                <span>Планировщик</span>
+            </button>
+            </>
+        )}
       </div>
 
       <div className="header-center">
@@ -31,26 +35,28 @@ export default function Header() {
         </button>
       </div>
 
-      <div className="header-right">
-        <div className="profile-box" onClick={() => navigate("/profile")}>
-          <img src={userIcon} alt="user" className="profile-icon" />
-          <div className="profile-text">
-            <div className="role">{user?.role === "organizer" ? "Организатор" : "Проектант"}</div>
-            <div className="name">{user?.name ? `${user.name} ${user.surname || ""}` : "Гость"}</div>
-          </div>
-        </div>
-
+            <div className="header-right">
         {user ? (
-          <button
-            className="head-btn head-btn--danger"
-            onClick={() => {
-              logout?.();
-              navigate("/login");
-            }}
-          >
-            <img src={exitIcon} alt="exit" />
-            <span>Выйти</span>
-          </button>
+          <>
+            <div className="profile-box" onClick={() => navigate("/profile")}>
+              <img src={userIcon} alt="user" className="profile-icon" />
+              <div className="profile-text">
+                <div className="role">{user?.role === "organizer" ? "Организатор" : "Проектант"}</div>
+                <div className="name">{user?.name ? `${user.name} ${user.surname || ""}` : "Гость"}</div>
+              </div>
+            </div>
+
+            <button
+              className="head-btn head-btn--danger"
+              onClick={() => {
+                logout?.();
+                navigate("/login");
+              }}
+            >
+              <img src={exitIcon} alt="exit" />
+              <span>Выйти</span>
+            </button>
+          </>
         ) : (
           <button className="head-btn head-btn--login" onClick={() => navigate("/login")}>
             <span>Войти</span>

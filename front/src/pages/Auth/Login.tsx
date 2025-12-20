@@ -1,11 +1,13 @@
 import { useState, useContext } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
+import { useToast } from "../../components/Toast/ToastProvider";
 import "../../styles/auth.scss";
 
 export default function Login() {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -14,7 +16,7 @@ export default function Login() {
     e.preventDefault();
     const ok = login(email.trim(), password);
     if (!ok) {
-      alert("Неверный email или пароль (проверь тестовые данные или зарегистрируйся)");
+      showToast("error", "Неверный email или пароль (проверь тестовые данные или зарегистрируйся)");
       return;
     }
     navigate("/events");

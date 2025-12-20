@@ -12,7 +12,9 @@ interface Props<T> {
   onInfoClick?: (row: T) => void;
   onRowClick?: (row: T) => void;
   onEdit?: (row: T) => void;
+  selectedId?: number;
   gridColumns?: string;
+  renderCell?: (row: T, colKey: string) => React.ReactNode | undefined;
 }
 
 export default function Table<T>({
@@ -21,7 +23,9 @@ export default function Table<T>({
   badgeKeys = [],
   onRowClick,
   onEdit,
-  gridColumns = ""
+  selectedId,
+  gridColumns = "",
+  renderCell
 }: Props<T>) {
   const { user } = useContext(AuthContext);
   const isOrganizer = user?.role === "organizer";
@@ -32,11 +36,9 @@ export default function Table<T>({
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key} style={{ width: c.width }} className="text-small">
-                {c.title}
-              </th>
+              <th key={c.key} style={{ width: c.width }} className="text-small"> {c.title}</th>
             ))}
-            {isOrganizer && <th style={{ width: "48px" }} />}
+            <th style={{ width: "60px" }} />
           </tr>
         </thead>
 
@@ -52,11 +54,22 @@ export default function Table<T>({
               <tr key={(row as any).id ?? idx}>
                 <td colSpan={columns.length + 1} className="td-full">
                   <div
-                    className="row-box"
+                    className={`row-box${(row as any).id === selectedId ? " selected" : ""}`}
                     style={{ "--table-grid": gridColumns } as React.CSSProperties}
                     onClick={() => onRowClick?.(row)}
                   >
                     {columns.map((col) => {
+                      if (renderCell) {
+                        const custom = renderCell(row, col.key);
+                        if (custom !== undefined) {
+                          return (
+                            <div key={col.key} className="cell" style={{ width: col.width }}>
+                              {custom}
+                            </div>
+                          );
+                        }
+                      }
+
                       if (col.key === "status") {
                         const statusRaw = (row as Record<string, unknown>)[col.key];
                         const isActive = String(statusRaw ?? "").toLowerCase() === "активно";

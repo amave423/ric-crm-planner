@@ -6,6 +6,7 @@ import type { Event } from "../types/event";
 import type { Direction } from "../types/direction";
 import type { Project } from "../types/project";
 import type { User } from "../types/user";
+import type { Request } from "../types/request";
 
 const LS_KEY_PREFIX = "ric_planner_";
 
@@ -129,4 +130,48 @@ export function saveProfile(userId: number, profile: Record<string, any>) {
   stored[String(userId)] = profile;
   writeJSON(LS_KEY_PREFIX + "profiles", stored);
   return stored[String(userId)];
+}
+
+export function getRequests(): Request[] {
+  const stored = readJSON<Request[]>(LS_KEY_PREFIX + "requests", []);
+  return Array.isArray(stored) ? stored : [];
+}
+
+export function saveRequest(req: Request): Request {
+  const all = getRequests();
+  if (!req.id) {
+    const max = all.reduce((m, x) => Math.max(m, x.id || 0), 0);
+    req.id = max + 1;
+    req.createdAt = new Date().toISOString();
+    req.status = req.status || "Прислал заявку";
+    all.push(req);
+  } else {
+    const idx = all.findIndex((x) => x.id === req.id);
+    if (idx >= 0) all[idx] = { ...all[idx], ...req };
+    else all.push(req);
+  }
+  writeJSON(LS_KEY_PREFIX + "requests", all);
+  return req;
+}
+
+export function updateRequestStatus(id: number, status: string): Request | undefined {
+  const all = getRequests();
+  const idx = all.findIndex((r) => r.id === id);
+  if (idx === -1) return undefined;
+  all[idx] = { ...all[idx], status };
+  writeJSON(LS_KEY_PREFIX + "requests", all);
+  return all[idx];
+}
+
+export function removeEvent(id: number): any | undefined {
+  const stored = readJSON<any[]>(LS_KEY_PREFIX + "events", []);
+  const idx = stored.findIndex((e) => e.id === id);
+  if (idx === -1) {
+    const filtered = stored.filter((e) => e.id !== id);
+    writeJSON(LS_KEY_PREFIX + "events", filtered);
+    return undefined;
+  }
+  const [removed] = stored.splice(idx, 1);
+  writeJSON(LS_KEY_PREFIX + "events", stored);
+  return removed;
 }

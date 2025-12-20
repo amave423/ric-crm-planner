@@ -2,6 +2,7 @@ import { getEvents as _getEvents, getEventById as _getEventById } from "../stora
 import { getAllUsers } from "../storage/storage";
 import type { Event } from "../types/event";
 import { saveEvent as _saveEvent } from "../storage/storage";
+import { removeEvent as _removeEvent } from "../storage/storage"
 
 function computeStatus(endDate?: string) {
   if (!endDate) return "Неактивно";
@@ -38,3 +39,4 @@ export function getEventById(id: number): Event | undefined {
 }
 
 export function saveEvent(data: Event) { return _saveEvent({ ...data }); }
+export function removeEvent(id: number) { return _removeEvent(id); }

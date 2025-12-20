@@ -133,7 +133,6 @@ input:focus,
 textarea:focus,
 select:focus {
   border-color: var(--row-border-color);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--row-border-color) 20%, transparent);
 }
 
 .date-row {
@@ -210,4 +209,19 @@ select:focus {
   font-size: 13px;
   margin-top: 6px;
   font-weight: 600;
+}
+
+.danger-outline {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #fff;
+  color: #e53935;
+  border: 1px solid #e53935;
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease;
+  
+}
+
+.danger-outline:hover {
+  background: #ffebee;
 }

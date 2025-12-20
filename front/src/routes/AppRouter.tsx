@@ -58,10 +58,7 @@ export default function AppRouter() {
             <Route path="/planner" element={<PlannerPage />} />
             <Route path="/profile" element={<ProfilePage />} />
 
-            {/* Только организатор */}
-            {user.role === "organizer" && (
-              <Route path="/requests" element={<RequestsPage />} />
-            )}
+            <Route path="/requests" element={<RequestsPage />} />
 
             {/* Остальное */}
             <Route path="*" element={<Navigate to="/events" replace />} />
