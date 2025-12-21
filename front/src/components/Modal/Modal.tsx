@@ -14,6 +14,7 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" aria-label="Закрыть" onClick={onClose}>×</button>
         {title && <h2 className="modal-title">{title}</h2>}
         <div className="modal-content">{children}</div>
       </div>

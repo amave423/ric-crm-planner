@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useMemo } from "react";
 import "../../styles/profile.scss";
 import { AuthContext } from "../../context/AuthContext";
 import { getProfile, saveProfile } from "../../storage/storage";
@@ -57,6 +57,29 @@ export default function ProfilePage() {
     showToast("success", "Профиль сохранён");
   };
 
+  const COLORS = [
+    "#f44336","#e91e63","#9c27b0","#673ab7","#3f51b5","#2196f3","#03a9f4","#00bcd4",
+    "#009688","#4caf50","#8bc34a","#cddc39","#ffeb3b","#ffc107","#ff9800","#ff5722",
+    "#795548","#607d8b"
+  ];
+
+  const pickColor = (seed: string | number | undefined) => {
+    const s = String(seed ?? profile.email ?? profile.name ?? Math.random());
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return COLORS[Math.abs(h) % COLORS.length];
+  };
+
+  const initials = useMemo(() => {
+    const s = (profile.surname || "").trim();
+    const n = (profile.name || "").trim();
+    const a = (s[0] || "").toUpperCase();
+    const b = (n[0] || "").toUpperCase();
+    return (a + b) || "—";
+  }, [profile.name, profile.surname]);
+
+  const avatarBg = useMemo(() => pickColor(user?.id ?? profile.email), [user, profile.email]);
+
   return (
     <div className="page profile-page">
       <h1 className="page-title">Личный кабинет</h1>
@@ -64,6 +87,10 @@ export default function ProfilePage() {
       <div className="profile-container">
         <div className="profile-block">
           <h3>Личная информация</h3>
+
+          <div className="avatar-wrap">
+            <div className="avatar" style={{ background: avatarBg }}>{initials}</div>
+          </div>
 
           <div className="inputs">
             <input disabled={!editing} value={profile.name} onChange={(e) => update("name", e.target.value)} />

@@ -4,7 +4,7 @@ import "../../styles/toast.scss";
 type ToastType = "success" | "error";
 interface Toast { id: number; type: ToastType; message: string; hiding?: boolean; }
 
-const ToastContext = createContext({ showToast: (t: ToastType, m: string) => {} });
+const ToastContext = createContext<{ showToast: (type: ToastType, message: string) => void }>({ showToast: () => {} });
 
 export function useToast() {
   return useContext(ToastContext) as { showToast: (t: ToastType, m: string) => void };

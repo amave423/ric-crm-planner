@@ -17,6 +17,7 @@
 }
 
 .modal {
+  position: relative;
   background: #fff;
   border-radius: 12px;
   width: 560px;
@@ -118,7 +119,7 @@
 .btn-cancel {
   padding: 10px 16px;
   border-radius: 10px;
-  background: #e53935; /* red */
+  background: #e53935;
   color: white;
   border: none;
   cursor: pointer;
@@ -145,4 +146,39 @@
 .btn-send:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.modal-close {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #666;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  background: rgba(0,0,0,0.04);
+  color: #111;
+}
+
+.form-field .field-error {
+  color: #d32f2f;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.form-field input[aria-invalid="true"],
+.form-field select[aria-invalid="true"],
+.form-field textarea[aria-invalid="true"] {
+  border-color: #d32f2f;
 }

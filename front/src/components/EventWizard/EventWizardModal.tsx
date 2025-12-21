@@ -103,6 +103,7 @@ export default function EventWizardModal({
           className={`wizard wizard-tab--${activeTab}`}
           onClick={(e) => e.stopPropagation()}
           >
+          <button className="wizard-close" aria-label="Закрыть" onClick={onClose}>×</button>
           <aside className="wizard-nav">
             <NavButton tab="event" label="Настройка мероприятия" />
             <NavButton tab="directions" label="Настройка направлений" />

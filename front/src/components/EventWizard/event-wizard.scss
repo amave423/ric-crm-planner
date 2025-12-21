@@ -12,7 +12,6 @@
   --wizard-accent: var(--projects-color, #b77bdc);
 }
 
-
 .wizard-overlay {
   position: fixed;
   inset: 0;
@@ -25,6 +24,7 @@
 }
 
 .wizard {
+  position: relative;
   width: 80%;
   height: 80%;
   background: #fff;
@@ -111,6 +111,30 @@
   border-radius: 10px;
   padding: 10px 14px;
   cursor: pointer;
+}
+
+.wizard-close {
+  position: absolute;
+  right: 16px;
+  top: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: #666;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+.wizard-close:hover {
+  background: rgba(0,0,0,0.04);
+  color: #111;
 }
 
 .tags { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
