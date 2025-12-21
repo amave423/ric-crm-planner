@@ -276,3 +276,36 @@ class ApplicationCreateSerializer(ModelSerializer):
             raise serializers.ValidationError(
                 {"direction": "Заявка на это направление уже создана"}
             )
+
+class ApplicationSerializer(ModelSerializer):
+    """Serializer for viewing and moderating applications."""
+
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    event_name = serializers.CharField(source="event.name", read_only=True)
+    direction_name = serializers.CharField(source="direction.name", read_only=True)
+
+    class Meta:
+        model = Application
+        fields = (
+            "id",
+            "message",
+            "is_link",
+            "is_approved",
+            "comment",
+            "date_sub",
+            "date_end",
+            "user",
+            "user_email",
+            "direction",
+            "direction_name",
+            "event",
+            "event_name",
+            "project_id",
+            "specialization",
+            "status",
+            "team_id",
+            "tests_assigned",
+            "tests_assigned_at",
+            "test_session_id",
+        )
+        read_only_fields = ("id", "user", "direction", "event", "date_sub")

@@ -3,8 +3,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.shortcuts import get_object_or_404
 from rest_framework import status
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework.generics import (
     CreateAPIView,
+    ListAPIView,
     ListCreateAPIView,
     RetrieveAPIView,
     RetrieveUpdateAPIView,
@@ -18,11 +21,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from users.permissions import (
+    CuratorOrAdminPermission,
     ProjectantOnlyPermission,
     ProjectantReadCuratorAdminWritePermission,
 )
 from users.serializers import (
     ApplicationCreateSerializer,
+    ApplicationSerializer,
     DirectionSerializer,
     EmailConfirmationSerializer,
     EventSerializer,
@@ -33,7 +38,7 @@ from users.serializers import (
     RegisterUserSerializer,
     UserSerializer,
 )
-from users.models import Direction, Event, Profile
+from users.models import Application, Direction, Event, Profile
 
 
 class UserInfoView(RetrieveAPIView):
@@ -258,6 +263,117 @@ class DirectionDetailView(RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
         return Direction.objects.filter(event=event)
+
+class ApplicationListView(ListAPIView):
+    """List applications with moderation filters."""
+
+    permission_classes = (CuratorOrAdminPermission,)
+    serializer_class = ApplicationSerializer
+
+    filter_parameters = [
+        openapi.Parameter(
+            "event",
+            openapi.IN_QUERY,
+            description="ID мероприятия",
+            type=openapi.TYPE_INTEGER,
+        ),
+        openapi.Parameter(
+            "direction",
+            openapi.IN_QUERY,
+            description="ID направления",
+            type=openapi.TYPE_INTEGER,
+        ),
+        openapi.Parameter(
+            "specialization",
+            openapi.IN_QUERY,
+            description="ID специализации",
+            type=openapi.TYPE_INTEGER,
+        ),
+        openapi.Parameter(
+            "status",
+            openapi.IN_QUERY,
+            description="ID статуса",
+            type=openapi.TYPE_INTEGER,
+        ),
+        openapi.Parameter(
+            "user",
+            openapi.IN_QUERY,
+            description="ID пользователя",
+            type=openapi.TYPE_INTEGER,
+        ),
+        openapi.Parameter(
+            "is_approved",
+            openapi.IN_QUERY,
+            description="Фильтр по признаку одобрения заявки",
+            type=openapi.TYPE_BOOLEAN,
+        ),
+        openapi.Parameter(
+            "tests_assigned",
+            openapi.IN_QUERY,
+            description="Фильтр по назначению тестов",
+            type=openapi.TYPE_BOOLEAN,
+        ),
+    ]
+
+    @swagger_auto_schema(manual_parameters=filter_parameters)
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = Application.objects.select_related(
+            "user", "direction", "event", "specialization", "status"
+        ).order_by("-date_sub")
+
+        filters = {
+            "event": "event_id",
+            "direction": "direction_id",
+            "specialization": "specialization_id",
+            "status": "status_id",
+            "user": "user_id",
+        }
+
+        for param, field in filters.items():
+            value = self.request.query_params.get(param)
+            if value:
+                queryset = queryset.filter(**{field: value})
+
+        boolean_params = {
+            "is_approved": "is_approved",
+            "tests_assigned": "tests_assigned",
+        }
+        for param, field in boolean_params.items():
+            value = self.request.query_params.get(param)
+            if value is not None:
+                normalized = value.lower() in {"true", "1", "yes", "t"}
+                queryset = queryset.filter(**{field: normalized})
+
+        return queryset
+
+
+class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
+    """Retrieve, update or delete a specific application."""
+
+    permission_classes = (CuratorOrAdminPermission,)
+    serializer_class = ApplicationSerializer
+    lookup_url_kwarg = "application_id"
+
+    @swagger_auto_schema(operation_description="Получение заявки")
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @swagger_auto_schema(operation_description="Обновление заявки")
+    def patch(self, request, *args, **kwargs):
+        return super().patch(request, *args, **kwargs)
+
+    @swagger_auto_schema(operation_description="Удаление заявки")
+    def delete(self, request, *args, **kwargs):
+        return super().delete(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return Application.objects.select_related(
+            "user", "direction", "event", "specialization", "status"
+        )
+
 
 
 class DirectionApplicationCreateView(CreateAPIView):

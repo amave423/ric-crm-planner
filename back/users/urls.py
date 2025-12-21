@@ -1,6 +1,8 @@
 from django.urls import path
 
 from .views import (
+    ApplicationDetailView,
+    ApplicationListView,
     CookieTokenRefreshView,
     DirectionApplicationCreateView,
     DirectionDetailView,
@@ -43,5 +45,11 @@ urlpatterns = [
         "events/<int:event_id>/directions/<int:direction_id>/applications/",
         DirectionApplicationCreateView.as_view(),
         name="direction-application-create",
+    ),
+    path("applications/", ApplicationListView.as_view(), name="application-list"),
+    path(
+        "applications/<int:application_id>/",
+        ApplicationDetailView.as_view(),
+        name="application-detail",
     ),
 ]
