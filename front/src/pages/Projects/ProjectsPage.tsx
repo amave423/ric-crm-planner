@@ -90,9 +90,20 @@ export default function ProjectsPage() {
 
       {isStudent && selectedProjectId && (
         <div className="apply-container">
-          <div className="apply-box" onClick={() => setApplyOpen(true)}>
-            <h1 className="h1">Подать заявку</h1>
-          </div>
+            <div
+            className="apply-box"
+            onClick={() => {
+                const ownerId = user?.id;
+                const existing = getRequests().find(r => r.ownerId === ownerId && r.projectId === selectedProjectId);
+                if (existing) {
+                showToast("error", "Вы уже отправляли заявку на этот проект");
+                return;
+                }
+                setApplyOpen(true);
+            }}
+            >
+            <h1 className="h4">Подать заявку</h1>
+            </div>
         </div>
       )}
 
@@ -118,11 +129,12 @@ export default function ProjectsPage() {
           const existing = getRequests().find(r => r.ownerId === ownerId && r.projectId === req.projectId);
           if (existing) {
               showToast("error", "Вы уже отправляли заявку на этот проект");
-              return;
+              return false;
           }
 
           saveRequest(req);
           showToast("success", "Заявка отправлена");
+          return true;
         }}
       />
     </div>

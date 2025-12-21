@@ -12,7 +12,7 @@ interface Props {
   projectTitle?: string;
   eventId?: number;
   specializations?: { id: number; title: string }[];
-  onSubmit: (req: Request) => void;
+  onSubmit: (req: Request) => boolean | Promise<boolean>;
 }
 
 export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, eventId, specializations = [], onSubmit }: Props) {
@@ -37,7 +37,7 @@ export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, e
     setSpecialization(prof?.specialty || specializations[0]?.title || "");
     setAbout(prof?.about || "");
     setErrors({});
-  }, [isOpen]); // <-- только при открытии модалки, чтобы не сбрасывать поля при ререндере родителя
+  }, [isOpen]);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -73,9 +73,13 @@ export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, e
       ownerId: user?.id
     };
 
-    onSubmit(req);
-    onClose();
-    showToast("success", "Заявка отправлена");
+    const res = onSubmit(req);
+    Promise.resolve(res).then((ok) => {
+      if (ok) {
+        onClose();
+      } else {
+      }
+    });
   };
 
   return (

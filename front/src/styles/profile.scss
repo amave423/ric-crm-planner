@@ -1,12 +1,11 @@
 @import "./variables.scss";
+@import "./typography.scss";
 
 .profile-page {
   padding: 20px;
 }
 
 .page-title {
-  font-size: 28px;
-  font-weight: 600;
   margin-bottom: 25px;
 }
 
@@ -23,10 +22,8 @@
   padding: 22px;
   border: 1px solid #e6e6e6;
 
-  h3 {
+  h4 {
     margin-bottom: 18px;
-    font-size: 20px;
-    font-weight: 600;
   }
 
   .inputs {
@@ -39,7 +36,6 @@
       padding: 10px 12px;
       border-radius: 10px;
       border: 1px solid #ccc;
-      font-size: 14px;
 
       &:disabled {
         background: #f5f5f5;
@@ -57,7 +53,6 @@
 .edit-btn {
   margin-top: 25px;
   padding: 12px 22px;
-  font-size: 16px;
   border-radius: 12px;
   border: none;
   cursor: pointer;
@@ -71,8 +66,9 @@
 }
 
 .avatar-wrap {
+  display: flex;
   justify-content: center;
-  margin: 12px 10px 18px;
+  margin: 12px 0 18px;
 }
 
 .avatar {
@@ -80,7 +76,7 @@
   height: 90px;
   border-radius: 50%;
   color: #fff;
-  font-weight: 700;
+  font-weight: 500;
   font-size: 32px;
   display: flex;
   align-items: center;

@@ -37,13 +37,15 @@
 }
 
 .toast.error:not(.hiding) {
-  animation: slideIn .35s forwards, shake .32s .05s 3;
+  animation: slideIn .35s forwards, shake .60s .35s ease-in-out 1;
 }
+
 @keyframes shake {
-  0% { transform: translateX(0); }
-  20% { transform: translateX(-8px); }
-  40% { transform: translateX(8px); }
-  60% { transform: translateX(-6px); }
-  80% { transform: translateX(6px); }
+  0%   { transform: translateX(0); }
+  10%  { transform: translateX(-8px); }
+  30%  { transform: translateX(6px); }
+  50%  { transform: translateX(-4px); }
+  70%  { transform: translateX(2px); }
+  90%  { transform: translateX(-1px); }
   100% { transform: translateX(0); }
 }

@@ -82,46 +82,46 @@ export default function ProfilePage() {
 
   return (
     <div className="page profile-page">
-      <h1 className="page-title">Личный кабинет</h1>
+      <h1 className="page-title h1">Личный кабинет</h1>
 
       <div className="profile-container">
         <div className="profile-block">
-          <h3>Личная информация</h3>
+          <h4 className="h4">Личная информация</h4>
 
           <div className="avatar-wrap">
             <div className="avatar" style={{ background: avatarBg }}>{initials}</div>
           </div>
 
           <div className="inputs">
-            <input disabled={!editing} value={profile.name} onChange={(e) => update("name", e.target.value)} />
+            <input className="text-regular" disabled={!editing} value={profile.name} onChange={(e) => update("name", e.target.value)} />
 
-            <input disabled={!editing} value={profile.surname} onChange={(e) => update("surname", e.target.value)} />
+            <input className="text-regular" disabled={!editing} value={profile.surname} onChange={(e) => update("surname", e.target.value)} />
 
-            <input disabled={!editing} value={profile.university} onChange={(e) => update("university", e.target.value)} placeholder="Учебное заведение" />
+            <input className="text-regular" disabled={!editing} value={profile.university} onChange={(e) => update("university", e.target.value)} placeholder="Учебное заведение" />
 
-            <input disabled={!editing} value={profile.course} onChange={(e) => update("course", e.target.value)} placeholder="Курс, группа" />
+            <input className="text-regular" disabled={!editing} value={profile.course} onChange={(e) => update("course", e.target.value)} placeholder="Курс" />
 
-            <input disabled={!editing} value={profile.specialty} onChange={(e) => update("specialty", e.target.value)} placeholder="Специальность" />
+            <input className="text-regular" disabled={!editing} value={profile.specialty} onChange={(e) => update("specialty", e.target.value)} placeholder="Специальность" />
 
-            <textarea disabled={!editing} value={profile.about} onChange={(e) => update("about", e.target.value)} placeholder="О себе" />
+            <textarea className="text-regular" disabled={!editing} value={profile.about} onChange={(e) => update("about", e.target.value)} placeholder="О себе" />
           </div>
         </div>
 
         <div className="profile-block">
-          <h3>Контакты</h3>
+          <h4 className="h4">Контакты</h4>
 
           <div className="inputs">
-            <input disabled={!editing} value={profile.telegram} onChange={(e) => update("telegram", e.target.value)} placeholder="Telegram" />
+            <input className="text-regular" disabled={!editing} value={profile.telegram} onChange={(e) => update("telegram", e.target.value)} placeholder="Telegram" />
 
-            <input disabled={!editing} value={profile.vk} onChange={(e) => update("vk", e.target.value)} placeholder="ВКонтакте" />
+            <input className="text-regular" disabled={!editing} value={profile.vk} onChange={(e) => update("vk", e.target.value)} placeholder="ВКонтакте" />
 
-            <input disabled value={profile.email} />
+            <input className="text-regular" disabled value={profile.email} />
           </div>
         </div>
       </div>
 
       <button
-        className="edit-btn"
+        className="edit-btn h3"
         onClick={() => {
           if (editing) onSave();
           else setEditing(true);
