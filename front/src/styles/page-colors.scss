@@ -1,19 +1,19 @@
 .page--events {
   --row-border-color: #6495ed;
   --badge-bg: rgba(100,149,237,0.08);
-  --table-grid: 305px 370px 455px 375px 200px;
+  --table-grid: 305px 370px 455px 375px 230px 0px;
 }
 
 .page--directions {
   --row-border-color: #83d34a;
   --badge-bg: rgba(218,255,206,0.45);
-  --table-grid: 790px 200px;
+  --table-grid: 785px 945px 0px;
 }
 
 .page--projects {
   --row-border-color: #b77bdc;
   --badge-bg: rgba(240,221,255,0.55);
-  --table-grid: 620px 545px 560px;
+  --table-grid: 615px 540px 570px 0px;
 }
 
 :root {

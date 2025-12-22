@@ -1,6 +1,7 @@
 import React, { useContext } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import editIcon from "../../assets/icons/edit.svg";
+import infoIcon from "../../assets/icons/info.svg";
 import "./table.scss";
 
 type Column = { key: string; title: string; width?: string };
@@ -23,6 +24,7 @@ export default function Table<T>({
   badgeKeys = [],
   onRowClick,
   onEdit,
+  onInfoClick,
   selectedId,
   gridColumns = "",
   renderCell
@@ -103,6 +105,19 @@ export default function Table<T>({
                           }}
                         >
                           <img src={editIcon} alt="edit" />
+                        </button>
+                      )}
+
+                      {!isOrganizer && onInfoClick && (
+                        <button
+                          className="info-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onInfoClick(row);
+                          }}
+                          aria-label="Информация"
+                        >
+                          <img src={infoIcon} alt="info" />
                         </button>
                       )}
                     </div>

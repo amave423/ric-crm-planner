@@ -9,6 +9,7 @@ import TableHeader from "../../components/Layout/TableHeader";
 import BackButton from "../../components/UI/BackButton";
 import EventWizardModal, { type WizardLaunchContext } from "../../components/EventWizard/EventWizardModal";
 import ApplyModal from "../../components/Requests/ApplyModal";
+import InfoModal from "../../components/Modal/InfoModal";
 import { AuthContext } from "../../context/AuthContext";
 import { saveRequest } from "../../api/requests";
 import { useToast } from "../../components/Toast/ToastProvider";
@@ -37,6 +38,10 @@ export default function ProjectsPage() {
 
   const { user } = useContext(AuthContext);
   const isStudent = user?.role === "student";
+
+  // info modal states
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [infoItem, setInfoItem] = useState<{ title?: string; description?: string } | null>(null);
 
   const filteredProjects = !search.trim()
     ? projects
@@ -84,26 +89,30 @@ export default function ProjectsPage() {
           });
           setWizardOpen(true);
         }}
+        onInfoClick={(row) => {
+          setInfoItem({ title: (row as any).title || "—", description: (row as any).description || "Нет описания" });
+          setInfoOpen(true);
+        }}
         onRowClick={(row) => setSelectedProjectId(row.id)}
         selectedId={selectedProjectId ?? undefined}
       />
 
       {isStudent && selectedProjectId && (
         <div className="apply-container">
-            <div
+          <div
             className="apply-box"
             onClick={() => {
-                const ownerId = user?.id;
-                const existing = getRequests().find(r => r.ownerId === ownerId && r.projectId === selectedProjectId);
-                if (existing) {
+              const ownerId = user?.id;
+              const existing = getRequests().find(r => r.ownerId === ownerId && r.projectId === selectedProjectId);
+              if (existing) {
                 showToast("error", "Вы уже отправляли заявку на этот проект");
                 return;
-                }
-                setApplyOpen(true);
+              }
+              setApplyOpen(true);
             }}
-            >
-            <h1 className="h4">Подать заявку</h1>
-            </div>
+          >
+            <h1 className="h1">Подать заявку</h1>
+          </div>
         </div>
       )}
 
@@ -136,6 +145,13 @@ export default function ProjectsPage() {
           showToast("success", "Заявка отправлена");
           return true;
         }}
+      />
+
+      <InfoModal
+        isOpen={infoOpen}
+        onClose={() => setInfoOpen(false)}
+        title={infoItem?.title}
+        description={infoItem?.description}
       />
     </div>
   );

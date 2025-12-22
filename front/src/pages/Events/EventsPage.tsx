@@ -5,6 +5,7 @@ import { useState } from "react";
 import Table from "../../components/Table/Table";
 import TableHeader from "../../components/Layout/TableHeader";
 import EventWizardModal, { type WizardLaunchContext } from "../../components/EventWizard/EventWizardModal";
+import InfoModal from "../../components/Modal/InfoModal";
 
 import "../../styles/page-colors.scss";
 
@@ -30,6 +31,9 @@ export default function EventsPage() {
           .toLowerCase()
           .includes(search.toLowerCase())
       );
+
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [infoItem, setInfoItem] = useState<{ title?: string; description?: string } | null>(null);
 
   return (
     <div className="page page--events">
@@ -62,6 +66,10 @@ export default function EventsPage() {
           setWizardContext({ type: "event", eventId: row.id });
           setWizardOpen(true);
         }}
+        onInfoClick={(row) => {
+          setInfoItem({ title: (row as any).title || "—", description: (row as any).description || "Нет описания" });
+          setInfoOpen(true);
+        }}
       />
 
       {wizardOpen && wizardContext && (
@@ -71,6 +79,13 @@ export default function EventsPage() {
           onClose={() => setWizardOpen(false)}
         />
       )}
+
+      <InfoModal
+        isOpen={infoOpen}
+        onClose={() => setInfoOpen(false)}
+        title={infoItem?.title}
+        description={infoItem?.description}
+      />
     </div>
   );
 }
