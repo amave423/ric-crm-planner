@@ -258,6 +258,16 @@ class ProjectSerializer(ModelSerializer):
         return super().create(validated_data)
 
 class ApplicationCreateSerializer(ModelSerializer):
+    project = serializers.PrimaryKeyRelatedField(
+        queryset=Project.objects.all(), required=False, allow_null=True
+    )
+    project_ref = serializers.PrimaryKeyRelatedField(
+        queryset=Project.objects.all(),
+        required=False,
+        allow_null=True,
+        write_only=True,
+        source="project",
+    )
     class Meta:
         model = Application
         fields = (
@@ -269,6 +279,8 @@ class ApplicationCreateSerializer(ModelSerializer):
             "date_end",
             "direction",
             "event",
+            "project",
+            "project_ref",
         )
         read_only_fields = ("id", "date_sub", "date_end", "direction", "event")
 
@@ -301,6 +313,20 @@ class ApplicationCreateSerializer(ModelSerializer):
             raise serializers.ValidationError(
                 {"direction": "Заявка на это направление уже создана"}
             )
+    def validate(self, attrs):
+        project_input = self.initial_data.get("project")
+        project_ref_input = self.initial_data.get("project_ref")
+
+        if (
+            project_input
+            and project_ref_input
+            and str(project_input) != str(project_ref_input)
+        ):
+            raise serializers.ValidationError(
+                {"project": "project и project_ref должны совпадать"}
+            )
+
+        return super().validate(attrs)
 
 class ApplicationSerializer(ModelSerializer):
     """Serializer for viewing and moderating applications."""
@@ -308,6 +334,18 @@ class ApplicationSerializer(ModelSerializer):
     user_email = serializers.EmailField(source="user.email", read_only=True)
     event_name = serializers.CharField(source="event.name", read_only=True)
     direction_name = serializers.CharField(source="direction.name", read_only=True)
+    project = serializers.PrimaryKeyRelatedField(
+    queryset=Project.objects.all(), required=False, allow_null=True
+    )
+    project_ref = serializers.PrimaryKeyRelatedField(
+        queryset=Project.objects.all(),
+        required=False,
+        allow_null=True,
+        write_only=True,
+        source="project",
+    )
+    projectId = serializers.IntegerField(source="project.id", read_only=True)
+    projectTitle = serializers.CharField(source="project.name", read_only=True)
 
     class Meta:
         model = Application
@@ -325,7 +363,10 @@ class ApplicationSerializer(ModelSerializer):
             "direction_name",
             "event",
             "event_name",
-            "project_id",
+            "project",
+            "project_ref",
+            "projectId",
+            "projectTitle",
             "specialization",
             "status",
             "team_id",
@@ -334,3 +375,18 @@ class ApplicationSerializer(ModelSerializer):
             "test_session_id",
         )
         read_only_fields = ("id", "user", "direction", "event", "date_sub")
+        
+    def validate(self, attrs):
+        project_input = self.initial_data.get("project")
+        project_ref_input = self.initial_data.get("project_ref")
+
+        if (
+            project_input
+            and project_ref_input
+            and str(project_input) != str(project_ref_input)
+        ):
+            raise serializers.ValidationError(
+                {"project": "project и project_ref должны совпадать"}
+            )
+
+        return super().validate(attrs)

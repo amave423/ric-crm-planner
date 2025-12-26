@@ -349,7 +349,7 @@ class ApplicationListView(ListAPIView):
 
     def get_queryset(self):
         queryset = Application.objects.select_related(
-            "user", "direction", "event", "specialization", "status"
+            "user", "direction", "event", "specialization", "status", "project"
         ).order_by("-date_sub")
 
         filters = {
@@ -399,7 +399,7 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Application.objects.select_related(
-            "user", "direction", "event", "specialization", "status"
+            "user", "direction", "event", "specialization", "status", "project"
         )
 
 

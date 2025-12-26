@@ -273,7 +273,13 @@ class Application(models.Model):
     event = models.ForeignKey(
         Event, on_delete=models.SET_NULL, null=True, blank=True, related_name="applications"
     )
-    project_id = models.BigIntegerField(null=True, blank=True)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="applications",
+    )
     specialization = models.ForeignKey(
         Specialization, on_delete=models.SET_NULL, null=True, blank=True, related_name="applications"
     )
