@@ -177,6 +177,63 @@ class Direction(models.Model):
         return f"{self.name} ({self.event.name})"
 
 
+class Project(models.Model):
+    """
+    Проект внутри направления мероприятия
+    """
+
+    direction = models.ForeignKey(
+        "Direction",
+        on_delete=models.CASCADE,
+        related_name="projects",
+        verbose_name="Направление",
+    )
+
+    name = models.CharField(
+        max_length=255,
+        verbose_name="Название проекта",
+    )
+
+    description = models.TextField(
+        blank=True,
+        verbose_name="Описание проекта",
+    )
+
+    curator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="curated_projects",
+        verbose_name="Куратор проекта",
+    )
+
+    teams = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Количество команд",
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Дата создания",
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Дата обновления",
+    )
+
+    class Meta:
+        verbose_name = "Проект"
+        verbose_name_plural = "Проекты"
+        ordering = ("name",)
+
+    def __str__(self):
+        return self.name
+
+
+
 class EventSpecialization(models.Model):
     id = models.BigAutoField(primary_key=True)
     event = models.ForeignKey(

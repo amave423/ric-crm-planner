@@ -35,10 +35,11 @@ from users.serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     ProfileSerializer,
+    ProjectSerializer,
     RegisterUserSerializer,
     UserSerializer,
 )
-from users.models import Application, Direction, Event, Profile
+from users.models import Application, Direction, Event, Profile, Project
 
 
 class UserInfoView(RetrieveAPIView):
@@ -263,6 +264,33 @@ class DirectionDetailView(RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
         return Direction.objects.filter(event=event)
+
+class ProjectListCreateView(ListCreateAPIView):
+    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    serializer_class = ProjectSerializer
+
+    def get_queryset(self):
+        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
+        direction = get_object_or_404(
+            Direction, pk=self.kwargs.get("direction_id"), event=event
+        )
+        return Project.objects.filter(direction=direction)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
+        direction = get_object_or_404(
+            Direction, pk=self.kwargs.get("direction_id"), event=event
+        )
+        context["direction"] = direction
+        return context
+
+
+class ProjectDetailView(RetrieveUpdateDestroyAPIView):
+    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    serializer_class = ProjectSerializer
+    lookup_url_kwarg = "project_id"
+    queryset = Project.objects.select_related("direction", "curator", "direction__event")
 
 class ApplicationListView(ListAPIView):
     """List applications with moderation filters."""

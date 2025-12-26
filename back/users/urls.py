@@ -14,6 +14,8 @@ from .views import (
     LogoutView,
     PasswordResetConfirmView,
     PasswordResetRequestView,
+    ProjectDetailView,
+    ProjectListCreateView,
     ProfileView,
     UserInfoView,
     UserRegistrationView,
@@ -45,6 +47,16 @@ urlpatterns = [
         "events/<int:event_id>/directions/<int:direction_id>/applications/",
         DirectionApplicationCreateView.as_view(),
         name="direction-application-create",
+    ),
+        path(
+        "events/<int:event_id>/directions/<int:direction_id>/projects/",
+        ProjectListCreateView.as_view(),
+        name="project-list-create",
+    ),
+    path(
+        "projects/<int:project_id>/",
+        ProjectDetailView.as_view(),
+        name="project-detail",
     ),
     path("applications/", ApplicationListView.as_view(), name="application-list"),
     path(

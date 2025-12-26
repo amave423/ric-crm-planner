@@ -9,6 +9,7 @@ from .models import (
     Direction,
     Event,
     EventSpecialization,
+    Project,
     Profile,
     Question,
     CRMRole,

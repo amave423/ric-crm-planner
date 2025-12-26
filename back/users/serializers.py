@@ -9,7 +9,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer, Serializer
 
-from .models import Application, Direction, Event, Profile
+from .models import Application, Direction, Event, Profile, Project
 
 
 class UserSerializer(ModelSerializer):
@@ -231,6 +231,31 @@ class DirectionSerializer(ModelSerializer):
         validated_data["event"] = event
         return super().create(validated_data)
 
+
+class ProjectSerializer(ModelSerializer):
+    direction = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = Project
+        fields = (
+            "id",
+            "name",
+            "description",
+            "direction",
+            "curator",
+            "teams",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "created_at", "updated_at", "direction")
+
+    def create(self, validated_data):
+        direction = self.context.get("direction")
+        if not direction:
+            raise serializers.ValidationError({"direction": "Направление не найдено"})
+
+        validated_data["direction"] = direction
+        return super().create(validated_data)
 
 class ApplicationCreateSerializer(ModelSerializer):
     class Meta:
