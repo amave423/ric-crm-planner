@@ -7,6 +7,7 @@ import Table from "../../components/Table/Table";
 import TableHeader from "../../components/Layout/TableHeader";
 import BackButton from "../../components/UI/BackButton";
 import EventWizardModal, { type WizardLaunchContext } from "../../components/EventWizard/EventWizardModal";
+import InfoModal from "../../components/Modal/InfoModal";
 
 import "../../styles/page-colors.scss";
 
@@ -22,6 +23,9 @@ export default function DirectionsPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardContext, setWizardContext] = useState<WizardLaunchContext | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
+
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [infoItem, setInfoItem] = useState<{ title?: string; description?: string } | null>(null);
 
   const filteredDirections = !search.trim()
   ? directions
@@ -66,6 +70,10 @@ export default function DirectionsPage() {
           });
           setWizardOpen(true);
         }}
+        onInfoClick={(row) => {
+          setInfoItem({ title: (row as any).title || "—", description: (row as any).description || "Нет описания" });
+          setInfoOpen(true);
+        }}
       />
 
       {wizardOpen && wizardContext && (
@@ -75,6 +83,13 @@ export default function DirectionsPage() {
           onClose={() => setWizardOpen(false)}
         />
       )}
+
+      <InfoModal
+        isOpen={infoOpen}
+        onClose={() => setInfoOpen(false)}
+        title={infoItem?.title}
+        description={infoItem?.description}
+      />
     </div>
   );
 }
