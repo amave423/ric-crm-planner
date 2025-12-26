@@ -16,6 +16,8 @@ from .views import (
     PasswordResetRequestView,
     ProjectDetailView,
     ProjectListCreateView,
+    SpecializationListView,
+    StatusListView,
     ProfileView,
     UserInfoView,
     UserRegistrationView,
@@ -63,5 +65,9 @@ urlpatterns = [
         "applications/<int:application_id>/",
         ApplicationDetailView.as_view(),
         name="application-detail",
+    ),
+    path("statuses/", StatusListView.as_view(), name="status-list"),
+    path(
+        "specializations/", SpecializationListView.as_view(), name="specialization-list"
     ),
 ]

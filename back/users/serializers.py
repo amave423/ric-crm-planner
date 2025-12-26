@@ -9,7 +9,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer, Serializer
 
-from .models import Application, Direction, Event, Profile, Project
+from .models import Application, Direction, Event, Profile, Project, Specialization, Status
 
 
 class UserSerializer(ModelSerializer):
@@ -390,3 +390,14 @@ class ApplicationSerializer(ModelSerializer):
             )
 
         return super().validate(attrs)
+    
+class StatusSerializer(ModelSerializer):
+    class Meta:
+        model = Status
+        fields = ("id", "name", "description", "is_positive")
+
+
+class SpecializationSerializer(ModelSerializer):
+    class Meta:
+        model = Specialization
+        fields = ("id", "name", "description")

@@ -38,8 +38,10 @@ from users.serializers import (
     ProjectSerializer,
     RegisterUserSerializer,
     UserSerializer,
+    SpecializationSerializer,
+    StatusSerializer,
 )
-from users.models import Application, Direction, Event, Profile, Project
+from users.models import Application, Direction, Event, Profile, Project, Specialization, Status
 
 
 class UserInfoView(RetrieveAPIView):
@@ -241,7 +243,17 @@ class EventDetailView(RetrieveUpdateDestroyAPIView):
     queryset = Event.objects.all()
     lookup_url_kwarg = "event_id"
 
+class StatusListView(ListAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = StatusSerializer
+    queryset = Status.objects.all()
 
+
+class SpecializationListView(ListAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = SpecializationSerializer
+    queryset = Specialization.objects.all()
+    
 class DirectionListCreateView(ListCreateAPIView):
     permission_classes = (ProjectantReadCuratorAdminWritePermission,)
     serializer_class = DirectionSerializer
