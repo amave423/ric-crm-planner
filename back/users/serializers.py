@@ -228,7 +228,9 @@ class DirectionSerializer(ModelSerializer):
 
 class ProjectSerializer(ModelSerializer):
     direction = serializers.PrimaryKeyRelatedField(read_only=True)
-
+    direction_id = serializers.PrimaryKeyRelatedField(
+        queryset=Direction.objects.all(), write_only=True, source="direction", required=False
+    )
     class Meta:
         model = Project
         fields = (
@@ -236,6 +238,7 @@ class ProjectSerializer(ModelSerializer):
             "name",
             "description",
             "direction",
+            "direction_id",
             "curator",
             "teams",
             "created_at",
@@ -244,7 +247,7 @@ class ProjectSerializer(ModelSerializer):
         read_only_fields = ("id", "created_at", "updated_at", "direction")
 
     def create(self, validated_data):
-        direction = self.context.get("direction")
+        direction = validated_data.get("direction") or self.context.get("direction")
         if not direction:
             raise serializers.ValidationError({"direction": "Направление не найдено"})
 
@@ -252,6 +255,12 @@ class ProjectSerializer(ModelSerializer):
         return super().create(validated_data)
 
 class ApplicationCreateSerializer(ModelSerializer):
+    event_id = serializers.PrimaryKeyRelatedField(
+        queryset=Event.objects.all(), write_only=True, source="event", required=False
+    )
+    direction_id = serializers.PrimaryKeyRelatedField(
+        queryset=Direction.objects.all(), write_only=True, source="direction", required=False
+    )
     project = serializers.PrimaryKeyRelatedField(
         queryset=Project.objects.all(), required=False, allow_null=True
     )
@@ -272,18 +281,23 @@ class ApplicationCreateSerializer(ModelSerializer):
             "date_sub",
             "date_end",
             "direction",
+            "direction_id",
             "event",
+            "event_id",
             "project",
             "project_ref",
         )
         read_only_fields = ("id", "date_sub", "date_end", "direction", "event")
 
     def create(self, validated_data):
-        event = self.context.get("event")
-        direction = self.context.get("direction")
+        event = validated_data.get("event") or self.context.get("event")
+        direction = validated_data.get("direction") or self.context.get("direction")
         if not event or not direction:
             raise serializers.ValidationError({"direction": "Направление или мероприятие не найдено"})
-
+        if direction.event_id != event.id:
+            raise serializers.ValidationError(
+                {"direction": "Направление не принадлежит мероприятию"}
+            )
         if timezone.now() > event.end_app_date:
             raise serializers.ValidationError(
                 {"event": "Дедлайн подачи заявок истёк"}

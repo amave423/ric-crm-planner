@@ -48,7 +48,7 @@ class Profile(models.Model):
     patronymic = models.CharField(max_length=150, blank=True)
     telegram = models.CharField(max_length=150, blank=True)
     email = models.EmailField()
-    course = models.PositiveIntegerField()
+    course = models.PositiveIntegerField(blank=True)
     university = models.CharField(max_length=255, blank=True)
     vk = models.CharField(max_length=255, blank=True)
     job = models.CharField(max_length=255, blank=True)

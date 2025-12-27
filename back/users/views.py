@@ -57,6 +57,10 @@ class UserRegistrationView(CreateAPIView):
     permission_classes = (AllowAny,)
     serializer_class = RegisterUserSerializer
 
+class UserListView(ListAPIView):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = UserSerializer
+    queryset = get_user_model().objects.all()
 
 def _set_auth_cookies(response, access_token: str, refresh_token: RefreshToken | None = None):
     response.set_cookie(
@@ -320,11 +324,19 @@ class ProjectDetailView(RetrieveUpdateDestroyAPIView):
     lookup_url_kwarg = "project_id"
     queryset = Project.objects.select_related("direction", "curator", "direction__event")
 
-class ApplicationListView(ListAPIView):
-    """List applications with moderation filters."""
+class UserProjectListCreateView(ListCreateAPIView):
+    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    serializer_class = ProjectSerializer
+    queryset = Project.objects.select_related("direction", "curator", "direction__event")
 
-    permission_classes = (CuratorOrAdminPermission,)
-    serializer_class = ApplicationSerializer
+
+class UserDirectionListView(ListAPIView):
+    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    serializer_class = DirectionSerializer
+    queryset = Direction.objects.select_related("event", "leader")
+
+class ApplicationListView(ListCreateAPIView):
+    """List and create applications."""
 
     filter_parameters = [
         openapi.Parameter(
@@ -370,7 +382,17 @@ class ApplicationListView(ListAPIView):
             type=openapi.TYPE_BOOLEAN,
         ),
     ]
+    def get_permissions(self):
+        if self.request.method.lower() == "get":
+            permissions = (CuratorOrAdminPermission,)
+        else:
+            permissions = (ProjectantOnlyPermission,)
+        return [permission() for permission in permissions]
 
+    def get_serializer_class(self):
+        if self.request.method.lower() == "post":
+            return ApplicationCreateSerializer
+        return ApplicationSerializer
     @swagger_auto_schema(manual_parameters=filter_parameters)
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
@@ -405,13 +427,30 @@ class ApplicationListView(ListAPIView):
 
         return queryset
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if self.request.method.lower() == "post":
+            event_id = self.request.data.get("event")
+            direction_id = self.request.data.get("direction")
 
+            if event_id:
+                context["event"] = get_object_or_404(Event, pk=event_id)
+            if direction_id:
+                context["direction"] = get_object_or_404(Direction, pk=direction_id)
+
+        return context
+    
 class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
     """Retrieve, update or delete a specific application."""
 
-    permission_classes = (CuratorOrAdminPermission,)
     serializer_class = ApplicationSerializer
     lookup_url_kwarg = "application_id"
+    def get_permissions(self):
+        if self.request.method.lower() in {"get", "patch", "delete"}:
+            permissions = (CuratorOrAdminPermission,)
+        else:
+            permissions = (IsAuthenticated,)
+        return [permission() for permission in permissions]
 
     @swagger_auto_schema(operation_description="Получение заявки")
     def get(self, request, *args, **kwargs):
@@ -426,10 +465,19 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
         return super().delete(request, *args, **kwargs)
 
     def get_queryset(self):
-        return Application.objects.select_related(
+        queryset = Application.objects.select_related(
             "user", "direction", "event", "specialization", "status", "project"
         )
 
+        if CuratorOrAdminPermission().has_permission(self.request, self):
+            return queryset
+
+        if self.request.method.lower() == "put" and not (
+            self.request.user.is_staff or self.request.user.is_superuser
+        ):
+            return queryset.filter(user=self.request.user)
+
+        return queryset
 
 
 class DirectionApplicationCreateView(CreateAPIView):
