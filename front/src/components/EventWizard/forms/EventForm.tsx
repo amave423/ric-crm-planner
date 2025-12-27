@@ -131,8 +131,17 @@ export default function EventForm() {
 
       <FieldWrap name="title">
         <label className="text-small">
-          Название мероприятия
-          <input value={title} onChange={(e) => setTitle(e.target.value)} autoComplete="off" spellCheck={false} />
+            Название мероприятия
+            <input
+              ref={titleRef}
+              defaultValue={title}
+              onBlur={() => {
+                const v = titleRef.current?.value ?? "";
+                setTitle(v);
+              }}
+              autoComplete="off"
+              spellCheck={false}
+              />
         </label>
       </FieldWrap>
 
@@ -242,13 +251,30 @@ function DateField({
   onChange: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (inputRef.current && value !== inputRef.current.value) {
+      inputRef.current.value = value || "";
+    }
+  }, [value]);
 
   return (
     <label className="date-field">
       <span className="text-small">{label}</span>
 
       <div className="date-input">
-        <input type="text" placeholder="YYYY-MM-DD" value={value} onChange={(e) => onChange(e.target.value)} onFocus={() => setOpen(true)} />
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder="YYYY-MM-DD"
+          defaultValue={value}
+          onBlur={() => {
+            const v = inputRef.current?.value ?? "";
+            if (v !== value) onChange(v);
+          }}
+          onFocus={() => setOpen(true)}
+        />
 
         <button type="button" className="calendar-btn" onClick={() => setOpen((prev) => !prev)}>
           <img src={calendarIcon} alt="calendar" />
@@ -260,6 +286,7 @@ function DateField({
             onSelect={(date) => {
               onChange(date);
               setOpen(false);
+              if (inputRef.current) inputRef.current.value = date;
             }}
           />
         )}

@@ -28,6 +28,8 @@ export default function ProjectForm() {
   const { showToast } = useToast();
   const usersList = users;
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   useEffect(() => {
     if (ctxDirectionId) {
       setDirectionId(String(ctxDirectionId));
@@ -55,16 +57,20 @@ export default function ProjectForm() {
   }, [directionId, savedDirections]);
 
   const addProject = () => {
-    if (!title.trim() || !directionId) {
-      showToast("error", "Выберите направление и введите название проекта");
+    if (!directionId) {
+      setErrors((p) => ({ ...p, directionId: "Выберите направление" }));
+      return;
+    }
+    if (!title.trim()) {
+      setErrors((p) => ({ ...p, title: "Введите название проекта" }));
       return;
     }
     if (!curator) {
-      showToast("error", "Выберите куратора проекта");
+      setErrors((p) => ({ ...p, curator: "Выберите куратора" }));
       return;
     }
     if (teams === "" || Number(teams) < 0) {
-      showToast("error", "Укажите количество команд (0 или больше)");
+      setErrors((p) => ({ ...p, teams: "Укажите количество команд (0 или больше)" }));
       return;
     }
     setProjects([...projects, { id: Date.now(), title: title.trim(), description: description.trim(), directionId, curator, teams: typeof teams === "number" ? teams : Number(teams) }]);
@@ -72,6 +78,7 @@ export default function ProjectForm() {
     setDescription("");
     setCurator("");
     setTeams("");
+    setErrors({});
   };
 
   const removeProject = (id: number) => {
@@ -101,41 +108,59 @@ export default function ProjectForm() {
     <div className="wizard-form">
       <h2 className="h2">Добавление проектов</h2>
 
-      <label className="text-small">
-        Выберите направление
-        <select value={directionId ?? ""} onChange={(e) => setDirectionId(String(e.target.value))}>
-          <option value="" disabled>
-            Выберите направление
-          </option>
-          {directions.map((d: any) => (
-            <option key={d.id} value={d.id}>
-              {d.title}
+      <div className={`field-wrap ${errors.directionId ? "error" : ""}`}>
+        <label className="text-small">
+          Выберите направление
+          <select value={directionId ?? ""} onChange={(e) => {
+            setDirectionId(String(e.target.value));
+            setErrors((p) => { const np = { ...p }; delete np.directionId; return np; });
+          }}>
+            <option value="" disabled>
+              Выберите направление
             </option>
-          ))}
-        </select>
-      </label>
+            {directions.map((d: any) => (
+              <option key={d.id} value={d.id}>
+                {d.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        {errors.directionId && <div className="field-error">{errors.directionId}</div>}
+      </div>
 
-      <label className="text-small">
-        Название проекта
-        <input placeholder="Введите название проекта и нажмите Enter" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addProject()} />
-      </label>
+      <div className={`field-wrap ${errors.title ? "error" : ""}`}>
+        <label className="text-small">
+          Название проекта
+          <input placeholder="Введите название проекта" value={title} onChange={(e) => {
+            setTitle(e.target.value);
+            setErrors((p) => { const np = { ...p }; delete np.title; return np; });
+          }} onKeyDown={(e) => e.key === "Enter" && addProject()} />
+        </label>
+        {errors.title && <div className="field-error">{errors.title}</div>}
+      </div>
 
-      <label className="text-small">
-        Куратор
-        <select value={curator ?? ""} onChange={(e) => setCurator(e.target.value)}>
-          <option value="">-- выбрать куратора --</option>
-          {usersList.map((u) => (
-            <option key={u.id} value={`${u.surname} ${u.name}`}>
-              {u.surname} {u.name} ({u.role})
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className={`field-wrap ${errors.curator ? "error" : ""}`}>
+        <label className="text-small">
+          Куратор
+          <select value={curator ?? ""} onChange={(e) => { setCurator(e.target.value); setErrors((p) => { const np = { ...p }; delete np.curator; return np; }); }}>
+            <option value="">-- выбрать куратора --</option>
+            {usersList.map((u) => (
+              <option key={u.id} value={`${u.surname} ${u.name}`}>
+                {u.surname} {u.name} ({u.role})
+              </option>
+            ))}
+          </select>
+        </label>
+        {errors.curator && <div className="field-error">{errors.curator}</div>}
+      </div>
 
-      <label className="text-small">
-        Команд
-        <input type="number" min={0} value={teams as any} onChange={(e) => setTeams(e.target.value === "" ? "" : Number(e.target.value))} />
-      </label>
+      <div className={`field-wrap ${errors.teams ? "error" : ""}`}>
+        <label className="text-small">
+          Команд
+          <input type="number" min={0} value={teams as any} onChange={(e) => { setTeams(e.target.value === "" ? "" : Number(e.target.value)); setErrors((p) => { const np = { ...p }; delete np.teams; return np; }); }} />
+        </label>
+        {errors.teams && <div className="field-error">{errors.teams}</div>}
+      </div>
 
       <label className="text-small">
         Описание
@@ -157,6 +182,10 @@ export default function ProjectForm() {
       </div>
 
       <div className="wizard-actions">
+        <button className="primary" type="button" onClick={addProject} style={{ marginRight: 8 }}>
+          Добавить проект
+        </button>
+
         <button className="primary" type="button" onClick={handleSave}>
           Сохранить настройки проекта
         </button>

@@ -17,6 +17,8 @@ export default function DirectionForm() {
   const [selectedOrganizer, setSelectedOrganizer] = useState<string>("");
   const { showToast } = useToast();
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   useEffect(() => {
     if (savedDirections && savedDirections.length > 0) {
       setDirections(savedDirections);
@@ -46,20 +48,22 @@ export default function DirectionForm() {
   }, [savedDirections, eventId]);
 
   const addDirection = () => {
-    if (!input.trim()) {
-      showToast("error", "Введите название направления");
+    const title = input.trim();
+    const desc = description.trim();
+    if (!title) {
+      setErrors((p) => ({ ...p, input: "Введите название направления" }));
       return;
     }
     if (!selectedOrganizer) {
-      showToast("error", "Выберите организатора направления");
+      setErrors((p) => ({ ...p, selectedOrganizer: "Выберите организатора" }));
       return;
     }
     setDirections((prev) => [
       ...prev,
       {
         id: Date.now(),
-        title: input.trim(),
-        description: description.trim() || undefined,
+        title,
+        description: desc || undefined,
         projects: [],
         organizer: selectedOrganizer
       }
@@ -67,6 +71,7 @@ export default function DirectionForm() {
     setInput("");
     setDescription("");
     setSelectedOrganizer("");
+    setErrors({});
   };
 
   const removeDirection = (id: number) => {
@@ -104,32 +109,44 @@ export default function DirectionForm() {
     <div className="wizard-form">
       <h2 className="h2">Добавление направлений</h2>
 
-      <label className="text-small">
-        Название направления
-        <input
-          placeholder="Введите название направления и нажмите Enter"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && addDirection()}
-        />
-      </label>
+      <div className={`field-wrap ${errors.input ? "error" : ""}`}>
+        <label className="text-small">
+          Название направления
+          <input
+            placeholder="Введите название направления"
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setErrors((p) => { const np = { ...p }; delete np.input; return np; });
+            }}
+            onKeyDown={(e) => e.key === "Enter" && addDirection()}
+          />
+        </label>
+        {errors.input && <div className="field-error">{errors.input}</div>}
+      </div>
 
       <label className="text-small">
         Описание
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
       </label>
 
-      <label className="text-small">
-        Организатор направления
-        <select value={selectedOrganizer} onChange={(e) => setSelectedOrganizer(e.target.value)}>
-          <option value="">-- выбрать организатора --</option>
-          {organizers.map((o) => (
-            <option key={o.id} value={`${o.surname} ${o.name}`}>
-              {o.surname} {o.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className={`field-wrap ${errors.selectedOrganizer ? "error" : ""}`}>
+        <label className="text-small">
+          Организатор направления
+          <select value={selectedOrganizer} onChange={(e) => {
+            setSelectedOrganizer(e.target.value);
+            setErrors((p) => { const np = { ...p }; delete np.selectedOrganizer; return np; });
+          }}>
+            <option value="">-- выбрать организатора --</option>
+            {organizers.map((o) => (
+              <option key={o.id} value={`${o.surname} ${o.name}`}>
+                {o.surname} {o.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {errors.selectedOrganizer && <div className="field-error">{errors.selectedOrganizer}</div>}
+      </div>
 
       <div className="tags">
         {directions.map((d) => (
@@ -145,7 +162,11 @@ export default function DirectionForm() {
       </div>
 
       <div className="wizard-actions">
-        <button className="primary" onClick={handleSave}>
+        <button className="primary" type="button" onClick={addDirection} style={{ marginRight: 8 }}>
+          Добавить направление
+        </button>
+
+        <button className="primary" onClick={handleSave} type="button">
           Сохранить направления
         </button>
       </div>
