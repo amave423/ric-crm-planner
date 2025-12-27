@@ -1,7 +1,6 @@
 import { useState, useEffect, useContext, useMemo } from "react";
 import "../../styles/profile.scss";
 import { AuthContext } from "../../context/AuthContext";
-import client from "../../api/client";
 import { useToast } from "../../components/Toast/ToastProvider";
 
 export default function ProfilePage() {
@@ -30,7 +29,7 @@ export default function ProfilePage() {
         return;
       }
       try {
-        const data = await client.get("/api/users/profile/");
+        const data = await (await fetch("/api/users/profile/")).json().catch(() => null);
         if (!mounted) return;
         setProfile({
           name: data?.name || user.name || "Имя",
@@ -67,17 +66,24 @@ export default function ProfilePage() {
   const onSave = async () => {
     if (!user) return;
     try {
-      await updateProfile({ name: profile.name, surname: profile.surname });
-      await client.put("/api/users/profile/", {
-        university: profile.university,
-        course: profile.course,
-        specialty: profile.specialty,
-        job: profile.workplace,
-        about: profile.about,
-        telegram: profile.telegram,
-        vk: profile.vk,
-        email: profile.email,
+      const payload: Record<string, any> = {
+        name: profile.name,
+        surname: profile.surname,
+        patronymic: undefined,
+        telegram: profile.telegram || undefined,
+        email: profile.email || undefined,
+        course: profile.course || undefined,
+        university: profile.university || undefined,
+        vk: profile.vk || undefined,
+        job: profile.workplace || undefined,
+      };
+
+      Object.keys(payload).forEach((k) => {
+        if (typeof payload[k] === "undefined" || payload[k] === "") delete payload[k];
       });
+
+      await updateProfile(payload);
+
       setEditing(false);
       showToast("success", "Профиль сохранён");
     } catch {

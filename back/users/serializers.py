@@ -7,16 +7,28 @@ from django.urls import reverse
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import serializers
+from .models import CRMRole, ROLE_PROJECTANT, ROLE_CURATOR, ROLE_ADMIN
 from rest_framework.serializers import ModelSerializer, Serializer
 
 from .models import Application, Direction, Event, Profile, Project, Specialization, Status
 
 
 class UserSerializer(ModelSerializer):
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = get_user_model()
-        fields = ("id", "email", "username", "first_name", "last_name")
+        fields = ("id", "email", "username", "first_name", "last_name", "role")
+
+    def get_role(self, obj):
+        role_obj = CRMRole.objects.filter(user=obj).first()
+        if not role_obj:
+            return "student"
+        if role_obj.role_type == ROLE_PROJECTANT:
+            return "student"
+        if role_obj.role_type in (ROLE_CURATOR, ROLE_ADMIN):
+            return "organizer"
+        return "student"
 
 
 class RegisterUserSerializer(ModelSerializer):
