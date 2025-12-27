@@ -134,17 +134,20 @@ class CookieTokenRefreshView(TokenRefreshView):
 
         if not refresh_token:
             return Response({"error": "Refresh token not provided"}, status=status.HTTP_401_UNAUTHORIZED)
+        serializer = self.get_serializer(data={"refresh": refresh_token})
+
         try:
-            refresh = RefreshToken(refresh_token)
-            access_token = str(refresh.access_token)
-
-            response = Response({"message": "Access token refresh successfully"}, status=status.HTTP_200_OK)
-            _set_auth_cookies(response, access_token)
-            _set_csrf_cookie(response)
-            return response
-
+            serializer.is_valid(raise_exception=True)
         except InvalidToken:
             return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+        token_data = serializer.validated_data
+        access_token = token_data.get("access")
+        rotated_refresh = token_data.get("refresh")
+
+        response = Response(token_data, status=status.HTTP_200_OK)
+        _set_auth_cookies(response, access_token, rotated_refresh)
+        _set_csrf_cookie(response)
+        return response
 
 
 class PasswordResetRequestView(APIView):
