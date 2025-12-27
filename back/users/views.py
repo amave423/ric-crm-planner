@@ -1,4 +1,5 @@
 from django.conf import settings
+import secrets
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.shortcuts import get_object_or_404
@@ -57,6 +58,36 @@ class UserRegistrationView(CreateAPIView):
     serializer_class = RegisterUserSerializer
 
 
+def _set_auth_cookies(response, access_token: str, refresh_token: RefreshToken | None = None):
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=settings.SESSION_COOKIE_SECURE,
+        samesite=settings.SESSION_COOKIE_SAMESITE,
+    )
+
+    if refresh_token is not None:
+        response.set_cookie(
+            key="refresh_token",
+            value=str(refresh_token),
+            httponly=True,
+            secure=settings.SESSION_COOKIE_SECURE,
+            samesite=settings.SESSION_COOKIE_SAMESITE,
+        )
+
+
+def _set_csrf_cookie(response):
+    csrf_token = secrets.token_urlsafe(32)
+    response.set_cookie(
+        key="csrftoken",
+        value=csrf_token,
+        httponly=False,
+        secure=settings.CSRF_COOKIE_SECURE,
+        samesite=settings.CSRF_COOKIE_SAMESITE,
+    )
+    return csrf_token
+
 class LoginView(APIView):
     permission_classes = (AllowAny,)
 
@@ -70,21 +101,8 @@ class LoginView(APIView):
 
             response = Response({"user": UserSerializer(user).data}, status=status.HTTP_200_OK)
 
-            response.set_cookie(
-                key="access_token",
-                value=access_token,
-                httponly=True,
-                secure=settings.SESSION_COOKIE_SECURE,
-                samesite="None",
-            )
-
-            response.set_cookie(
-                key="refresh_token",
-                value=str(refresh),
-                httponly=True,
-                secure=settings.SESSION_COOKIE_SECURE,
-                samesite="None",
-            )
+            _set_auth_cookies(response, access_token, refresh)
+            _set_csrf_cookie(response)
 
             return response
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -121,13 +139,8 @@ class CookieTokenRefreshView(TokenRefreshView):
             access_token = str(refresh.access_token)
 
             response = Response({"message": "Access token refresh successfully"}, status=status.HTTP_200_OK)
-            response.set_cookie(
-                key="access_token",
-                value=access_token,
-                httponly=True,
-                secure=settings.SESSION_COOKIE_SECURE,
-                samesite="None",
-            )
+            _set_auth_cookies(response, access_token)
+            _set_csrf_cookie(response)
             return response
 
         except InvalidToken:
@@ -428,3 +441,4 @@ class DirectionApplicationCreateView(CreateAPIView):
         )
         context.update({"event": event, "direction": direction})
         return context
+
