@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getProjectsByDirection } from "../../api/projects";
 import { getEventById } from "../../api/events";
@@ -11,9 +11,8 @@ import EventWizardModal, { type WizardLaunchContext } from "../../components/Eve
 import ApplyModal from "../../components/Requests/ApplyModal";
 import InfoModal from "../../components/Modal/InfoModal";
 import { AuthContext } from "../../context/AuthContext";
-import { saveRequest } from "../../api/requests";
+import { saveRequest, getRequests as apiGetRequests } from "../../api/requests";
 import { useToast } from "../../components/Toast/ToastProvider";
-import { getRequests } from "../../api/requests";
 
 import "../../styles/page-colors.scss";
 
@@ -24,9 +23,31 @@ export default function ProjectsPage() {
   const eventIdNum = Number(eventId);
   const directionIdNum = Number(directionId);
 
-  const event = getEventById(eventIdNum);
-  const direction = getDirectionById(directionIdNum);
-  const projects = getProjectsByDirection(directionIdNum);
+  const [event, setEvent] = useState<any | null>(null);
+  const [direction, setDirection] = useState<any | null>(null);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    Promise.all([
+      getEventById(eventIdNum),
+      getDirectionById(directionIdNum),
+      getProjectsByDirection(directionIdNum),
+      apiGetRequests()
+    ])
+      .then(([ev, dir, projs, reqs]) => {
+        if (!mounted) return;
+        setEvent(ev || null);
+        setDirection(dir || null);
+        setProjects(projs || []);
+        setRequests(reqs || []);
+      })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [eventIdNum, directionIdNum]);
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardContext, setWizardContext] = useState<WizardLaunchContext | null>(null);
@@ -39,7 +60,6 @@ export default function ProjectsPage() {
   const { user } = useContext(AuthContext);
   const isStudent = user?.role === "student";
 
-  // info modal states
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoItem, setInfoItem] = useState<{ title?: string; description?: string } | null>(null);
 
@@ -103,7 +123,7 @@ export default function ProjectsPage() {
             className="apply-box"
             onClick={() => {
               const ownerId = user?.id;
-              const existing = getRequests().find(r => r.ownerId === ownerId && r.projectId === selectedProjectId);
+              const existing = requests.find(r => r.ownerId === ownerId && r.projectId === selectedProjectId);
               if (existing) {
                 showToast("error", "Вы уже отправляли заявку на этот проект");
                 return;
@@ -131,19 +151,26 @@ export default function ProjectsPage() {
         projectTitle={projects.find((p) => p.id === selectedProjectId)?.title}
         eventId={eventIdNum}
         specializations={event?.specializations || []}
-        onSubmit={(req) => {
+        onSubmit={async (req) => {
           const ownerId = user?.id;
           if (ownerId) (req as any).ownerId = ownerId;
 
-          const existing = getRequests().find(r => r.ownerId === ownerId && r.projectId === req.projectId);
+          const existing = requests.find(r => r.ownerId === ownerId && r.projectId === req.projectId);
           if (existing) {
               showToast("error", "Вы уже отправляли заявку на этот проект");
               return false;
           }
 
-          saveRequest(req);
-          showToast("success", "Заявка отправлена");
-          return true;
+          try {
+            await saveRequest(req);
+            showToast("success", "Заявка отправлена");
+            const rs = await apiGetRequests();
+            setRequests(rs || []);
+            return true;
+          } catch {
+            showToast("error", "Ошибка при отправке заявки");
+            return false;
+          }
         }}
       />
 

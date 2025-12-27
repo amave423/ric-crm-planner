@@ -1,14 +1,30 @@
-import { getDirectionsByEvent as _getDirectionsByEvent, getDirectionById as _getDirectionById, saveDirectionsForEvent as _saveDirectionsForEvent } from "../storage/storage";
+import client from "../api/client";
 import type { Direction } from "../types/direction";
+import { getDirectionsByEvent as _getDirectionsByEvent, getDirectionById as _getDirectionById, saveDirectionsForEvent as _saveDirectionsForEvent } from "../storage/storage";
 
-export function getDirectionsByEvent(eventId: number): Direction[] {
-  return _getDirectionsByEvent(eventId);
+const USE_MOCK = client.USE_MOCK;
+
+export async function getDirectionsByEvent(eventId: number): Promise<Direction[]> {
+  if (USE_MOCK) return _getDirectionsByEvent(eventId);
+  return client.get(`/api/users/events/${eventId}/directions/`);
 }
 
-export function getDirectionById(id: number): Direction | undefined {
-  return _getDirectionById(id);
+export async function getDirectionById(id: number): Promise<Direction | undefined> {
+  if (USE_MOCK) return _getDirectionById(id);
+  return client.get(`/api/users/events/0/directions/${id}/`).catch(() => undefined);
 }
 
-export function saveDirectionsForEvent(eventId: number, dirs: Direction[]) {
-  return _saveDirectionsForEvent(eventId, dirs);
+export async function saveDirectionsForEvent(eventId: number, dirs: Direction[]) {
+  if (USE_MOCK) return _saveDirectionsForEvent(eventId, dirs);
+  const created: any[] = [];
+  for (const d of dirs) {
+    if (d.id) {
+      await client.put(`/api/users/events/${eventId}/directions/${d.id}/`, d);
+      created.push(d);
+    } else {
+      const res = await client.post(`/api/users/events/${eventId}/directions/`, d);
+      created.push(res);
+    }
+  }
+  return created;
 }

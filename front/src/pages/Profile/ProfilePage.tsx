@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext, useMemo } from "react";
 import "../../styles/profile.scss";
 import { AuthContext } from "../../context/AuthContext";
-import { getProfile, saveProfile } from "../../storage/storage";
+import client from "../../api/client";
 import { useToast } from "../../components/Toast/ToastProvider";
 
 export default function ProfilePage() {
@@ -23,38 +23,66 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    if (!user) return;
-    const stored = getProfile(user.id);
-    setProfile({
-      name: user.name || "Имя",
-      surname: user.surname || "Фамилия",
-      university: stored?.university || "",
-      course: stored?.course || "",
-      specialty: stored?.specialty || "",
-      workplace: stored?.workplace || "",
-      about: stored?.about || "",
-      telegram: stored?.telegram || "",
-      vk: stored?.vk || "",
-      email: user.email || "",
-    });
+    let mounted = true;
+    (async () => {
+      if (!user) {
+        setProfile((p) => ({ ...p, email: "example@mail.ru" }));
+        return;
+      }
+      try {
+        const data = await client.get("/api/users/profile/");
+        if (!mounted) return;
+        setProfile({
+          name: data?.name || user.name || "Имя",
+          surname: data?.surname || user.surname || "Фамилия",
+          university: data?.university || "",
+          course: data?.course || "",
+          specialty: data?.specialty || "",
+          workplace: data?.job || data?.workplace || "",
+          about: data?.about || "",
+          telegram: data?.telegram || "",
+          vk: data?.vk || "",
+          email: data?.email || user.email || "",
+        });
+      } catch {
+        setProfile({
+          name: user.name || "Имя",
+          surname: user.surname || "Фамилия",
+          university: "",
+          course: "",
+          specialty: "",
+          workplace: "",
+          about: "",
+          telegram: "",
+          vk: "",
+          email: user.email || "",
+        });
+      }
+    })();
+    return () => { mounted = false; };
   }, [user]);
 
   const update = (key: string, value: string) => setProfile({ ...profile, [key]: value });
 
-  const onSave = () => {
+  const onSave = async () => {
     if (!user) return;
-    updateProfile({ name: profile.name, surname: profile.surname });
-    saveProfile(user.id, {
-      university: profile.university,
-      course: profile.course,
-      specialty: profile.specialty,
-      workplace: profile.workplace,
-      about: profile.about,
-      telegram: profile.telegram,
-      vk: profile.vk,
-    });
-    setEditing(false);
-    showToast("success", "Профиль сохранён");
+    try {
+      await updateProfile({ name: profile.name, surname: profile.surname });
+      await client.put("/api/users/profile/", {
+        university: profile.university,
+        course: profile.course,
+        specialty: profile.specialty,
+        job: profile.workplace,
+        about: profile.about,
+        telegram: profile.telegram,
+        vk: profile.vk,
+        email: profile.email,
+      });
+      setEditing(false);
+      showToast("success", "Профиль сохранён");
+    } catch {
+      showToast("error", "Ошибка при сохранении профиля");
+    }
   };
 
   const COLORS = [

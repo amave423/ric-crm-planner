@@ -48,27 +48,9 @@ class RegisterUserSerializer(ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        validated_data.pop("password_confirmation")
-        user = get_user_model().objects.create_user(
-            **validated_data, is_active=False
-        )
+        validated_data.pop("password_confirmation", None)
 
-        token = default_token_generator.make_token(user)
-        request = self.context.get("request")
-        confirmation_path = reverse("email-confirmation")
-        confirmation_link = (
-            request.build_absolute_uri(f"{confirmation_path}?email={user.email}&token={token}")
-            if request
-            else f"{confirmation_path}?email={user.email}&token={token}"
-        )
-
-        send_mail(
-            subject="Подтверждение регистрации",
-            message=f"Для подтверждения аккаунта перейдите по ссылке: {confirmation_link}",
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-            recipient_list=[user.email],
-            fail_silently=True,
-        )
+        user = get_user_model().objects.create_user(**validated_data, is_active=True)
 
         return user
 

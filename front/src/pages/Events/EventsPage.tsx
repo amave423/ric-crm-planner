@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { getEvents } from "../../api/events";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import Table from "../../components/Table/Table";
 import TableHeader from "../../components/Layout/TableHeader";
@@ -17,7 +17,22 @@ export default function EventsPage() {
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [search, setSearch] = useState("");
 
-  const allEvents = getEvents();
+  const [allEvents, setAllEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    getEvents()
+      .then((evs) => {
+        if (mounted) setAllEvents(evs || []);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => { mounted = false; };
+  }, []);
+
   const events = !search.trim()
     ? allEvents
     : allEvents.filter(e =>

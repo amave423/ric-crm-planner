@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useWizard } from "../EventWizardModal";
 import type { DirectionModel } from "../types";
-import { getDirectionsByEvent } from "../../../api/directions";
-import { saveDirectionsForEvent as persistDirections } from "../../../api/directions";
+import { getDirectionsByEvent, saveDirectionsForEvent as persistDirections } from "../../../api/directions";
 import { getEventById } from "../../../api/events";
 import users from "../../../mock-data/users.json";
 import { useToast } from "../../Toast/ToastProvider";
@@ -18,33 +17,50 @@ export default function DirectionForm() {
   const { showToast } = useToast();
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (savedDirections && savedDirections.length > 0) {
-      setDirections(savedDirections);
-      setSelectedOrganizer(savedDirections[0]?.organizer ?? "");
-    } else if (eventId) {
-      const api = getDirectionsByEvent(Number(eventId));
-      setDirections(
-        api.map((d) => ({
-          id: d.id,
-          title: d.title,
-          description: (d as any).description ?? undefined,
-          projects: (d as any).projects ?? [],
-          organizer: (d as any).organizer ?? ""
-        }))
-      );
-
-      const ev = getEventById(Number(eventId));
-      if (ev) {
-        const leaderId = (ev as any).leader;
-        if (leaderId != null) {
-          const u = organizers.find((o) => String(o.id) === String(leaderId));
-          if (u) setSelectedOrganizer(`${u.surname} ${u.name}`);
-          else setSelectedOrganizer(String(leaderId));
-        }
+    let mounted = true;
+    (async () => {
+      if (savedDirections && savedDirections.length > 0) {
+        if (!mounted) return;
+        setDirections(savedDirections);
+        setSelectedOrganizer(savedDirections[0]?.organizer ?? "");
+        return;
       }
-    }
+      if (!eventId) return;
+      setLoading(true);
+      try {
+        const apiDirs = await getDirectionsByEvent(Number(eventId));
+        if (!mounted) return;
+        setDirections(
+          apiDirs.map((d: any) => ({
+            id: d.id,
+            title: d.title,
+            description: d.description ?? undefined,
+            projects: d.projects ?? [],
+            organizer: d.organizer ?? ""
+          }))
+        );
+
+        const ev = await getEventById(Number(eventId));
+        if (!mounted) return;
+        if (ev) {
+          const leaderId = (ev as any).leader;
+          if (leaderId != null) {
+            const u = organizers.find((o) => String(o.id) === String(leaderId));
+            if (u) setSelectedOrganizer(`${u.surname} ${u.name}`);
+            else setSelectedOrganizer(String(leaderId));
+          }
+        }
+      } catch {
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
   }, [savedDirections, eventId]);
 
   const addDirection = () => {
@@ -85,7 +101,7 @@ export default function DirectionForm() {
     setDirections((prev) => prev.filter((d) => d.id !== id));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!eventId) {
       showToast("error", "Сохраните сначала мероприятие (первая вкладка).");
       return;
@@ -100,9 +116,14 @@ export default function DirectionForm() {
         return;
       }
     }
-    const saved = persistDirections(Number(eventId), directions as any);
-    saveDirections?.(saved as any);
-    showToast("success", "Направления сохранены");
+
+    try {
+      const saved = await persistDirections(Number(eventId), directions as any);
+      saveDirections?.(saved as any);
+      showToast("success", "Направления сохранены");
+    } catch {
+      showToast("error", "Ошибка при сохранении направлений");
+    }
   };
 
   return (
@@ -117,7 +138,11 @@ export default function DirectionForm() {
             value={input}
             onChange={(e) => {
               setInput(e.target.value);
-              setErrors((p) => { const np = { ...p }; delete np.input; return np; });
+              setErrors((p) => {
+                const np = { ...p };
+                delete np.input;
+                return np;
+              });
             }}
             onKeyDown={(e) => e.key === "Enter" && addDirection()}
           />
@@ -133,10 +158,17 @@ export default function DirectionForm() {
       <div className={`field-wrap ${errors.selectedOrganizer ? "error" : ""}`}>
         <label className="text-small">
           Организатор направления
-          <select value={selectedOrganizer} onChange={(e) => {
-            setSelectedOrganizer(e.target.value);
-            setErrors((p) => { const np = { ...p }; delete np.selectedOrganizer; return np; });
-          }}>
+          <select
+            value={selectedOrganizer}
+            onChange={(e) => {
+              setSelectedOrganizer(e.target.value);
+              setErrors((p) => {
+                const np = { ...p };
+                delete np.selectedOrganizer;
+                return np;
+              });
+            }}
+          >
             <option value="">-- выбрать организатора --</option>
             {organizers.map((o) => (
               <option key={o.id} value={`${o.surname} ${o.name}`}>
@@ -149,16 +181,20 @@ export default function DirectionForm() {
       </div>
 
       <div className="tags">
-        {directions.map((d) => (
-          <div key={d.id} className="tag">
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-              <strong style={{ lineHeight: 1 }}>{d.title}</strong>
-              {d.description && <span className="text-small" style={{ opacity: 0.8 }}>{d.description}</span>}
-              {d.organizer && <span className="text-small" style={{ opacity: 0.8 }}>Организатор: {d.organizer}</span>}
+        {loading ? (
+          <div>Загрузка...</div>
+        ) : (
+          directions.map((d) => (
+            <div key={d.id} className="tag">
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                <strong style={{ lineHeight: 1 }}>{d.title}</strong>
+                {d.description && <span className="text-small" style={{ opacity: 0.8 }}>{d.description}</span>}
+                {d.organizer && <span className="text-small" style={{ opacity: 0.8 }}>Организатор: {d.organizer}</span>}
+              </div>
+              <button onClick={() => removeDirection(d.id)}>×</button>
             </div>
-            <button onClick={() => removeDirection(d.id)}>×</button>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       <div className="wizard-actions">

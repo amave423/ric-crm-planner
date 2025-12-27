@@ -17,9 +17,8 @@ interface Project {
 export default function ProjectForm() {
   const { eventId, savedDirections, directionId: ctxDirectionId } = useWizard();
 
-  const directions: any[] = savedDirections && savedDirections.length > 0 ? savedDirections : getDirectionsByEvent(eventId ?? 0);
-
-  const [directionId, setDirectionId] = useState<string>(ctxDirectionId ? String(ctxDirectionId) : directions[0]?.id ? String(directions[0].id) : "");
+  const [directions, setDirections] = useState<any[]>([]);
+  const [directionId, setDirectionId] = useState<string>(ctxDirectionId ? String(ctxDirectionId) : "");
   const [projects, setProjects] = useState<Project[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -29,6 +28,70 @@ export default function ProjectForm() {
   const usersList = users;
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loadingDirs, setLoadingDirs] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (savedDirections && savedDirections.length > 0) {
+        if (!mounted) return;
+        setDirections(savedDirections);
+        if (!directionId && savedDirections.length > 0) setDirectionId(String(savedDirections[0].id));
+        return;
+      }
+
+      if (!eventId) return;
+      setLoadingDirs(true);
+      try {
+        const dirs = await getDirectionsByEvent(eventId ?? 0);
+        if (!mounted) return;
+        setDirections(dirs || []);
+        if (!directionId && dirs && dirs.length > 0) setDirectionId(String(dirs[0].id));
+      } catch {
+      } finally {
+        if (mounted) setLoadingDirs(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [eventId, savedDirections]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!directionId) {
+        setProjects([]);
+        return;
+      }
+
+      const dirFromSaved = (savedDirections || []).find((d: any) => String(d.id) === String(directionId));
+      if (dirFromSaved && dirFromSaved.projects && dirFromSaved.projects.length > 0) {
+        if (!mounted) return;
+        setProjects(dirFromSaved.projects.map((p: any) => ({ ...p, directionId: String(directionId) })));
+        return;
+      }
+
+      setLoadingProjects(true);
+      try {
+        const apiProjects = await getProjectsByDirection(Number(directionId));
+        if (!mounted) return;
+        setProjects(
+          (apiProjects || []).map((p: any) => ({
+            id: p.id,
+            title: p.title ?? "",
+            description: p.description ?? "",
+            directionId: String(directionId),
+            curator: p.curator ?? "",
+            teams: p.teams ?? 0
+          }))
+        );
+      } catch {
+      } finally {
+        if (mounted) setLoadingProjects(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [directionId, savedDirections]);
 
   useEffect(() => {
     if (ctxDirectionId) {
@@ -41,20 +104,6 @@ export default function ProjectForm() {
       setDirectionId(String(directions[0].id));
     }
   }, [directions]);
-
-  useEffect(() => {
-    if (!directionId) {
-      setProjects([]);
-      return;
-    }
-    const dirFromSaved = (savedDirections || []).find((d: any) => String(d.id) === String(directionId));
-    if (dirFromSaved && dirFromSaved.projects && dirFromSaved.projects.length > 0) {
-      setProjects(dirFromSaved.projects.map((p: any) => ({ ...p, directionId: String(directionId) })));
-      return;
-    }
-    const apiProjects = getProjectsByDirection(Number(directionId));
-    setProjects(apiProjects.map((p) => ({ id: p.id, title: p.title ?? "", description: (p as any).description ?? "", directionId: String(directionId), curator: (p as any).curator ?? "", teams: (p as any).teams ?? 0 })));
-  }, [directionId, savedDirections]);
 
   const addProject = () => {
     if (!directionId) {
@@ -85,7 +134,7 @@ export default function ProjectForm() {
     setProjects(projects.filter((p) => p.id !== id));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!directionId) {
       showToast("error", "Выберите направление");
       return;
@@ -100,8 +149,13 @@ export default function ProjectForm() {
         return;
       }
     }
-    saveProjectsForDirection(Number(directionId), projects as any);
-    showToast("success", "Проекты сохранены");
+
+    try {
+      await saveProjectsForDirection(Number(directionId), projects as any);
+      showToast("success", "Проекты сохранены");
+    } catch {
+      showToast("error", "Ошибка при сохранении проектов");
+    }
   };
 
   return (
@@ -118,7 +172,7 @@ export default function ProjectForm() {
             <option value="" disabled>
               Выберите направление
             </option>
-            {directions.map((d: any) => (
+            {loadingDirs ? <option>Загрузка...</option> : directions.map((d: any) => (
               <option key={d.id} value={d.id}>
                 {d.title}
               </option>
@@ -168,17 +222,21 @@ export default function ProjectForm() {
       </label>
 
       <div className="tags" style={{ marginTop: 12 }}>
-        {projects.map((p) => (
-          <div key={p.id} className="tag">
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-              <strong style={{ lineHeight: 1 }}>{p.title}</strong>
-              {p.description && <span className="text-small" style={{ opacity: 0.8 }}>{p.description}</span>}
-              {p.curator && <span className="text-small" style={{ opacity: 0.8 }}>Куратор: {p.curator}</span>}
-              {typeof p.teams !== "undefined" && <span className="text-small" style={{ opacity: 0.8 }}>Команд: {p.teams}</span>}
+        {loadingProjects ? (
+          <div>Загрузка...</div>
+        ) : (
+          projects.map((p) => (
+            <div key={p.id} className="tag">
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                <strong style={{ lineHeight: 1 }}>{p.title}</strong>
+                {p.description && <span className="text-small" style={{ opacity: 0.8 }}>{p.description}</span>}
+                {p.curator && <span className="text-small" style={{ opacity: 0.8 }}>Куратор: {p.curator}</span>}
+                {typeof p.teams !== "undefined" && <span className="text-small" style={{ opacity: 0.8 }}>Команд: {p.teams}</span>}
+              </div>
+              <button onClick={() => removeProject(p.id)}>×</button>
             </div>
-            <button onClick={() => removeProject(p.id)}>×</button>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       <div className="wizard-actions">

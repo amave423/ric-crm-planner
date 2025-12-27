@@ -2,8 +2,8 @@ import { useState, useEffect, useContext } from "react";
 import Modal from "../Modal/Modal";
 import type { Request } from "../../types/request";
 import { AuthContext } from "../../context/AuthContext";
-import { getProfile } from "../../storage/storage";
 import { useToast } from "../Toast/ToastProvider";
+import client from "../../api/client";
 
 interface Props {
   isOpen: boolean;
@@ -29,14 +29,29 @@ export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, e
 
   useEffect(() => {
     if (!isOpen) return;
-    const prof = user ? getProfile(user.id) : undefined;
-    setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");
-    setTelegram(prof?.telegram || "");
-    setUniversity(prof?.university || "");
-    setCourse(prof?.course || "");
-    setSpecialization(prof?.specialty || specializations[0]?.title || "");
-    setAbout(prof?.about || "");
-    setErrors({});
+    let mounted = true;
+    (async () => {
+      try {
+        const prof = user ? await client.get("/api/users/profile/") : undefined;
+        if (!mounted) return;
+        setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");
+        setTelegram(prof?.telegram || "");
+        setUniversity(prof?.university || "");
+        setCourse(prof?.course || "");
+        setSpecialization(prof?.specialty || specializations[0]?.title || "");
+        setAbout(prof?.about || "");
+        setErrors({});
+      } catch {
+        setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");
+        setTelegram("");
+        setUniversity("");
+        setCourse("");
+        setSpecialization(specializations[0]?.title || "");
+        setAbout("");
+        setErrors({});
+      }
+    })();
+    return () => { mounted = false; };
   }, [isOpen]);
 
   const validate = () => {

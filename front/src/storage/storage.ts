@@ -1,177 +1,149 @@
-import mockEvents from "../mock-data/events.json";
-import mockDirections from "../mock-data/directions.json";
-import mockProjects from "../mock-data/projects.json";
-import mockUsers from "../mock-data/users.json";
+import client from "../api/client";
 import type { Event } from "../types/event";
 import type { Direction } from "../types/direction";
 import type { Project } from "../types/project";
 import type { User } from "../types/user";
-import type { Request } from "../types/request";
 
-const LS_KEY_PREFIX = "ric_planner_";
+export async function getEvents(): Promise<Event[]> {
+  return client.get("/api/users/events/");
+}
 
-function readJSON<T>(key: string, fallback: T): T {
+export async function getEventById(id: number): Promise<Event | undefined> {
   try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
+    return await client.get(`/api/users/events/${id}/`);
   } catch {
-    return fallback;
-  }
-}
-
-function writeJSON<T>(key: string, value: T) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-function mergeById<T extends { id: number }>(base: T[], overrides: Partial<T>[]): T[] {
-  const map = new Map<number, T>();
-  base.forEach((b) => map.set(b.id, { ...b }));
-  overrides.forEach((o) => {
-    if (o.id == null) return;
-    const existing = map.get(o.id);
-    map.set(o.id, { ...(existing || (o as T)), ...(o as T) });
-  });
-  return Array.from(map.values());
-}
-
-export function getEvents(): Event[] {
-  const stored = readJSON<Event[]>(LS_KEY_PREFIX + "events", []);
-  const base = Array.isArray(mockEvents) ? (mockEvents as Event[]) : [];
-  return mergeById(base, stored);
-}
-
-export function getEventById(id: number): Event | undefined {
-  return getEvents().find((e) => e.id === id);
-}
-
-export function saveEvent(ev: Event): Event {
-  const all = getEvents();
-  if (!ev.id) {
-    const max = all.reduce((m, x) => Math.max(m, x.id || 0), 0);
-    ev.id = max + 1;
-    all.push(ev);
-  } else {
-    const idx = all.findIndex((x) => x.id === ev.id);
-    if (idx >= 0) all[idx] = { ...all[idx], ...ev };
-    else all.push(ev);
-  }
-  writeJSON(LS_KEY_PREFIX + "events", all);
-  return ev;
-}
-
-export function getDirectionsByEvent(eventId: number): Direction[] {
-  const stored = readJSON<Direction[]>(LS_KEY_PREFIX + "directions", []);
-  const base = Array.isArray(mockDirections) ? (mockDirections as Direction[]) : [];
-  const merged = mergeById(base, stored);
-  return merged.filter((d) => d.eventId === eventId);
-}
-
-export function getDirectionById(id: number): Direction | undefined {
-  const stored = readJSON<Direction[]>(LS_KEY_PREFIX + "directions", []);
-  const base = Array.isArray(mockDirections) ? (mockDirections as Direction[]) : [];
-  const merged = mergeById(base, stored);
-  return merged.find((d) => d.id === id);
-}
-
-export function saveDirectionsForEvent(eventId: number, dirs: Direction[]): Direction[] {
-  const stored = readJSON<Direction[]>(LS_KEY_PREFIX + "directions", []);
-  const others = stored.filter((d) => d.eventId !== eventId);
-  const normalized = dirs.map((d) => ({ ...d, eventId }));
-  const result = [...others, ...normalized];
-  writeJSON(LS_KEY_PREFIX + "directions", result);
-  return normalized;
-}
-
-export function getProjectsByDirection(directionId: number): Project[] {
-  const stored = readJSON<Project[]>(LS_KEY_PREFIX + "projects", []);
-  const base = Array.isArray(mockProjects) ? (mockProjects as Project[]) : [];
-  const merged = mergeById(base, stored);
-  return merged.filter((p) => p.directionId === directionId);
-}
-
-export function saveProjectsForDirection(directionId: number, projects: Project[]): Project[] {
-  const stored = readJSON<Project[]>(LS_KEY_PREFIX + "projects", []);
-  const others = stored.filter((p) => p.directionId !== directionId);
-  const normalized = projects.map((p) => ({ ...p, directionId }));
-  const result = [...others, ...normalized];
-  writeJSON(LS_KEY_PREFIX + "projects", result);
-  return normalized;
-}
-
-export function getAllUsers(): User[] {
-  const stored = readJSON<User[]>(LS_KEY_PREFIX + "users", []);
-  const base = Array.isArray(mockUsers) ? (mockUsers as User[]) : [];
-  return mergeById(base, stored);
-}
-
-export function saveUser(user: User): User {
-  const users = getAllUsers();
-  if (!user.id) {
-    const max = users.reduce((m, x) => Math.max(m, x.id || 0), 0);
-    user.id = max + 1;
-    users.push(user);
-  } else {
-    const idx = users.findIndex((u) => u.id === user.id);
-    if (idx >= 0) users[idx] = { ...users[idx], ...user };
-    else users.push(user);
-  }
-  writeJSON(LS_KEY_PREFIX + "users", users);
-  return user;
-}
-
-export function getProfile(userId: number): Record<string, any> | undefined {
-  const stored = readJSON<Record<string, Record<string, any>>>(LS_KEY_PREFIX + "profiles", {});
-  return stored[String(userId)];
-}
-
-export function saveProfile(userId: number, profile: Record<string, any>) {
-  const stored = readJSON<Record<string, Record<string, any>>>(LS_KEY_PREFIX + "profiles", {});
-  stored[String(userId)] = profile;
-  writeJSON(LS_KEY_PREFIX + "profiles", stored);
-  return stored[String(userId)];
-}
-
-export function getRequests(): Request[] {
-  const stored = readJSON<Request[]>(LS_KEY_PREFIX + "requests", []);
-  return Array.isArray(stored) ? stored : [];
-}
-
-export function saveRequest(req: Request): Request {
-  const all = getRequests();
-  if (!req.id) {
-    const max = all.reduce((m, x) => Math.max(m, x.id || 0), 0);
-    req.id = max + 1;
-    req.createdAt = new Date().toISOString();
-    req.status = req.status || "Прислал заявку";
-    all.push(req);
-  } else {
-    const idx = all.findIndex((x) => x.id === req.id);
-    if (idx >= 0) all[idx] = { ...all[idx], ...req };
-    else all.push(req);
-  }
-  writeJSON(LS_KEY_PREFIX + "requests", all);
-  return req;
-}
-
-export function updateRequestStatus(id: number, status: string): Request | undefined {
-  const all = getRequests();
-  const idx = all.findIndex((r) => r.id === id);
-  if (idx === -1) return undefined;
-  all[idx] = { ...all[idx], status };
-  writeJSON(LS_KEY_PREFIX + "requests", all);
-  return all[idx];
-}
-
-export function removeEvent(id: number): any | undefined {
-  const stored = readJSON<any[]>(LS_KEY_PREFIX + "events", []);
-  const idx = stored.findIndex((e) => e.id === id);
-  if (idx === -1) {
-    const filtered = stored.filter((e) => e.id !== id);
-    writeJSON(LS_KEY_PREFIX + "events", filtered);
     return undefined;
   }
-  const [removed] = stored.splice(idx, 1);
-  writeJSON(LS_KEY_PREFIX + "events", stored);
-  return removed;
+}
+
+export async function saveEvent(ev: Event): Promise<Event> {
+  if (ev.id) {
+    return client.put(`/api/users/events/${ev.id}/`, ev);
+  }
+  return client.post("/api/users/events/", ev);
+}
+
+export async function removeEvent(id: number): Promise<any> {
+  return client.del(`/api/users/events/${id}/`);
+}
+
+export async function getDirectionsByEvent(eventId: number): Promise<Direction[]> {
+  return client.get(`/api/users/events/${eventId}/directions/`);
+}
+
+export async function getDirectionById(id: number): Promise<Direction | undefined> {
+  try {
+    const events: Event[] = await getEvents();
+    for (const ev of events) {
+      const dirs: Direction[] = await getDirectionsByEvent(ev.id as number);
+      const found = dirs.find((d) => d.id === id);
+      if (found) return found;
+    }
+  } catch {
+  }
+  return undefined;
+}
+
+export async function saveDirectionsForEvent(eventId: number, dirs: Direction[]): Promise<Direction[]> {
+  const results: any[] = [];
+  for (const d of dirs) {
+    if (d.id) {
+      results.push(await client.put(`/api/users/events/${eventId}/directions/${d.id}/`, d));
+    } else {
+      results.push(await client.post(`/api/users/events/${eventId}/directions/`, d));
+    }
+  }
+  return results;
+}
+
+export async function getProjectsByDirection(directionId: number): Promise<Project[]> {
+  try {
+    const byQuery = await client.get(`/api/users/projects/?direction=${directionId}`);
+    if (Array.isArray(byQuery)) return byQuery;
+  } catch {
+  }
+
+  try {
+    const events: Event[] = await getEvents();
+    for (const ev of events) {
+      const dirs: Direction[] = await getDirectionsByEvent(ev.id as number);
+      const dir = dirs.find((d) => d.id === directionId);
+      if (dir) {
+        return client.get(`/api/users/events/${ev.id}/directions/${directionId}/projects/`);
+      }
+    }
+  } catch {
+  }
+  return [];
+}
+
+export async function saveProjectsForDirection(directionId: number, projects: Project[]): Promise<any[]> {
+  let eventId: number | null = null;
+  try {
+    const events: Event[] = await getEvents();
+    for (const ev of events) {
+      const dirs: Direction[] = await getDirectionsByEvent(ev.id as number);
+      if (dirs.find((d) => d.id === directionId)) {
+        eventId = ev.id as number;
+        break;
+      }
+    }
+  } catch {
+  }
+
+  const results: any[] = [];
+  for (const p of projects) {
+    if (p.id) {
+      results.push(await client.put(`/api/users/projects/${p.id}/`, p));
+    } else {
+      if (eventId != null) {
+        results.push(await client.post(`/api/users/events/${eventId}/directions/${directionId}/projects/`, p));
+      } else {
+        results.push(await client.post("/api/users/projects/", { ...p, direction: directionId }));
+      }
+    }
+  }
+  return results;
+}
+
+export async function getAllUsers(): Promise<User[]> {
+  try {
+    return await client.get("/api/users/");
+  } catch {
+    return [];
+  }
+}
+
+export async function saveUser(user: User): Promise<User> {
+  return client.post("/api/users/register/", user);
+}
+
+export async function getProfile(_userId: number): Promise<Record<string, any> | undefined> {
+  try {
+    return await client.get("/api/users/profile/");
+  } catch {
+    return undefined;
+  }
+}
+
+export async function saveProfile(_userId: number, profile: Record<string, any>) {
+  return client.put("/api/users/profile/", profile);
+}
+
+export async function getRequests(): Promise<any[]> {
+  return client.get("/api/users/applications/");
+}
+
+export async function saveRequest(req: any): Promise<any> {
+  if (req.id) {
+    return client.put(`/api/users/applications/${req.id}/`, req);
+  }
+  if (req.eventId && req.directionId) {
+    return client.post(`/api/users/events/${req.eventId}/directions/${req.directionId}/applications/`, req);
+  }
+  return client.post("/api/users/applications/", req);
+}
+
+export async function updateRequestStatus(id: number, status: string): Promise<any> {
+  return client.put(`/api/users/applications/${id}/`, { status });
 }

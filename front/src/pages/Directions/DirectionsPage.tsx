@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { getDirectionsByEvent } from "../../api/directions";
 import { getEventById } from "../../api/events";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import Table from "../../components/Table/Table";
 import TableHeader from "../../components/Layout/TableHeader";
@@ -17,8 +17,22 @@ export default function DirectionsPage() {
   const eventIdNum = Number(eventId);
   const [search, setSearch] = useState("");
 
-  const event = getEventById(eventIdNum);
-  const directions = getDirectionsByEvent(eventIdNum);
+  const [event, setEvent] = useState<any | null>(null);
+  const [directions, setDirections] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    Promise.all([getEventById(eventIdNum), getDirectionsByEvent(eventIdNum)])
+      .then(([ev, dirs]) => {
+        if (!mounted) return;
+        setEvent(ev || null);
+        setDirections(dirs || []);
+      })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [eventIdNum]);
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardContext, setWizardContext] = useState<WizardLaunchContext | null>(null);
