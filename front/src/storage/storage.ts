@@ -46,8 +46,16 @@ export async function getDirectionById(id: number): Promise<Direction | undefine
 
 export async function saveDirectionsForEvent(eventId: number, dirs: Direction[]): Promise<Direction[]> {
   const results: any[] = [];
+
+  function isTempId(id: any) {
+    if (id == null) return false;
+    const n = Number(id);
+    if (Number.isNaN(n)) return true;
+    return String(n).length >= 12 || n > 1e11;
+  }
+
   for (const d of dirs) {
-    if (d.id) {
+    if (d.id && !isTempId(d.id)) {
       results.push(await client.put(`/api/users/events/${eventId}/directions/${d.id}/`, d));
     } else {
       results.push(await client.post(`/api/users/events/${eventId}/directions/`, d));

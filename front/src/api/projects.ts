@@ -6,7 +6,9 @@ const USE_MOCK = client.USE_MOCK;
 
 export async function getProjectsByDirection(directionId: number): Promise<Project[]> {
   if (USE_MOCK) return _getProjectsByDirection(directionId);
-  return client.get(`/api/users/projects/?direction=${directionId}`);
+  // Используем storage-логику — она сначала попытается получить проекты через event-specific endpoint,
+  // что безопаснее в окружении, где таблица projects может отсутствовать для общего query.
+  return _getProjectsByDirection(directionId);
 }
 
 export async function saveProjectsForDirection(directionId: number, projects: Project[]) {

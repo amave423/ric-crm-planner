@@ -3,7 +3,8 @@ import { useWizard } from "../EventWizardModal";
 import type { DirectionModel } from "../types";
 import { getDirectionsByEvent, saveDirectionsForEvent as persistDirections } from "../../../api/directions";
 import { getEventById } from "../../../api/events";
-import users from "../../../mock-data/users.json";
+import type { User } from "../../../types/user";
+import { getAllUsers } from "../../../storage/storage";
 import { useToast } from "../../Toast/ToastProvider";
 
 export default function DirectionForm() {
@@ -12,12 +13,32 @@ export default function DirectionForm() {
   const [description, setDescription] = useState("");
   const [directions, setDirections] = useState<DirectionModel[]>([]);
   const [input, setInput] = useState("");
-  const organizers = users.filter((u) => u.role === "organizer");
   const [selectedOrganizer, setSelectedOrganizer] = useState<string>("");
   const { showToast } = useToast();
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [usersList, setUsersList] = useState<User[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const users = await getAllUsers();
+        const mapped = (users || []).map((u: any) => ({
+          ...u,
+          name: u.name ?? u.firstName ?? u.first_name ?? "",
+          surname: u.surname ?? u.lastName ?? u.last_name ?? "",
+        }));
+        if (mounted) setUsersList(mapped);
+      } catch {
+        if (mounted) setUsersList([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const organizers = usersList.filter((u) => u.role === "organizer");
 
   useEffect(() => {
     let mounted = true;
@@ -111,14 +132,37 @@ export default function DirectionForm() {
         showToast("error", "У одного из направлений нет названия");
         return;
       }
-      if (!d.organizer || !d.organizer.trim()) {
+      const orgVal = typeof d.organizer === "string" ? d.organizer : String(d.organizer ?? "");
+      if (!orgVal.trim()) {
         showToast("error", "У одного из направлений не выбран организатор");
         return;
       }
     }
 
+    const toSend = directions.map((d) => {
+      let leaderId: number | undefined = undefined;
+      if (typeof d.organizer === "number") {
+        leaderId = d.organizer;
+      } else if (typeof d.organizer === "string") {
+        const num = Number(d.organizer);
+        if (!Number.isNaN(num)) leaderId = num;
+        else {
+          const found = usersList.find((u) => `${u.surname} ${u.name}` === d.organizer);
+          if (found) leaderId = found.id;
+        }
+      }
+
+      const payload: any = {
+        ...(d.id ? { id: d.id } : {}),
+        name: d.title,
+        description: d.description ?? "",
+      };
+      if (typeof leaderId !== "undefined") payload.leader = leaderId;
+      return payload;
+    });
+
     try {
-      const saved = await persistDirections(Number(eventId), directions as any);
+      const saved = await persistDirections(Number(eventId), toSend as any);
       saveDirections?.(saved as any);
       showToast("success", "Направления сохранены");
     } catch {

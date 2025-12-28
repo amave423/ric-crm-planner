@@ -29,14 +29,16 @@ function mapBackendUser(data: any): User | null {
   const id = data.id ?? data.pk ?? null;
   const email = data.email ?? (data.profile && data.profile.email) ?? "";
   const name =
-    data.first_name ??
+    (data.firstName as string) ??
+    (data.first_name as string) ??
     data.name ??
-    (data.profile && data.profile.name) ??
+    (data.profile && (data.profile.name || data.profile.name)) ??
     "";
   const surname =
-    data.last_name ??
+    (data.lastName as string) ??
+    (data.last_name as string) ??
     data.surname ??
-    (data.profile && data.profile.surname) ??
+    (data.profile && (data.profile.surname || data.profile.surname)) ??
     "";
   let role = "guest";
   if (typeof data.role === "string") {

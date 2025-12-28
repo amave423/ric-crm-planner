@@ -2,7 +2,6 @@ import { useContext, useEffect, useState } from "react";
 import Table from "../../components/Table/Table";
 import TableHeader from "../../components/Layout/TableHeader";
 import { getRequests, updateRequestStatus, removeRequest } from "../../api/requests";
-import { getEventById } from "../../api/events";
 import { AuthContext } from "../../context/AuthContext";
 import Modal from "../../components/Modal/Modal";
 import "../../styles/page-colors.scss";
@@ -27,18 +26,26 @@ export default function RequestsPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [toRemoveId, setToRemoveId] = useState<number | null>(null);
 
-  const load = () => {
-    const rs = getRequests();
-    setRequests(rs);
+  // Загрузка заявок — теперь асинхронно и с обработкой ошибок
+  const load = async () => {
+    try {
+      const rs = await getRequests();
+      setRequests(Array.isArray(rs) ? rs : []);
+    } catch {
+      setRequests([]);
+    }
   };
 
   useEffect(() => {
     load();
   }, []);
 
-  const handleStatusChange = (id: number, status: string) => {
-    updateRequestStatus(id, status);
-    load();
+  const handleStatusChange = async (id: number, status: string) => {
+    try {
+      await updateRequestStatus(id, status);
+    } finally {
+      await load();
+    }
   };
 
   const handleWithdraw = (id: number) => {
@@ -46,21 +53,30 @@ export default function RequestsPage() {
     setConfirmOpen(true);
   };
 
-  const confirmWithdraw = () => {
+  const confirmWithdraw = async () => {
     if (toRemoveId != null) {
-      removeRequest(toRemoveId);
-      setConfirmOpen(false);
-      setToRemoveId(null);
-      load();
+      try {
+        await removeRequest(toRemoveId);
+      } finally {
+        setConfirmOpen(false);
+        setToRemoveId(null);
+        await load();
+      }
     }
   };
+
+  // безопасная функция для получения заголовка мероприятия из записи (без await)
+  const eventTitleFromRecord = (r: any) =>
+    r.event || r.eventTitle || r.event_name || r.event_name || "—";
 
   const filteredAll = !search.trim()
     ? requests
     : requests.filter((r) =>
         (r.studentName || "").toLowerCase().includes(search.toLowerCase()) ||
         (r.projectTitle || "").toLowerCase().includes(search.toLowerCase()) ||
-        String(getEventById(r.eventId)?.title || "").toLowerCase().includes(search.toLowerCase())
+        String(eventTitleFromRecord(r) || "")
+          .toLowerCase()
+          .includes(search.toLowerCase())
       );
 
   const filtered = user?.role === "student" ? filteredAll.filter((r) => r.ownerId === user.id) : filteredAll;
@@ -68,7 +84,7 @@ export default function RequestsPage() {
   const mapped = filtered.map((r) => ({
     id: r.id,
     studentName: r.studentName,
-    event: getEventById(r.eventId)?.title || "—",
+    event: eventTitleFromRecord(r),
     project: r.projectTitle || "—",
     specialization: r.specialization || "—",
     status: r.status || "—",

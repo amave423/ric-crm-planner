@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useWizard } from "../EventWizardModal";
 import { getDirectionsByEvent } from "../../../api/directions";
 import { getProjectsByDirection, saveProjectsForDirection } from "../../../api/projects";
-import users from "../../../mock-data/users.json";
+import type { User } from "../../../types/user";
+import { getAllUsers } from "../../../storage/storage";
 import { useToast } from "../../Toast/ToastProvider";
 
 interface Project {
@@ -24,12 +25,30 @@ export default function ProjectForm() {
   const [description, setDescription] = useState("");
   const [curator, setCurator] = useState("");
   const [teams, setTeams] = useState<number | "">("");
+  const [usersList, setUsersList] = useState<User[]>([]);
   const { showToast } = useToast();
-  const usersList = users;
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadingDirs, setLoadingDirs] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const users = await getAllUsers();
+        const mapped = (users || []).map((u: any) => ({
+          ...u,
+          name: u.name ?? u.firstName ?? u.first_name ?? "",
+          surname: u.surname ?? u.lastName ?? u.last_name ?? "",
+        }));
+        if (mounted) setUsersList(mapped);
+      } catch {
+        if (mounted) setUsersList([]);
+      }
+  })();
+  return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     let mounted = true;

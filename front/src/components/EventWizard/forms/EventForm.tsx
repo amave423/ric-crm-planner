@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useWizard } from "../EventWizardModal";
 import calendarIcon from "../../../assets/icons/calendar.svg";
-import users from "../../../mock-data/users.json";
+import type { User } from "../../../types/user";
+import { getAllUsers } from "../../../storage/storage";
 import Calendar from "../../UI/Calendar";
 import { getEventById, saveEvent as persistEvent, removeEvent as apiRemoveEvent } from "../../../api/events";
 import type { Event } from "../../../types/event";
@@ -29,10 +30,29 @@ export default function EventForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [usersList, setUsersList] = useState<User[]>([]);
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
 
-  const organizers = users.filter((u) => u.role === "organizer");
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const users = await getAllUsers();
+        const mapped = (users || []).map((u: any) => ({
+          ...u,
+          name: u.name ?? u.firstName ?? u.first_name ?? "",
+          surname: u.surname ?? u.lastName ?? u.last_name ?? "",
+        }));
+        if (mounted) setUsersList(mapped);
+      } catch {
+        if (mounted) setUsersList([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+  
+  const organizers = usersList.filter((u) => u.role === "organizer");
 
   useEffect(() => {
     let mounted = true;
