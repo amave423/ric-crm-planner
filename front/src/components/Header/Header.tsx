@@ -31,7 +31,7 @@ export default function Header() {
 
       <div className="header-center">
         <button className="header-logo" onClick={() => navigate("/")}>
-          <img src="/src/assets/LogoIcon.png" alt="logo" className="header-logo" />
+          <img src="/src/assets/LogoIcon.svg" alt="logo" className="header-logo" />
         </button>
       </div>
 
