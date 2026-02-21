@@ -7,9 +7,12 @@ export interface Request {
   projectId?: number;
   projectTitle?: string;
   eventId?: number;
+  eventTitle?: string;
+  directionId?: number;
   specialization?: string;
   about?: string;
   status?: string;
+  statusId?: number;
   ownerId?: number;
   createdAt?: string;
 }

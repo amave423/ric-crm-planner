@@ -1,27 +1,27 @@
-import { useState, useContext, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { getProjectsByDirection } from "../../api/projects";
-import { getEventById } from "../../api/events";
+import { useContext, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { getDirectionById } from "../../api/directions";
-
-import Table from "../../components/Table/Table";
-import TableHeader from "../../components/Layout/TableHeader";
-import BackButton from "../../components/UI/BackButton";
+import { getEventById } from "../../api/events";
+import { getProjectsByDirection } from "../../api/projects";
+import { getRequests as apiGetRequests, saveRequest } from "../../api/requests";
 import EventWizardModal, { type WizardLaunchContext } from "../../components/EventWizard/EventWizardModal";
-import ApplyModal from "../../components/Requests/ApplyModal";
+import TableHeader from "../../components/Layout/TableHeader";
 import InfoModal from "../../components/Modal/InfoModal";
-import { AuthContext } from "../../context/AuthContext";
-import { saveRequest, getRequests as apiGetRequests } from "../../api/requests";
+import ApplyModal from "../../components/Requests/ApplyModal";
+import Table from "../../components/Table/Table";
 import { useToast } from "../../components/Toast/ToastProvider";
-
+import BackButton from "../../components/UI/BackButton";
+import { AuthContext } from "../../context/AuthContext";
 import "../../styles/page-colors.scss";
 
 export default function ProjectsPage() {
   const { eventId, directionId } = useParams();
   const navigate = useNavigate();
-
   const eventIdNum = Number(eventId);
   const directionIdNum = Number(directionId);
+
+  const { user } = useContext(AuthContext);
+  const isStudent = user?.role === "student";
 
   const [event, setEvent] = useState<any | null>(null);
   const [direction, setDirection] = useState<any | null>(null);
@@ -29,47 +29,49 @@ export default function ProjectsPage() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    Promise.all([
-      getEventById(eventIdNum),
-      getDirectionById(directionIdNum),
-      getProjectsByDirection(directionIdNum),
-      apiGetRequests()
-    ])
-      .then(([ev, dir, projs, reqs]) => {
-        if (!mounted) return;
-        setEvent(ev || null);
-        setDirection(dir || null);
-        setProjects(projs || []);
-        setRequests(reqs || []);
-      })
-      .finally(() => { if (mounted) setLoading(false); });
-    return () => { mounted = false; };
-  }, [eventIdNum, directionIdNum]);
-
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardContext, setWizardContext] = useState<WizardLaunchContext | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [search, setSearch] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [applyOpen, setApplyOpen] = useState(false);
-  const { showToast } = useToast();
-
-  const { user } = useContext(AuthContext);
-  const isStudent = user?.role === "student";
 
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoItem, setInfoItem] = useState<{ title?: string; description?: string } | null>(null);
 
+  const { showToast } = useToast();
+
+  const loadAll = async () => {
+    setLoading(true);
+    const ownerId = user?.id;
+    const role = user?.role;
+
+    const [ev, dir, projs, reqs] = await Promise.all([
+      getEventById(eventIdNum).catch(() => null),
+      getDirectionById(directionIdNum).catch(() => null),
+      getProjectsByDirection(directionIdNum).catch(() => []),
+      apiGetRequests({ ownerId, role }).catch(() => []),
+    ]);
+
+    setEvent(ev || null);
+    setDirection(dir || null);
+    setProjects(Array.isArray(projs) ? projs : []);
+    setRequests(Array.isArray(reqs) ? reqs : []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    void loadAll();
+  }, [eventIdNum, directionIdNum, user?.id, user?.role]);
+
   const filteredProjects = !search.trim()
     ? projects
-    : projects.filter(p =>
-        (p.title || "").toLowerCase().includes(search.toLowerCase()) ||
-        (p.curator || "").toLowerCase().includes(search.toLowerCase())
+    : projects.filter(
+        (p) =>
+          (p.title || "").toLowerCase().includes(search.toLowerCase()) ||
+          (p.curator || "").toLowerCase().includes(search.toLowerCase())
       );
-    
+
   return (
     <div className="page page--projects">
       <TableHeader
@@ -83,11 +85,7 @@ export default function ProjectsPage() {
         onSearch={setSearch}
         onCreate={() => {
           setMode("create");
-          setWizardContext({
-            type: "project",
-            eventId: eventIdNum,
-            directionId: directionIdNum
-          });
+          setWizardContext({ type: "project", eventId: eventIdNum, directionId: directionIdNum });
           setWizardOpen(true);
         }}
       />
@@ -96,7 +94,7 @@ export default function ProjectsPage() {
         columns={[
           { key: "title", title: "Название" },
           { key: "curator", title: "Куратор" },
-          { key: "teams", title: "Команды" }
+          { key: "teams", title: "Команды" },
         ]}
         data={filteredProjects}
         onEdit={(row) => {
@@ -105,7 +103,7 @@ export default function ProjectsPage() {
             type: "project",
             eventId: eventIdNum,
             directionId: directionIdNum,
-            projectId: row.id
+            projectId: row.id,
           });
           setWizardOpen(true);
         }}
@@ -123,7 +121,9 @@ export default function ProjectsPage() {
             className="apply-box"
             onClick={() => {
               const ownerId = user?.id;
-              const existing = requests.find(r => r.ownerId === ownerId && r.projectId === selectedProjectId);
+              const existing = requests.find(
+                (r: any) => Number(r.ownerId) === Number(ownerId) && Number(r.projectId) === Number(selectedProjectId)
+              );
               if (existing) {
                 showToast("error", "Вы уже отправляли заявку на этот проект");
                 return;
@@ -137,11 +137,7 @@ export default function ProjectsPage() {
       )}
 
       {wizardOpen && wizardContext && (
-        <EventWizardModal
-          mode={mode}
-          context={wizardContext}
-          onClose={() => setWizardOpen(false)}
-        />
+        <EventWizardModal mode={mode} context={wizardContext} onClose={() => setWizardOpen(false)} />
       )}
 
       <ApplyModal
@@ -150,22 +146,25 @@ export default function ProjectsPage() {
         projectId={selectedProjectId ?? undefined}
         projectTitle={projects.find((p) => p.id === selectedProjectId)?.title}
         eventId={eventIdNum}
+        directionId={directionIdNum}
         specializations={event?.specializations || []}
         onSubmit={async (req) => {
           const ownerId = user?.id;
           if (ownerId) (req as any).ownerId = ownerId;
 
-          const existing = requests.find(r => r.ownerId === ownerId && r.projectId === req.projectId);
+          const existing = requests.find(
+            (r: any) => Number(r.ownerId) === Number(ownerId) && Number(r.projectId) === Number(req.projectId)
+          );
           if (existing) {
-              showToast("error", "Вы уже отправляли заявку на этот проект");
-              return false;
+            showToast("error", "Вы уже отправляли заявку на этот проект");
+            return false;
           }
 
           try {
             await saveRequest(req);
             showToast("success", "Заявка отправлена");
-            const rs = await apiGetRequests();
-            setRequests(rs || []);
+            const rs = await apiGetRequests({ ownerId, role: user?.role }).catch(() => []);
+            setRequests(Array.isArray(rs) ? rs : []);
             return true;
           } catch {
             showToast("error", "Ошибка при отправке заявки");
@@ -180,6 +179,8 @@ export default function ProjectsPage() {
         title={infoItem?.title}
         description={infoItem?.description}
       />
+
+      {loading && <div style={{ marginTop: 12 }}>Загрузка...</div>}
     </div>
   );
 }

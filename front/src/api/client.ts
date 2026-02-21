@@ -152,6 +152,10 @@ async function put(path: string, body?: any) {
   return request(path, { method: "PUT", body });
 }
 
+async function patch(path: string, body?: any) {
+  return request(path, { method: "PATCH", body });
+}
+
 async function del(path: string) {
   return request(path, { method: "DELETE" });
 }
@@ -176,6 +180,7 @@ export default {
   get,
   post,
   put,
+  patch,
   del,
   login,
   logout,

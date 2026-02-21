@@ -1,9 +1,10 @@
 import { useContext, useEffect, useState } from "react";
-import Table from "../../components/Table/Table";
+import client from "../../api/client";
+import { getRequests, removeRequest, updateRequestStatus } from "../../api/requests";
 import TableHeader from "../../components/Layout/TableHeader";
-import { getRequests, updateRequestStatus, removeRequest } from "../../api/requests";
-import { AuthContext } from "../../context/AuthContext";
 import Modal from "../../components/Modal/Modal";
+import Table from "../../components/Table/Table";
+import { AuthContext } from "../../context/AuthContext";
 import "../../styles/page-colors.scss";
 
 const STATUSES = [
@@ -16,7 +17,7 @@ const STATUSES = [
   "Не прошел к тестирование",
   "Не добавился в орг. чат",
   "Удален с ПШ",
-  "Отказался от ПШ"
+  "Отказался от ПШ",
 ];
 
 export default function RequestsPage() {
@@ -26,19 +27,14 @@ export default function RequestsPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [toRemoveId, setToRemoveId] = useState<number | null>(null);
 
-  // Загрузка заявок — теперь асинхронно и с обработкой ошибок
   const load = async () => {
-    try {
-      const rs = await getRequests();
-      setRequests(Array.isArray(rs) ? rs : []);
-    } catch {
-      setRequests([]);
-    }
+    const rs = await getRequests({ ownerId: user?.id, role: user?.role }).catch(() => []);
+    setRequests(Array.isArray(rs) ? rs : []);
   };
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [user?.id, user?.role]);
 
   const handleStatusChange = async (id: number, status: string) => {
     try {
@@ -49,6 +45,7 @@ export default function RequestsPage() {
   };
 
   const handleWithdraw = (id: number) => {
+    if (!client.USE_MOCK) return;
     setToRemoveId(id);
     setConfirmOpen(true);
   };
@@ -65,30 +62,30 @@ export default function RequestsPage() {
     }
   };
 
-  // безопасная функция для получения заголовка мероприятия из записи (без await)
-  const eventTitleFromRecord = (r: any) =>
-    r.event || r.eventTitle || r.event_name || r.event_name || "—";
+  const eventTitleFromRecord = (r: any) => r.eventTitle || r.eventName || r.event || r.event_name || "—";
 
   const filteredAll = !search.trim()
     ? requests
-    : requests.filter((r) =>
-        (r.studentName || "").toLowerCase().includes(search.toLowerCase()) ||
-        (r.projectTitle || "").toLowerCase().includes(search.toLowerCase()) ||
-        String(eventTitleFromRecord(r) || "")
-          .toLowerCase()
-          .includes(search.toLowerCase())
+    : requests.filter(
+        (r) =>
+          (r.studentName || "").toLowerCase().includes(search.toLowerCase()) ||
+          (r.projectTitle || "").toLowerCase().includes(search.toLowerCase()) ||
+          String(eventTitleFromRecord(r)).toLowerCase().includes(search.toLowerCase())
       );
 
-  const filtered = user?.role === "student" ? filteredAll.filter((r) => r.ownerId === user.id) : filteredAll;
+  const filtered =
+    user?.role === "student"
+      ? filteredAll.filter((r) => Number(r.ownerId) === Number(user.id))
+      : filteredAll;
 
   const mapped = filtered.map((r) => ({
     id: r.id,
-    studentName: r.studentName,
+    studentName: r.studentName || "—",
     event: eventTitleFromRecord(r),
     project: r.projectTitle || "—",
     specialization: r.specialization || "—",
     status: r.status || "—",
-    raw: r
+    raw: r,
   }));
 
   return (
@@ -101,7 +98,7 @@ export default function RequestsPage() {
           { key: "event", title: "Мероприятие", width: "370px" },
           { key: "project", title: "Проект", width: "450px" },
           { key: "specialization", title: "Специализация", width: "380px" },
-          { key: "status", title: user?.role === "student" ? "Действие" : "Статус"}
+          { key: "status", title: user?.role === "student" ? "Действие" : "Статус" },
         ]}
         data={mapped}
         renderCell={(row: any, colKey: string) => {
@@ -112,31 +109,39 @@ export default function RequestsPage() {
               <select className="status-select" value={row.status || ""} onChange={(e) => handleStatusChange(row.id, e.target.value)}>
                 <option value="">—</option>
                 {STATUSES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
               </select>
             );
           }
 
-          if (user?.role === "student") {
+          if (user?.role === "student" && client.USE_MOCK) {
             return (
               <div>
-                <button className="danger-outline" onClick={() => handleWithdraw(row.id)}>Отозвать заявку</button>
+                <button className="danger-outline" onClick={() => handleWithdraw(row.id)}>
+                  Отозвать заявку
+                </button>
               </div>
             );
           }
 
-          return <div>{row.status}</div>;
+          return <div>{row.status || "—"}</div>;
         }}
       />
 
       <Modal isOpen={confirmOpen} onClose={() => setConfirmOpen(false)} title="Подтвердите">
         <div className="confirm-body">
-            <div className="confirm-text">Вы уверены, что хотите отозвать заявку?</div>
-            <div className="confirm-actions">
-              <button className="close-btn" onClick={() => setConfirmOpen(false)}>Отмена</button>
-              <button className="danger-outline" onClick={confirmWithdraw}>Отозвать</button>
-            </div>
+          <div className="confirm-text">Вы уверены, что хотите отозвать заявку?</div>
+          <div className="confirm-actions">
+            <button className="close-btn" onClick={() => setConfirmOpen(false)}>
+              Отмена
+            </button>
+            <button className="danger-outline" onClick={confirmWithdraw}>
+              Отозвать
+            </button>
+          </div>
         </div>
       </Modal>
     </div>

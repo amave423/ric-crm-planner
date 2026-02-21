@@ -1,14 +1,88 @@
 import client from "../api/client";
-import type { Event } from "../types/event";
+import seedDirections from "../mock-data/directions.json";
+import seedEvents from "../mock-data/events.json";
+import seedProfile from "../mock-data/profile.json";
+import seedProjects from "../mock-data/projects.json";
+import seedUsers from "../mock-data/users.json";
 import type { Direction } from "../types/direction";
+import type { Event } from "../types/event";
 import type { Project } from "../types/project";
 import type { User } from "../types/user";
 
+const USE_MOCK = client.USE_MOCK;
+
+const LS_EVENTS = "ric_mock_events";
+const LS_DIRECTIONS = "ric_mock_directions";
+const LS_PROJECTS = "ric_mock_projects";
+const LS_PROFILES = "ric_mock_profiles";
+const LS_USERS = "users";
+
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function readLS<T>(key: string, fallback: T): T {
+  const raw = localStorage.getItem(key);
+  if (!raw) return clone(fallback);
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return clone(fallback);
+  }
+}
+
+function writeLS<T>(key: string, value: T) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function nextId(items: Array<{ id?: number }>): number {
+  const max = items.reduce((acc, x) => Math.max(acc, Number(x.id || 0)), 0);
+  return max + 1;
+}
+
+function ensureMockSeeded() {
+  if (!localStorage.getItem(LS_EVENTS)) writeLS(LS_EVENTS, seedEvents);
+  if (!localStorage.getItem(LS_DIRECTIONS)) writeLS(LS_DIRECTIONS, seedDirections);
+  if (!localStorage.getItem(LS_PROJECTS)) writeLS(LS_PROJECTS, seedProjects);
+  if (!localStorage.getItem(LS_PROFILES)) writeLS(LS_PROFILES, seedProfile || {});
+}
+
+function mockEvents(): Event[] {
+  ensureMockSeeded();
+  return readLS<Event[]>(LS_EVENTS, seedEvents as Event[]);
+}
+
+function mockDirections(): Direction[] {
+  ensureMockSeeded();
+  return readLS<Direction[]>(LS_DIRECTIONS, seedDirections as Direction[]);
+}
+
+function mockProjects(): Project[] {
+  ensureMockSeeded();
+  return readLS<Project[]>(LS_PROJECTS, seedProjects as Project[]);
+}
+
+function writeMockEvents(items: Event[]) {
+  writeLS(LS_EVENTS, items);
+}
+
+function writeMockDirections(items: Direction[]) {
+  writeLS(LS_DIRECTIONS, items);
+}
+
+function writeMockProjects(items: Project[]) {
+  writeLS(LS_PROJECTS, items);
+}
+
 export async function getEvents(): Promise<Event[]> {
+  if (USE_MOCK) return mockEvents();
   return client.get("/api/users/events/");
 }
 
 export async function getEventById(id: number): Promise<Event | undefined> {
+  if (USE_MOCK) {
+    return mockEvents().find((x) => Number(x.id) === Number(id));
+  }
   try {
     return await client.get(`/api/users/events/${id}/`);
   } catch {
@@ -17,141 +91,189 @@ export async function getEventById(id: number): Promise<Event | undefined> {
 }
 
 export async function saveEvent(ev: Event): Promise<Event> {
-  if (ev.id) {
-    return client.put(`/api/users/events/${ev.id}/`, ev);
+  if (!USE_MOCK) {
+    if (ev.id) return client.put(`/api/users/events/${ev.id}/`, ev);
+    return client.post("/api/users/events/", ev);
   }
-  return client.post("/api/users/events/", ev);
+
+  const events = mockEvents();
+  if (ev.id) {
+    const idx = events.findIndex((x) => Number(x.id) === Number(ev.id));
+    if (idx >= 0) {
+      events[idx] = { ...events[idx], ...ev };
+      writeMockEvents(events);
+      return events[idx];
+    }
+  }
+
+  const created: Event = { ...ev, id: nextId(events as Array<{ id?: number }>) } as Event;
+  events.push(created);
+  writeMockEvents(events);
+  return created;
 }
 
-export async function removeEvent(id: number): Promise<any> {
-  return client.del(`/api/users/events/${id}/`);
+export async function removeEvent(id: number): Promise<{ ok: true }> {
+  if (!USE_MOCK) {
+    await client.del(`/api/users/events/${id}/`);
+    return { ok: true };
+  }
+
+  const events = mockEvents().filter((x) => Number(x.id) !== Number(id));
+  const directions = mockDirections().filter((x: any) => Number((x as any).eventId) !== Number(id));
+  const directionIds = new Set(directions.map((x) => Number(x.id)));
+  const projects = mockProjects().filter((x: any) => directionIds.has(Number((x as any).directionId)));
+
+  writeMockEvents(events);
+  writeMockDirections(directions);
+  writeMockProjects(projects);
+  return { ok: true };
 }
 
 export async function getDirectionsByEvent(eventId: number): Promise<Direction[]> {
+  if (USE_MOCK) {
+    return mockDirections().filter((x: any) => Number((x as any).eventId) === Number(eventId));
+  }
   return client.get(`/api/users/events/${eventId}/directions/`);
 }
 
 export async function getDirectionById(id: number): Promise<Direction | undefined> {
+  if (USE_MOCK) {
+    return mockDirections().find((x) => Number(x.id) === Number(id));
+  }
   try {
-    const events: Event[] = await getEvents();
-    for (const ev of events) {
-      const dirs: Direction[] = await getDirectionsByEvent(ev.id as number);
-      const found = dirs.find((d) => d.id === id);
-      if (found) return found;
-    }
-  } catch {
-  }
-  return undefined;
-}
-
-export async function saveDirectionsForEvent(eventId: number, dirs: Direction[]): Promise<Direction[]> {
-  const results: any[] = [];
-
-  function isTempId(id: any) {
-    if (id == null) return false;
-    const n = Number(id);
-    if (Number.isNaN(n)) return true;
-    return String(n).length >= 12 || n > 1e11;
-  }
-
-  for (const d of dirs) {
-    if (d.id && !isTempId(d.id)) {
-      results.push(await client.put(`/api/users/events/${eventId}/directions/${d.id}/`, d));
-    } else {
-      results.push(await client.post(`/api/users/events/${eventId}/directions/`, d));
-    }
-  }
-  return results;
-}
-
-export async function getProjectsByDirection(directionId: number): Promise<Project[]> {
-  try {
-    const byQuery = await client.get(`/api/users/projects/?direction=${directionId}`);
-    if (Array.isArray(byQuery)) return byQuery;
-  } catch {
-  }
-
-  try {
-    const events: Event[] = await getEvents();
-    for (const ev of events) {
-      const dirs: Direction[] = await getDirectionsByEvent(ev.id as number);
-      const dir = dirs.find((d) => d.id === directionId);
-      if (dir) {
-        return client.get(`/api/users/events/${ev.id}/directions/${directionId}/projects/`);
-      }
-    }
-  } catch {
-  }
-  return [];
-}
-
-export async function saveProjectsForDirection(directionId: number, projects: Project[]): Promise<any[]> {
-  let eventId: number | null = null;
-  try {
-    const events: Event[] = await getEvents();
-    for (const ev of events) {
-      const dirs: Direction[] = await getDirectionsByEvent(ev.id as number);
-      if (dirs.find((d) => d.id === directionId)) {
-        eventId = ev.id as number;
-        break;
-      }
-    }
-  } catch {
-  }
-
-  const results: any[] = [];
-  for (const p of projects) {
-    if (p.id) {
-      results.push(await client.put(`/api/users/projects/${p.id}/`, p));
-    } else {
-      if (eventId != null) {
-        results.push(await client.post(`/api/users/events/${eventId}/directions/${directionId}/projects/`, p));
-      } else {
-        results.push(await client.post("/api/users/projects/", { ...p, direction: directionId }));
-      }
-    }
-  }
-  return results;
-}
-
-export async function getAllUsers(): Promise<User[]> {
-  try {
-    return await client.get("/api/users/");
-  } catch {
-    return [];
-  }
-}
-
-export async function saveUser(user: User): Promise<User> {
-  return client.post("/api/users/register/", user);
-}
-
-export async function getProfile(_userId: number): Promise<Record<string, any> | undefined> {
-  try {
-    return await client.get("/api/users/profile/");
+    const all: Direction[] = await client.get("/api/users/directions/");
+    return all.find((d) => Number((d as any).id) === Number(id));
   } catch {
     return undefined;
   }
 }
 
-export async function saveProfile(_userId: number, profile: Record<string, any>) {
-  return client.put("/api/users/profile/", profile);
-}
+export async function saveDirectionsForEvent(eventId: number, dirs: Direction[]): Promise<Direction[]> {
+  if (!USE_MOCK) {
+    const results: Direction[] = [];
+    const isTempId = (id: any) => {
+      if (id == null) return false;
+      const n = Number(id);
+      if (Number.isNaN(n)) return true;
+      return String(n).length >= 12 || n > 1e11;
+    };
 
-export async function getRequests(): Promise<any[]> {
-  return client.get("/api/users/applications/");
-}
-
-export async function saveRequest(req: any): Promise<any> {
-  if (req.id) {
-    return client.put(`/api/users/applications/${req.id}/`, req);
+    for (const d of dirs) {
+      if (d.id && !isTempId(d.id)) {
+        results.push(await client.put(`/api/users/events/${eventId}/directions/${d.id}/`, d));
+      } else {
+        results.push(await client.post(`/api/users/events/${eventId}/directions/`, d));
+      }
+    }
+    return results;
   }
-  if (req.eventId && req.directionId) {
-    return client.post(`/api/users/events/${req.eventId}/directions/${req.directionId}/applications/`, req);
-  }
-  return client.post("/api/users/applications/", req);
+
+  const existing = mockDirections().filter((x: any) => Number((x as any).eventId) !== Number(eventId));
+  const current = mockDirections().filter((x: any) => Number((x as any).eventId) === Number(eventId));
+
+  let idCounter = nextId(current as Array<{ id?: number }>);
+  const persisted = dirs.map((d) => {
+    const id = d.id && Number(d.id) > 0 ? Number(d.id) : idCounter++;
+    return {
+      ...d,
+      id,
+      eventId,
+    } as Direction;
+  });
+
+  writeMockDirections([...existing, ...persisted]);
+  return persisted;
 }
 
-export async function updateRequestStatus(id: number, status: string): Promise<any> {
-  return client.put(`/api/users/applications/${id}/`, { status });
+export async function getProjectsByDirection(directionId: number): Promise<Project[]> {
+  if (USE_MOCK) {
+    return mockProjects().filter((x: any) => Number((x as any).directionId) === Number(directionId));
+  }
+
+  try {
+    const all = await client.get("/api/users/projects/");
+    if (!Array.isArray(all)) return [];
+    return all.filter((x: any) => Number(x.directionId ?? x.direction) === Number(directionId));
+  } catch {
+    return [];
+  }
+}
+
+export async function saveProjectsForDirection(directionId: number, projects: Project[]): Promise<Project[]> {
+  if (!USE_MOCK) {
+    const out: Project[] = [];
+    for (const p of projects) {
+      if (p.id) out.push(await client.put(`/api/users/projects/${p.id}/`, p));
+      else out.push(await client.post("/api/users/projects/", { ...p, direction_id: directionId }));
+    }
+    return out;
+  }
+
+  const current = mockProjects().filter((x: any) => Number((x as any).directionId) !== Number(directionId));
+  const own = mockProjects().filter((x: any) => Number((x as any).directionId) === Number(directionId));
+
+  let idCounter = nextId(own as Array<{ id?: number }>);
+  const persisted = projects.map((p) => {
+    const id = p.id && Number(p.id) > 0 ? Number(p.id) : idCounter++;
+    return {
+      ...p,
+      id,
+      directionId,
+    } as Project;
+  });
+
+  writeMockProjects([...current, ...persisted]);
+  return persisted;
+}
+
+export async function getAllUsers(): Promise<User[]> {
+  if (!USE_MOCK) {
+    try {
+      return await client.get("/api/users/");
+    } catch {
+      return [];
+    }
+  }
+
+  const base = clone(seedUsers as User[]);
+  const local = readLS<any[]>(LS_USERS, []);
+  const byId = new Map<number, User>();
+
+  [...base, ...local].forEach((u: any) => {
+    if (u && typeof u.id !== "undefined") byId.set(Number(u.id), u as User);
+  });
+
+  return Array.from(byId.values());
+}
+
+export async function saveUser(user: User): Promise<User> {
+  if (!USE_MOCK) return client.post("/api/users/register/", user);
+
+  const users = await getAllUsers();
+  const id = user.id ?? nextId(users as Array<{ id?: number }>);
+  const created = { ...user, id };
+  writeLS(LS_USERS, [...users.filter((u) => Number(u.id) !== Number(id)), created]);
+  return created;
+}
+
+export async function getProfile(userId: number): Promise<Record<string, any> | undefined> {
+  if (!USE_MOCK) {
+    try {
+      return await client.get("/api/users/profile/");
+    } catch {
+      return undefined;
+    }
+  }
+
+  const profiles = readLS<Record<string, any>>(LS_PROFILES, seedProfile || {});
+  return profiles[String(userId)] || {};
+}
+
+export async function saveProfile(userId: number, profile: Record<string, any>) {
+  if (!USE_MOCK) return client.put("/api/users/profile/", profile);
+
+  const profiles = readLS<Record<string, any>>(LS_PROFILES, seedProfile || {});
+  profiles[String(userId)] = { ...(profiles[String(userId)] || {}), ...profile };
+  writeLS(LS_PROFILES, profiles);
+  return profiles[String(userId)];
 }

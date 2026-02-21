@@ -18,17 +18,15 @@ export default function EventsPage() {
   const [search, setSearch] = useState("");
 
   const [allEvents, setAllEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
     getEvents()
       .then((evs) => {
         if (mounted) setAllEvents(evs || []);
       })
-      .finally(() => {
-        if (mounted) setLoading(false);
+      .catch(() => {
+        if (mounted) setAllEvents([]);
       });
     return () => { mounted = false; };
   }, []);

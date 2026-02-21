@@ -1,7 +1,7 @@
-import { useState, useContext } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { AuthContext } from "../../context/AuthContext";
+import { useContext, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "../../components/Toast/ToastProvider";
+import { AuthContext } from "../../context/AuthContext";
 import "../../styles/auth.scss";
 
 export default function Login() {
@@ -12,11 +12,11 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const ok = login(email.trim(), password);
+    const ok = await login(email.trim(), password);
     if (!ok) {
-      showToast("error", "Неверный email или пароль (проверь тестовые данные или зарегистрируйся)");
+      showToast("error", "Неверный email или пароль");
       return;
     }
     navigate("/events");
@@ -47,7 +47,9 @@ export default function Login() {
           required
         />
 
-        <button type="submit" className="auth-submit text-regular">Войти</button>
+        <button type="submit" className="auth-submit text-regular">
+          Войти
+        </button>
       </form>
 
       <p className="switch-link text-small">

@@ -19,18 +19,15 @@ export default function DirectionsPage() {
 
   const [event, setEvent] = useState<any | null>(null);
   const [directions, setDirections] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
     Promise.all([getEventById(eventIdNum), getDirectionsByEvent(eventIdNum)])
       .then(([ev, dirs]) => {
         if (!mounted) return;
         setEvent(ev || null);
         setDirections(dirs || []);
-      })
-      .finally(() => { if (mounted) setLoading(false); });
+      });
     return () => { mounted = false; };
   }, [eventIdNum]);
 

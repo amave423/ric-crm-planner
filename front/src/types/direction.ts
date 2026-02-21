@@ -5,6 +5,7 @@ export interface Direction {
   title: string;
   description?: string;
   organizer?: string;
+  leader?: number | string;
   eventId?: number;
   projects?: Project[];
 }

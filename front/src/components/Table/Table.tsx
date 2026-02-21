@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
-import { AuthContext } from "../../context/AuthContext";
 import editIcon from "../../assets/icons/edit.svg";
 import infoIcon from "../../assets/icons/info.svg";
+import { AuthContext } from "../../context/AuthContext";
 import "./table.scss";
 
 type Column = { key: string; title: string; width?: string };
@@ -18,6 +18,13 @@ interface Props<T> {
   renderCell?: (row: T, colKey: string) => React.ReactNode | undefined;
 }
 
+function buildGridTemplate(columns: Column[], gridColumns?: string) {
+  if (gridColumns && gridColumns.trim()) return gridColumns;
+  const cols = columns.map((c) => (c.width ? `minmax(${c.width}, ${c.width})` : "minmax(150px, 1fr)"));
+  cols.push("60px");
+  return cols.join(" ");
+}
+
 export default function Table<T>({
   columns,
   data,
@@ -27,107 +34,99 @@ export default function Table<T>({
   onInfoClick,
   selectedId,
   gridColumns = "",
-  renderCell
+  renderCell,
 }: Props<T>) {
   const { user } = useContext(AuthContext);
   const isOrganizer = user?.role === "organizer";
 
+  const template = buildGridTemplate(columns, gridColumns);
+  const gridStyle = { "--table-grid": template } as React.CSSProperties;
+
   return (
     <div className="custom-table-container">
-      <table className="custom-table">
-        <thead>
-          <tr>
-            {columns.map((c) => (
-              <th key={c.key} style={{ width: c.width }} className="text-small"> {c.title}</th>
-            ))}
-            <th style={{ width: "60px" }} />
-          </tr>
-        </thead>
+      <div className="custom-table">
+        <div className="table-grid table-grid-head" style={gridStyle}>
+          {columns.map((c) => (
+            <div key={c.key} className="head-cell text-small">
+              {c.title}
+            </div>
+          ))}
+          <div className="head-cell head-cell-actions" />
+        </div>
 
-        <tbody>
-          {data.length === 0 ? (
-            <tr>
-              <td colSpan={columns.length + 1} className="td-full">
-                <div className="table-placeholder">Нет данных</div>
-              </td>
-            </tr>
-          ) : (
-            data.map((row, idx) => (
-              <tr key={(row as any).id ?? idx}>
-                <td colSpan={columns.length + 1} className="td-full">
-                  <div
-                    className={`row-box${(row as any).id === selectedId ? " selected" : ""}`}
-                    style={{ "--table-grid": gridColumns } as React.CSSProperties}
-                    onClick={() => onRowClick?.(row)}
-                  >
-                    {columns.map((col) => {
-                      if (renderCell) {
-                        const custom = renderCell(row, col.key);
-                        if (custom !== undefined) {
-                          return (
-                            <div key={col.key} className="cell" style={{ width: col.width }}>
-                              {custom}
-                            </div>
-                          );
-                        }
-                      }
+        {data.length === 0 ? (
+          <div className="table-placeholder">Нет данных</div>
+        ) : (
+          data.map((row, idx) => (
+            <div
+              key={(row as any).id ?? idx}
+              className={`row-box table-grid${(row as any).id === selectedId ? " selected" : ""}`}
+              style={gridStyle}
+              onClick={() => onRowClick?.(row)}
+            >
+              {columns.map((col) => {
+                if (renderCell) {
+                  const custom = renderCell(row, col.key);
+                  if (custom !== undefined) {
+                    return (
+                      <div key={col.key} className="cell">
+                        {custom}
+                      </div>
+                    );
+                  }
+                }
 
-                      if (col.key === "status") {
-                        const statusRaw = (row as Record<string, unknown>)[col.key];
-                        const isActive = String(statusRaw ?? "").toLowerCase() === "активно";
-                        return (
-                          <div key={col.key} className="cell status-cell" style={{ width: col.width }}>
-                            <span className={`cell-badge status-${isActive ? "active" : "inactive"}`}>
-                              {String(statusRaw ?? "—")}
-                            </span>
-                          </div>
-                        );
-                      }
-
-                      const raw = (row as Record<string, unknown>)[col.key];
-                      const isBadge = badgeKeys.includes(col.key);
-                      const display = raw == null ? "—" : Array.isArray(raw) ? (raw as any[]).map((x) => String(x)).join(", ") : String(raw);
-
-                      return (
-                        <div key={col.key} className="cell" style={{ width: col.width }}>
-                          {isBadge ? <span className="cell-badge">{display}</span> : <div className="title-text">{display}</div>}
-                        </div>
-                      );
-                    })}
-
-                    <div className="cell" style={{ width: 60 }}>
-                      {isOrganizer && onEdit && (
-                        <button
-                          className="edit-btn-icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit(row);
-                          }}
-                        >
-                          <img src={editIcon} alt="edit" />
-                        </button>
-                      )}
-
-                      {!isOrganizer && onInfoClick && (
-                        <button
-                          className="info-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onInfoClick(row);
-                          }}
-                          aria-label="Информация"
-                        >
-                          <img src={infoIcon} alt="info" />
-                        </button>
-                      )}
+                if (col.key === "status") {
+                  const statusRaw = (row as Record<string, unknown>)[col.key];
+                  const isActive = String(statusRaw ?? "").toLowerCase() === "активно";
+                  return (
+                    <div key={col.key} className="cell status-cell">
+                      <span className={`cell-badge status-${isActive ? "active" : "inactive"}`}>{String(statusRaw ?? "—")}</span>
                     </div>
+                  );
+                }
+
+                const raw = (row as Record<string, unknown>)[col.key];
+                const isBadge = badgeKeys.includes(col.key);
+                const display = raw == null ? "—" : Array.isArray(raw) ? (raw as any[]).map((x) => String(x)).join(", ") : String(raw);
+
+                return (
+                  <div key={col.key} className="cell">
+                    {isBadge ? <span className="cell-badge">{display}</span> : <div className="title-text">{display}</div>}
                   </div>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+                );
+              })}
+
+              <div className="cell cell-actions">
+                {isOrganizer && onEdit && (
+                  <button
+                    className="edit-btn-icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(row);
+                    }}
+                  >
+                    <img src={editIcon} alt="edit" />
+                  </button>
+                )}
+
+                {!isOrganizer && onInfoClick && (
+                  <button
+                    className="info-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onInfoClick(row);
+                    }}
+                    aria-label="Информация"
+                  >
+                    <img src={infoIcon} alt="info" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

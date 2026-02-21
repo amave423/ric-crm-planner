@@ -1,7 +1,8 @@
-import { useState, useEffect, useContext, useMemo } from "react";
-import "../../styles/profile.scss";
-import { AuthContext } from "../../context/AuthContext";
+import { useContext, useEffect, useMemo, useState } from "react";
+import client from "../../api/client";
 import { useToast } from "../../components/Toast/ToastProvider";
+import { AuthContext } from "../../context/AuthContext";
+import "../../styles/profile.scss";
 
 export default function ProfilePage() {
   const { user, updateProfile } = useContext(AuthContext);
@@ -28,8 +29,25 @@ export default function ProfilePage() {
         setProfile((p) => ({ ...p, email: "example@mail.ru" }));
         return;
       }
+
+      if (client.USE_MOCK) {
+        setProfile({
+          name: user.name || "Имя",
+          surname: user.surname || "Фамилия",
+          university: "",
+          course: "",
+          specialty: "",
+          workplace: "",
+          about: "",
+          telegram: "",
+          vk: "",
+          email: user.email || "",
+        });
+        return;
+      }
+
       try {
-        const data = await (await fetch("/api/users/profile/")).json().catch(() => null);
+        const data = await client.get("/api/users/profile/");
         if (!mounted) return;
         setProfile({
           name: data?.name || user.name || "Имя",
@@ -44,6 +62,7 @@ export default function ProfilePage() {
           email: data?.email || user.email || "",
         });
       } catch {
+        if (!mounted) return;
         setProfile({
           name: user.name || "Имя",
           surname: user.surname || "Фамилия",
@@ -58,7 +77,10 @@ export default function ProfilePage() {
         });
       }
     })();
-    return () => { mounted = false; };
+
+    return () => {
+      mounted = false;
+    };
   }, [user]);
 
   const update = (key: string, value: string) => setProfile({ ...profile, [key]: value });
@@ -69,7 +91,6 @@ export default function ProfilePage() {
       const payload: Record<string, any> = {
         name: profile.name,
         surname: profile.surname,
-        patronymic: undefined,
         telegram: profile.telegram || undefined,
         email: profile.email || undefined,
         course: profile.course || undefined,
@@ -83,7 +104,6 @@ export default function ProfilePage() {
       });
 
       await updateProfile(payload);
-
       setEditing(false);
       showToast("success", "Профиль сохранён");
     } catch {
@@ -92,9 +112,24 @@ export default function ProfilePage() {
   };
 
   const COLORS = [
-    "#f44336","#e91e63","#9c27b0","#673ab7","#3f51b5","#2196f3","#03a9f4","#00bcd4",
-    "#009688","#4caf50","#8bc34a","#cddc39","#ffeb3b","#ffc107","#ff9800","#ff5722",
-    "#795548","#607d8b"
+    "#f44336",
+    "#e91e63",
+    "#9c27b0",
+    "#673ab7",
+    "#3f51b5",
+    "#2196f3",
+    "#03a9f4",
+    "#00bcd4",
+    "#009688",
+    "#4caf50",
+    "#8bc34a",
+    "#cddc39",
+    "#ffeb3b",
+    "#ffc107",
+    "#ff9800",
+    "#ff5722",
+    "#795548",
+    "#607d8b",
   ];
 
   const pickColor = (seed: string | number | undefined) => {
@@ -112,7 +147,7 @@ export default function ProfilePage() {
     return (a + b) || "—";
   }, [profile.name, profile.surname]);
 
-  const avatarBg = useMemo(() => pickColor(user?.id ?? profile.email), [user, profile.email]);
+  const avatarBg = useMemo(() => pickColor(user?.id ?? profile.email), [profile.email, user?.id]);
 
   return (
     <div className="page profile-page">
@@ -123,20 +158,29 @@ export default function ProfilePage() {
           <h4 className="h4">Личная информация</h4>
 
           <div className="avatar-wrap">
-            <div className="avatar" style={{ background: avatarBg }}>{initials}</div>
+            <div className="avatar" style={{ background: avatarBg }}>
+              {initials}
+            </div>
           </div>
 
           <div className="inputs">
             <input className="text-regular" disabled={!editing} value={profile.name} onChange={(e) => update("name", e.target.value)} />
-
             <input className="text-regular" disabled={!editing} value={profile.surname} onChange={(e) => update("surname", e.target.value)} />
-
-            <input className="text-regular" disabled={!editing} value={profile.university} onChange={(e) => update("university", e.target.value)} placeholder="Учебное заведение" />
-
+            <input
+              className="text-regular"
+              disabled={!editing}
+              value={profile.university}
+              onChange={(e) => update("university", e.target.value)}
+              placeholder="Учебное заведение"
+            />
             <input className="text-regular" disabled={!editing} value={profile.course} onChange={(e) => update("course", e.target.value)} placeholder="Курс" />
-
-            <input className="text-regular" disabled={!editing} value={profile.specialty} onChange={(e) => update("specialty", e.target.value)} placeholder="Специальность" />
-
+            <input
+              className="text-regular"
+              disabled={!editing}
+              value={profile.specialty}
+              onChange={(e) => update("specialty", e.target.value)}
+              placeholder="Специальность"
+            />
             <textarea className="text-regular" disabled={!editing} value={profile.about} onChange={(e) => update("about", e.target.value)} placeholder="О себе" />
           </div>
         </div>
@@ -146,9 +190,7 @@ export default function ProfilePage() {
 
           <div className="inputs">
             <input className="text-regular" disabled={!editing} value={profile.telegram} onChange={(e) => update("telegram", e.target.value)} placeholder="Telegram" />
-
             <input className="text-regular" disabled={!editing} value={profile.vk} onChange={(e) => update("vk", e.target.value)} placeholder="ВКонтакте" />
-
             <input className="text-regular" disabled value={profile.email} />
           </div>
         </div>
@@ -157,7 +199,7 @@ export default function ProfilePage() {
       <button
         className="edit-btn h3"
         onClick={() => {
-          if (editing) onSave();
+          if (editing) void onSave();
           else setEditing(true);
         }}
       >

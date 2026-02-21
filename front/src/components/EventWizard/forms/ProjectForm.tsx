@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
-import { useWizard } from "../EventWizardModal";
+import { useEffect, useState } from "react";
 import { getDirectionsByEvent } from "../../../api/directions";
 import { getProjectsByDirection, saveProjectsForDirection } from "../../../api/projects";
-import type { User } from "../../../types/user";
 import { getAllUsers } from "../../../storage/storage";
+import type { User } from "../../../types/user";
 import { useToast } from "../../Toast/ToastProvider";
+import { useWizard } from "../EventWizardModal";
 
 interface Project {
   id: number;
@@ -12,6 +12,7 @@ interface Project {
   description?: string;
   directionId?: string;
   curator?: string;
+  curatorId?: number;
   teams?: number;
 }
 
@@ -23,7 +24,7 @@ export default function ProjectForm() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [curator, setCurator] = useState("");
+  const [curatorId, setCuratorId] = useState("");
   const [teams, setTeams] = useState<number | "">("");
   const [usersList, setUsersList] = useState<User[]>([]);
   const { showToast } = useToast();
@@ -31,6 +32,30 @@ export default function ProjectForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadingDirs, setLoadingDirs] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
+
+  const userNameById = new Map<number, string>(
+    usersList.map((u) => [Number(u.id), `${u.surname ?? ""} ${u.name ?? ""}`.trim()])
+  );
+  const userIdByName = new Map<string, number>(
+    usersList.map((u) => [`${u.surname ?? ""} ${u.name ?? ""}`.trim(), Number(u.id)])
+  );
+
+  const resolveCuratorId = (value: any): number | undefined => {
+    if (typeof value === "number" && !Number.isNaN(value)) return value;
+    if (typeof value === "string") {
+      const n = Number(value);
+      if (!Number.isNaN(n)) return n;
+      const byName = userIdByName.get(value.trim());
+      if (typeof byName !== "undefined") return byName;
+    }
+    return undefined;
+  };
+
+  const curatorLabel = (p: Project) => {
+    const id = resolveCuratorId((p as any).curatorId ?? p.curator);
+    if (typeof id !== "undefined") return userNameById.get(id) ?? String(id);
+    return p.curator ?? "";
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -46,8 +71,11 @@ export default function ProjectForm() {
       } catch {
         if (mounted) setUsersList([]);
       }
-  })();
-  return () => { mounted = false; };
+    })();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -72,8 +100,11 @@ export default function ProjectForm() {
         if (mounted) setLoadingDirs(false);
       }
     })();
-    return () => { mounted = false; };
-  }, [eventId, savedDirections]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [directionId, eventId, savedDirections]);
 
   useEffect(() => {
     let mounted = true;
@@ -86,7 +117,13 @@ export default function ProjectForm() {
       const dirFromSaved = (savedDirections || []).find((d: any) => String(d.id) === String(directionId));
       if (dirFromSaved && dirFromSaved.projects && dirFromSaved.projects.length > 0) {
         if (!mounted) return;
-        setProjects(dirFromSaved.projects.map((p: any) => ({ ...p, directionId: String(directionId) })));
+        setProjects(
+          dirFromSaved.projects.map((p: any) => ({
+            ...p,
+            directionId: String(directionId),
+            curatorId: resolveCuratorId(p.curatorId ?? p.curator),
+          }))
+        );
         return;
       }
 
@@ -100,8 +137,9 @@ export default function ProjectForm() {
             title: p.title ?? "",
             description: p.description ?? "",
             directionId: String(directionId),
+            curatorId: resolveCuratorId(p.curatorId ?? p.curator),
             curator: p.curator ?? "",
-            teams: p.teams ?? 0
+            teams: p.teams ?? 0,
           }))
         );
       } catch {
@@ -109,20 +147,19 @@ export default function ProjectForm() {
         if (mounted) setLoadingProjects(false);
       }
     })();
-    return () => { mounted = false; };
-  }, [directionId, savedDirections]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [directionId, savedDirections, usersList]);
 
   useEffect(() => {
-    if (ctxDirectionId) {
-      setDirectionId(String(ctxDirectionId));
-    }
+    if (ctxDirectionId) setDirectionId(String(ctxDirectionId));
   }, [ctxDirectionId]);
 
   useEffect(() => {
-    if (!directionId && directions.length > 0) {
-      setDirectionId(String(directions[0].id));
-    }
-  }, [directions]);
+    if (!directionId && directions.length > 0) setDirectionId(String(directions[0].id));
+  }, [directionId, directions]);
 
   const addProject = () => {
     if (!directionId) {
@@ -133,7 +170,7 @@ export default function ProjectForm() {
       setErrors((p) => ({ ...p, title: "Введите название проекта" }));
       return;
     }
-    if (!curator) {
+    if (!curatorId) {
       setErrors((p) => ({ ...p, curator: "Выберите куратора" }));
       return;
     }
@@ -141,10 +178,24 @@ export default function ProjectForm() {
       setErrors((p) => ({ ...p, teams: "Укажите количество команд (0 или больше)" }));
       return;
     }
-    setProjects([...projects, { id: Date.now(), title: title.trim(), description: description.trim(), directionId, curator, teams: typeof teams === "number" ? teams : Number(teams) }]);
+
+    const curatorIdNum = Number(curatorId);
+    setProjects([
+      ...projects,
+      {
+        id: Date.now(),
+        title: title.trim(),
+        description: description.trim(),
+        directionId,
+        curatorId: Number.isNaN(curatorIdNum) ? undefined : curatorIdNum,
+        curator: userNameById.get(curatorIdNum) ?? "",
+        teams: typeof teams === "number" ? teams : Number(teams),
+      },
+    ]);
+
     setTitle("");
     setDescription("");
-    setCurator("");
+    setCuratorId("");
     setTeams("");
     setErrors({});
   };
@@ -158,19 +209,31 @@ export default function ProjectForm() {
       showToast("error", "Выберите направление");
       return;
     }
+
     for (const p of projects) {
       if (!p.title || !p.title.trim()) {
         showToast("error", "У одного из проектов нет названия");
         return;
       }
-      if (!p.curator || !p.curator.trim()) {
+      if (!resolveCuratorId((p as any).curatorId ?? p.curator)) {
         showToast("error", "У одного из проектов не выбран куратор");
         return;
       }
     }
 
     try {
-      await saveProjectsForDirection(Number(directionId), projects as any);
+      const saved = await saveProjectsForDirection(Number(directionId), projects as any);
+      setProjects(
+        (saved || []).map((p: any) => ({
+          id: p.id,
+          title: p.title ?? "",
+          description: p.description ?? "",
+          directionId: String(directionId),
+          curatorId: resolveCuratorId(p.curatorId ?? p.curator),
+          curator: p.curator ?? "",
+          teams: p.teams ?? 0,
+        }))
+      );
       showToast("success", "Проекты сохранены");
     } catch {
       showToast("error", "Ошибка при сохранении проектов");
@@ -184,18 +247,29 @@ export default function ProjectForm() {
       <div className={`field-wrap ${errors.directionId ? "error" : ""}`}>
         <label className="text-small">
           Выберите направление
-          <select value={directionId ?? ""} onChange={(e) => {
-            setDirectionId(String(e.target.value));
-            setErrors((p) => { const np = { ...p }; delete np.directionId; return np; });
-          }}>
+          <select
+            value={directionId ?? ""}
+            onChange={(e) => {
+              setDirectionId(String(e.target.value));
+              setErrors((p) => {
+                const np = { ...p };
+                delete np.directionId;
+                return np;
+              });
+            }}
+          >
             <option value="" disabled>
               Выберите направление
             </option>
-            {loadingDirs ? <option>Загрузка...</option> : directions.map((d: any) => (
-              <option key={d.id} value={d.id}>
-                {d.title}
-              </option>
-            ))}
+            {loadingDirs ? (
+              <option>Загрузка...</option>
+            ) : (
+              directions.map((d: any) => (
+                <option key={d.id} value={d.id}>
+                  {d.title}
+                </option>
+              ))
+            )}
           </select>
         </label>
         {errors.directionId && <div className="field-error">{errors.directionId}</div>}
@@ -204,10 +278,19 @@ export default function ProjectForm() {
       <div className={`field-wrap ${errors.title ? "error" : ""}`}>
         <label className="text-small">
           Название проекта
-          <input placeholder="Введите название проекта" value={title} onChange={(e) => {
-            setTitle(e.target.value);
-            setErrors((p) => { const np = { ...p }; delete np.title; return np; });
-          }} onKeyDown={(e) => e.key === "Enter" && addProject()} />
+          <input
+            placeholder="Введите название проекта"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setErrors((p) => {
+                const np = { ...p };
+                delete np.title;
+                return np;
+              });
+            }}
+            onKeyDown={(e) => e.key === "Enter" && addProject()}
+          />
         </label>
         {errors.title && <div className="field-error">{errors.title}</div>}
       </div>
@@ -215,10 +298,20 @@ export default function ProjectForm() {
       <div className={`field-wrap ${errors.curator ? "error" : ""}`}>
         <label className="text-small">
           Куратор
-          <select value={curator ?? ""} onChange={(e) => { setCurator(e.target.value); setErrors((p) => { const np = { ...p }; delete np.curator; return np; }); }}>
+          <select
+            value={curatorId}
+            onChange={(e) => {
+              setCuratorId(e.target.value);
+              setErrors((p) => {
+                const np = { ...p };
+                delete np.curator;
+                return np;
+              });
+            }}
+          >
             <option value="">-- выбрать куратора --</option>
             {usersList.map((u) => (
-              <option key={u.id} value={`${u.surname} ${u.name}`}>
+              <option key={u.id} value={String(u.id)}>
                 {u.surname} {u.name} ({u.role})
               </option>
             ))}
@@ -229,15 +322,31 @@ export default function ProjectForm() {
 
       <div className={`field-wrap ${errors.teams ? "error" : ""}`}>
         <label className="text-small">
-          Команд
-          <input type="number" min={0} value={teams as any} onChange={(e) => { setTeams(e.target.value === "" ? "" : Number(e.target.value)); setErrors((p) => { const np = { ...p }; delete np.teams; return np; }); }} />
+          Команды
+          <input
+            type="number"
+            min={0}
+            value={teams as any}
+            onChange={(e) => {
+              setTeams(e.target.value === "" ? "" : Number(e.target.value));
+              setErrors((p) => {
+                const np = { ...p };
+                delete np.teams;
+                return np;
+              });
+            }}
+          />
         </label>
         {errors.teams && <div className="field-error">{errors.teams}</div>}
       </div>
 
       <label className="text-small">
         Описание
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Краткое описание проекта (необязательно)" />
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Краткое описание проекта (необязательно)"
+        />
       </label>
 
       <div className="tags" style={{ marginTop: 12 }}>
@@ -248,9 +357,21 @@ export default function ProjectForm() {
             <div key={p.id} className="tag">
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
                 <strong style={{ lineHeight: 1 }}>{p.title}</strong>
-                {p.description && <span className="text-small" style={{ opacity: 0.8 }}>{p.description}</span>}
-                {p.curator && <span className="text-small" style={{ opacity: 0.8 }}>Куратор: {p.curator}</span>}
-                {typeof p.teams !== "undefined" && <span className="text-small" style={{ opacity: 0.8 }}>Команд: {p.teams}</span>}
+                {p.description && (
+                  <span className="text-small" style={{ opacity: 0.8 }}>
+                    {p.description}
+                  </span>
+                )}
+                {curatorLabel(p) && (
+                  <span className="text-small" style={{ opacity: 0.8 }}>
+                    Куратор: {curatorLabel(p)}
+                  </span>
+                )}
+                {typeof p.teams !== "undefined" && (
+                  <span className="text-small" style={{ opacity: 0.8 }}>
+                    Команд: {p.teams}
+                  </span>
+                )}
               </div>
               <button onClick={() => removeProject(p.id)}>×</button>
             </div>
