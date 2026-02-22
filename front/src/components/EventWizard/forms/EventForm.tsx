@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import { useWizard } from "../EventWizardModal";
 import calendarIcon from "../../../assets/icons/calendar.svg";
 import type { User } from "../../../types/user";
@@ -25,7 +26,7 @@ export default function EventForm() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [applyDeadline, setApplyDeadline] = useState("");
-  const [leader, setLeader] = useState<any>("");
+  const [leader, setLeader] = useState<string>("");
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -38,11 +39,14 @@ export default function EventForm() {
     (async () => {
       try {
         const users = await getAllUsers();
-        const mapped = (users || []).map((u: any) => ({
-          ...u,
-          name: u.name ?? u.firstName ?? u.first_name ?? "",
-          surname: u.surname ?? u.lastName ?? u.last_name ?? "",
-        }));
+        const mapped = (users || []).map((u) => {
+          const raw = u as User & Record<string, unknown>;
+          return {
+            ...raw,
+            name: raw.name ?? String(raw.firstName ?? raw.first_name ?? ""),
+            surname: raw.surname ?? String(raw.lastName ?? raw.last_name ?? ""),
+          };
+        });
         if (mounted) setUsersList(mapped);
       } catch {
         if (mounted) setUsersList([]);
@@ -134,7 +138,8 @@ export default function EventForm() {
       return endObj >= new Date() ? "Активно" : "Неактивно";
     })();
 
-    const payload: any = {
+    const payload: Event = {
+      id: mode === "edit" && eventId ? Number(eventId) : 0,
       title: (title || "").trim(),
       description: description.trim(),
       startDate,
@@ -144,8 +149,6 @@ export default function EventForm() {
       specializations,
       status: computedStatus
     };
-    if (mode === "edit" && eventId) payload.id = eventId;
-
     try {
       const saved = await persistEvent(payload);
       saveEvent?.(saved);
@@ -155,7 +158,7 @@ export default function EventForm() {
     }
   };
 
-  const FieldWrap = ({ name, children }: { name: string; children: any }) => (
+  const FieldWrap = ({ name, children }: { name: string; children: ReactNode }) => (
     <div className={`field-wrap ${errors[name] ? "error" : ""}`} style={{ marginBottom: 8 }}>
       {children}
       {errors[name] && <div className="field-error">{errors[name]}</div>}

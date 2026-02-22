@@ -1,5 +1,14 @@
-const API_BASE = (import.meta as any).env.VITE_API_BASE || "";
-const USE_MOCK = (import.meta as any).env.VITE_USE_MOCK === "true";
+interface AppImportMetaEnv {
+  VITE_API_BASE?: string;
+  VITE_USE_MOCK?: string;
+}
+
+type UnknownRecord = Record<string, unknown>;
+type RequestBody = unknown;
+
+const ENV = (import.meta as ImportMeta & { env?: AppImportMetaEnv }).env ?? {};
+const API_BASE = ENV.VITE_API_BASE || "";
+const USE_MOCK = ENV.VITE_USE_MOCK === "true";
 
 function getCookie(name: string) {
   const match = document.cookie.split("; ").find((s) => s.trim().startsWith(name + "="));
@@ -10,66 +19,71 @@ function toCamel(s: string) {
   return s.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
 }
 
-function transformSpecial(obj: any): any {
+function transformSpecial(obj: unknown): unknown {
   if (!obj || typeof obj !== "object") return obj;
   if (Array.isArray(obj)) return obj.map(transformSpecial);
 
-  const res: any = {};
-  for (const k of Object.keys(obj)) {
+  const source = obj as UnknownRecord;
+  const res: UnknownRecord = {};
+  for (const k of Object.keys(source)) {
     const nk = toCamel(k);
-    res[nk] = transformSpecial(obj[k]);
+    res[nk] = transformSpecial(source[k]);
   }
 
-  if ("name" in res && ( "startDate" in res || "stage" in res || "endDate" in res || "eventId" in res || "directionId" in res )) {
+  if (
+    typeof res.name !== "undefined" &&
+    ("startDate" in res || "stage" in res || "endDate" in res || "eventId" in res || "directionId" in res)
+  ) {
     res.title = res.name;
     delete res.name;
   }
-  if ("name" in res && !("startDate" in res) && !("questionCount" in res)) {
+  if (typeof res.name !== "undefined" && !("startDate" in res) && !("questionCount" in res)) {
     res.title = res.name;
     delete res.name;
   }
-  if ("endAppDate" in res && !("applyDeadline" in res)) {
+  if (typeof res.endAppDate !== "undefined" && !("applyDeadline" in res)) {
     res.applyDeadline = res.endAppDate;
     delete res.endAppDate;
   }
-  if ("event" in res && (typeof res.event === "number" || typeof res.event === "string")) {
+  if (typeof res.event === "number" || typeof res.event === "string") {
     res.eventId = Number(res.event);
     delete res.event;
   }
-  if ("direction" in res && (typeof res.direction === "number" || typeof res.direction === "string")) {
+  if (typeof res.direction === "number" || typeof res.direction === "string") {
     res.directionId = Number(res.direction);
     delete res.direction;
   }
-  if ("project" in res && (typeof res.project === "number" || typeof res.project === "string")) {
+  if (typeof res.project === "number" || typeof res.project === "string") {
     res.projectId = Number(res.project);
   }
-  if ("leader" in res && (typeof res.leader === "number" || typeof res.leader === "string")) {
+  if (typeof res.leader === "number" || typeof res.leader === "string") {
     res.organizer = Number(res.leader);
     delete res.leader;
   }
-  if ("curator" in res && (typeof res.curator === "number" || typeof res.curator === "string")) {
+  if (typeof res.curator === "number" || typeof res.curator === "string") {
     res.curator = Number(res.curator);
   }
-  if ("message" in res && !("about" in res)) {
+  if (typeof res.message !== "undefined" && !("about" in res)) {
     res.about = res.message;
     delete res.message;
   }
-  if ("dateSub" in res && !("createdAt" in res)) {
+  if (typeof res.dateSub !== "undefined" && !("createdAt" in res)) {
     res.createdAt = res.dateSub;
     delete res.dateSub;
   }
-  if ("user" in res && (typeof res.user === "number" || typeof res.user === "string")) {
+  if (typeof res.user === "number" || typeof res.user === "string") {
     res.ownerId = Number(res.user);
   }
-  if ("status" in res && typeof res.status === "object" && res.status !== null) {
-    res.status = res.status.name ?? res.status;
+  if (typeof res.status === "object" && res.status !== null && !Array.isArray(res.status)) {
+    const statusObj = res.status as UnknownRecord;
+    res.status = statusObj.name ?? res.status;
   }
   return res;
 }
 
-async function parseResponse(res: Response) {
+async function parseResponse(res: Response): Promise<unknown> {
   const text = await res.text();
-  let data: any;
+  let data: unknown;
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
@@ -99,36 +113,59 @@ async function doRefresh(): Promise<boolean> {
   return refreshingPromise;
 }
 
-async function request(path: string, options: RequestInit = {}) {
+type RequestOptions = Omit<RequestInit, "body"> & { body?: RequestBody };
+
+async function request<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
   if (USE_MOCK) throw new Error("client.request: called in mock mode (switch to backend in AuthContext).");
 
   const url = API_BASE + path;
-  const init: RequestInit = {
+  const headers = new Headers(options.headers ?? {});
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const init: RequestOptions = {
     credentials: "include",
-    headers: { ...(options.headers || {}), "Content-Type": "application/json" },
+    headers,
     ...options,
   };
 
   const method = (init.method || "GET").toUpperCase();
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
     const csrf = getCookie("csrftoken");
-    if (csrf) (init.headers as any)["X-CSRFToken"] = csrf;
+    if (csrf) {
+      const csrfHeaders = new Headers(init.headers ?? {});
+      csrfHeaders.set("X-CSRFToken", csrf);
+      init.headers = csrfHeaders;
+    }
   }
 
-  if (init.body && typeof init.body !== "string") {
-    init.body = JSON.stringify(init.body);
+  if (typeof init.body !== "undefined") {
+    const body = init.body;
+    const isBodyInit =
+      typeof body === "string" ||
+      body instanceof Blob ||
+      body instanceof FormData ||
+      body instanceof URLSearchParams ||
+      body instanceof ArrayBuffer ||
+      ArrayBuffer.isView(body);
+
+    if (!isBodyInit) {
+      init.body = JSON.stringify(body);
+    }
   }
 
-  let res = await fetch(url, init);
+  let res = await fetch(url, init as RequestInit);
 
   if (res.status === 401) {
     const ok = await doRefresh();
     if (ok) {
       if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
         const csrf = getCookie("csrftoken");
-        if (csrf) (init.headers as any)["X-CSRFToken"] = csrf;
+        if (csrf) {
+          const csrfHeaders = new Headers(init.headers ?? {});
+          csrfHeaders.set("X-CSRFToken", csrf);
+          init.headers = csrfHeaders;
+        }
       }
-      res = await fetch(url, init);
+      res = await fetch(url, init as RequestInit);
     }
   }
 
@@ -137,27 +174,27 @@ async function request(path: string, options: RequestInit = {}) {
     const err = data || { message: res.statusText || "Request failed" };
     throw err;
   }
-  return data;
+  return data as T;
 }
 
-async function get(path: string) {
-  return request(path, { method: "GET" });
+async function get<T = unknown>(path: string): Promise<T> {
+  return request<T>(path, { method: "GET" });
 }
 
-async function post(path: string, body?: any) {
-  return request(path, { method: "POST", body });
+async function post<T = unknown>(path: string, body?: RequestBody): Promise<T> {
+  return request<T>(path, { method: "POST", body });
 }
 
-async function put(path: string, body?: any) {
-  return request(path, { method: "PUT", body });
+async function put<T = unknown>(path: string, body?: RequestBody): Promise<T> {
+  return request<T>(path, { method: "PUT", body });
 }
 
-async function patch(path: string, body?: any) {
-  return request(path, { method: "PATCH", body });
+async function patch<T = unknown>(path: string, body?: RequestBody): Promise<T> {
+  return request<T>(path, { method: "PATCH", body });
 }
 
-async function del(path: string) {
-  return request(path, { method: "DELETE" });
+async function del<T = unknown>(path: string): Promise<T> {
+  return request<T>(path, { method: "DELETE" });
 }
 
 async function login(email: string, password: string) {

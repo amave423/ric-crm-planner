@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getDirectionById } from "../../api/directions";
 import { getEventById } from "../../api/events";
@@ -12,6 +12,10 @@ import Table from "../../components/Table/Table";
 import { useToast } from "../../components/Toast/ToastProvider";
 import BackButton from "../../components/UI/BackButton";
 import { AuthContext } from "../../context/AuthContext";
+import type { Direction } from "../../types/direction";
+import type { Event } from "../../types/event";
+import type { Project } from "../../types/project";
+import type { Request as RequestType } from "../../types/request";
 import "../../styles/page-colors.scss";
 
 export default function ProjectsPage() {
@@ -23,10 +27,10 @@ export default function ProjectsPage() {
   const { user } = useContext(AuthContext);
   const isStudent = user?.role === "student";
 
-  const [event, setEvent] = useState<any | null>(null);
-  const [direction, setDirection] = useState<any | null>(null);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [requests, setRequests] = useState<any[]>([]);
+  const [event, setEvent] = useState<Event | null>(null);
+  const [direction, setDirection] = useState<Direction | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [requests, setRequests] = useState<RequestType[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -41,7 +45,7 @@ export default function ProjectsPage() {
 
   const { showToast } = useToast();
 
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     const ownerId = user?.id;
     const role = user?.role;
@@ -58,18 +62,16 @@ export default function ProjectsPage() {
     setProjects(Array.isArray(projs) ? projs : []);
     setRequests(Array.isArray(reqs) ? reqs : []);
     setLoading(false);
-  };
+  }, [directionIdNum, eventIdNum, user?.id, user?.role]);
 
   useEffect(() => {
     void loadAll();
-  }, [eventIdNum, directionIdNum, user?.id, user?.role]);
+  }, [loadAll]);
 
   const filteredProjects = !search.trim()
     ? projects
     : projects.filter(
-        (p) =>
-          (p.title || "").toLowerCase().includes(search.toLowerCase()) ||
-          (p.curator || "").toLowerCase().includes(search.toLowerCase())
+        (p) => (p.title || "").toLowerCase().includes(search.toLowerCase()) || (p.curator || "").toLowerCase().includes(search.toLowerCase())
       );
 
   return (
@@ -108,7 +110,7 @@ export default function ProjectsPage() {
           setWizardOpen(true);
         }}
         onInfoClick={(row) => {
-          setInfoItem({ title: (row as any).title || "—", description: (row as any).description || "Нет описания" });
+          setInfoItem({ title: row.title || "—", description: row.description || "Нет описания" });
           setInfoOpen(true);
         }}
         onRowClick={(row) => setSelectedProjectId(row.id)}
@@ -121,9 +123,7 @@ export default function ProjectsPage() {
             className="apply-box"
             onClick={() => {
               const ownerId = user?.id;
-              const existing = requests.find(
-                (r: any) => Number(r.ownerId) === Number(ownerId) && Number(r.projectId) === Number(selectedProjectId)
-              );
+              const existing = requests.find((r) => Number(r.ownerId) === Number(ownerId) && Number(r.projectId) === Number(selectedProjectId));
               if (existing) {
                 showToast("error", "Вы уже отправляли заявку на этот проект");
                 return;
@@ -136,9 +136,7 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {wizardOpen && wizardContext && (
-        <EventWizardModal mode={mode} context={wizardContext} onClose={() => setWizardOpen(false)} />
-      )}
+      {wizardOpen && wizardContext && <EventWizardModal mode={mode} context={wizardContext} onClose={() => setWizardOpen(false)} />}
 
       <ApplyModal
         isOpen={applyOpen}
@@ -150,11 +148,9 @@ export default function ProjectsPage() {
         specializations={event?.specializations || []}
         onSubmit={async (req) => {
           const ownerId = user?.id;
-          if (ownerId) (req as any).ownerId = ownerId;
+          if (ownerId) req.ownerId = ownerId;
 
-          const existing = requests.find(
-            (r: any) => Number(r.ownerId) === Number(ownerId) && Number(r.projectId) === Number(req.projectId)
-          );
+          const existing = requests.find((r) => Number(r.ownerId) === Number(ownerId) && Number(r.projectId) === Number(req.projectId));
           if (existing) {
             showToast("error", "Вы уже отправляли заявку на этот проект");
             return false;
@@ -173,12 +169,7 @@ export default function ProjectsPage() {
         }}
       />
 
-      <InfoModal
-        isOpen={infoOpen}
-        onClose={() => setInfoOpen(false)}
-        title={infoItem?.title}
-        description={infoItem?.description}
-      />
+      <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} title={infoItem?.title} description={infoItem?.description} />
 
       {loading && <div style={{ marginTop: 12 }}>Загрузка...</div>}
     </div>

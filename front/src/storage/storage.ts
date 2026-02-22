@@ -10,6 +10,8 @@ import type { Project } from "../types/project";
 import type { User } from "../types/user";
 
 const USE_MOCK = client.USE_MOCK;
+type UnknownRecord = Record<string, unknown>;
+type LocalUser = User & UnknownRecord;
 
 const LS_EVENTS = "ric_mock_events";
 const LS_DIRECTIONS = "ric_mock_directions";
@@ -119,9 +121,9 @@ export async function removeEvent(id: number): Promise<{ ok: true }> {
   }
 
   const events = mockEvents().filter((x) => Number(x.id) !== Number(id));
-  const directions = mockDirections().filter((x: any) => Number((x as any).eventId) !== Number(id));
+  const directions = mockDirections().filter((x) => Number(x.eventId) !== Number(id));
   const directionIds = new Set(directions.map((x) => Number(x.id)));
-  const projects = mockProjects().filter((x: any) => directionIds.has(Number((x as any).directionId)));
+  const projects = mockProjects().filter((x) => directionIds.has(Number(x.directionId)));
 
   writeMockEvents(events);
   writeMockDirections(directions);
@@ -131,7 +133,7 @@ export async function removeEvent(id: number): Promise<{ ok: true }> {
 
 export async function getDirectionsByEvent(eventId: number): Promise<Direction[]> {
   if (USE_MOCK) {
-    return mockDirections().filter((x: any) => Number((x as any).eventId) === Number(eventId));
+    return mockDirections().filter((x) => Number(x.eventId) === Number(eventId));
   }
   return client.get(`/api/users/events/${eventId}/directions/`);
 }
@@ -142,7 +144,7 @@ export async function getDirectionById(id: number): Promise<Direction | undefine
   }
   try {
     const all: Direction[] = await client.get("/api/users/directions/");
-    return all.find((d) => Number((d as any).id) === Number(id));
+    return all.find((d) => Number(d.id) === Number(id));
   } catch {
     return undefined;
   }
@@ -151,7 +153,7 @@ export async function getDirectionById(id: number): Promise<Direction | undefine
 export async function saveDirectionsForEvent(eventId: number, dirs: Direction[]): Promise<Direction[]> {
   if (!USE_MOCK) {
     const results: Direction[] = [];
-    const isTempId = (id: any) => {
+    const isTempId = (id: unknown) => {
       if (id == null) return false;
       const n = Number(id);
       if (Number.isNaN(n)) return true;
@@ -168,8 +170,8 @@ export async function saveDirectionsForEvent(eventId: number, dirs: Direction[])
     return results;
   }
 
-  const existing = mockDirections().filter((x: any) => Number((x as any).eventId) !== Number(eventId));
-  const current = mockDirections().filter((x: any) => Number((x as any).eventId) === Number(eventId));
+  const existing = mockDirections().filter((x) => Number(x.eventId) !== Number(eventId));
+  const current = mockDirections().filter((x) => Number(x.eventId) === Number(eventId));
 
   let idCounter = nextId(current as Array<{ id?: number }>);
   const persisted = dirs.map((d) => {
@@ -187,13 +189,13 @@ export async function saveDirectionsForEvent(eventId: number, dirs: Direction[])
 
 export async function getProjectsByDirection(directionId: number): Promise<Project[]> {
   if (USE_MOCK) {
-    return mockProjects().filter((x: any) => Number((x as any).directionId) === Number(directionId));
+    return mockProjects().filter((x) => Number(x.directionId) === Number(directionId));
   }
 
   try {
-    const all = await client.get("/api/users/projects/");
+    const all = await client.get<Project[]>("/api/users/projects/");
     if (!Array.isArray(all)) return [];
-    return all.filter((x: any) => Number(x.directionId ?? x.direction) === Number(directionId));
+    return all.filter((x) => Number(x.directionId) === Number(directionId));
   } catch {
     return [];
   }
@@ -209,8 +211,8 @@ export async function saveProjectsForDirection(directionId: number, projects: Pr
     return out;
   }
 
-  const current = mockProjects().filter((x: any) => Number((x as any).directionId) !== Number(directionId));
-  const own = mockProjects().filter((x: any) => Number((x as any).directionId) === Number(directionId));
+  const current = mockProjects().filter((x) => Number(x.directionId) !== Number(directionId));
+  const own = mockProjects().filter((x) => Number(x.directionId) === Number(directionId));
 
   let idCounter = nextId(own as Array<{ id?: number }>);
   const persisted = projects.map((p) => {
@@ -236,10 +238,10 @@ export async function getAllUsers(): Promise<User[]> {
   }
 
   const base = clone(seedUsers as User[]);
-  const local = readLS<any[]>(LS_USERS, []);
+  const local = readLS<LocalUser[]>(LS_USERS, []);
   const byId = new Map<number, User>();
 
-  [...base, ...local].forEach((u: any) => {
+  [...base, ...local].forEach((u) => {
     if (u && typeof u.id !== "undefined") byId.set(Number(u.id), u as User);
   });
 
@@ -256,7 +258,7 @@ export async function saveUser(user: User): Promise<User> {
   return created;
 }
 
-export async function getProfile(userId: number): Promise<Record<string, any> | undefined> {
+export async function getProfile(userId: number): Promise<UnknownRecord | undefined> {
   if (!USE_MOCK) {
     try {
       return await client.get("/api/users/profile/");
@@ -265,14 +267,14 @@ export async function getProfile(userId: number): Promise<Record<string, any> | 
     }
   }
 
-  const profiles = readLS<Record<string, any>>(LS_PROFILES, seedProfile || {});
+  const profiles = readLS<Record<string, UnknownRecord>>(LS_PROFILES, seedProfile || {});
   return profiles[String(userId)] || {};
 }
 
-export async function saveProfile(userId: number, profile: Record<string, any>) {
+export async function saveProfile(userId: number, profile: UnknownRecord) {
   if (!USE_MOCK) return client.put("/api/users/profile/", profile);
 
-  const profiles = readLS<Record<string, any>>(LS_PROFILES, seedProfile || {});
+  const profiles = readLS<Record<string, UnknownRecord>>(LS_PROFILES, seedProfile || {});
   profiles[String(userId)] = { ...(profiles[String(userId)] || {}), ...profile };
   writeLS(LS_PROFILES, profiles);
   return profiles[String(userId)];

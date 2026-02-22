@@ -9,6 +9,7 @@ import {
   saveRequest as _saveRequest,
   updateRequestStatus as _updateRequestStatus,
 } from "../storage/requests";
+import { getEventById as _getMockEventById } from "../storage/storage";
 
 const USE_MOCK = client.USE_MOCK;
 
@@ -77,7 +78,7 @@ function isForbidden(err: unknown): boolean {
 async function loadStatuses(): Promise<BackendStatus[]> {
   if (statusCache) return statusCache;
   try {
-    const statuses = await client.get("/api/users/statuses/");
+    const statuses = await client.get<BackendStatus[]>("/api/users/statuses/");
     statusCache = Array.isArray(statuses) ? statuses : [];
     return statusCache;
   } catch {
@@ -129,12 +130,45 @@ function mapBackendRequest(item: BackendRequest, statuses: BackendStatus[]): Req
   };
 }
 
+async function enrichMockRequests(items: ReqType[]): Promise<ReqType[]> {
+  const ids = Array.from(
+    new Set(
+      items
+        .filter((r) => !r.eventTitle && typeof r.eventId !== "undefined")
+        .map((r) => Number(r.eventId))
+        .filter((id) => !Number.isNaN(id))
+    )
+  );
+
+  if (ids.length === 0) return items;
+
+  const pairs = await Promise.all(
+    ids.map(async (id) => {
+      const ev = await _getMockEventById(id).catch(() => undefined);
+      return [id, ev?.title] as const;
+    })
+  );
+  const titleByEventId = new Map<number, string>();
+  pairs.forEach(([id, title]) => {
+    if (title) titleByEventId.set(id, title);
+  });
+
+  return items.map((r) => {
+    if (r.eventTitle || typeof r.eventId === "undefined") return r;
+    const title = titleByEventId.get(Number(r.eventId));
+    return title ? { ...r, eventTitle: title } : r;
+  });
+}
+
 export async function getRequests(options: GetRequestsOptions = {}): Promise<ReqType[]> {
-  if (USE_MOCK) return _getRequests();
+  if (USE_MOCK) {
+    const items = await _getRequests();
+    return enrichMockRequests(items);
+  }
 
   const statuses = await loadStatuses();
   try {
-    const raw = (await client.get("/api/users/applications/")) as unknown;
+    const raw = await client.get<unknown>("/api/users/applications/");
     if (!Array.isArray(raw)) return [];
 
     const mapped = (raw as BackendRequest[]).map((x) => mapBackendRequest(x, statuses));
@@ -155,7 +189,11 @@ export async function getRequests(options: GetRequestsOptions = {}): Promise<Req
 }
 
 export async function saveRequest(req: ReqType): Promise<ReqType> {
-  if (USE_MOCK) return _saveRequest(req);
+  if (USE_MOCK) {
+    if (req.eventTitle || typeof req.eventId === "undefined") return _saveRequest(req);
+    const ev = await _getMockEventById(Number(req.eventId)).catch(() => undefined);
+    return _saveRequest({ ...req, eventTitle: ev?.title ?? req.eventTitle });
+  }
 
   const statuses = await loadStatuses();
   const eventId = toNumber(req.eventId);
@@ -175,13 +213,13 @@ export async function saveRequest(req: ReqType): Promise<ReqType> {
   };
 
   if (req.id && req.id > 0) {
-    const updated = await client.put(`/api/users/applications/${req.id}/`, payload);
+    const updated = await client.put<BackendRequest>(`/api/users/applications/${req.id}/`, payload);
     const mapped = { ...req, ...mapBackendRequest(updated, statuses) };
     cacheBackendRequest(mapped);
     return mapped;
   }
 
-  const created = await client.post(`/api/users/events/${eventId}/directions/${directionId}/applications/`, payload);
+  const created = await client.post<BackendRequest>(`/api/users/events/${eventId}/directions/${directionId}/applications/`, payload);
   const mapped = {
     ...req,
     ...mapBackendRequest(created, statuses),
@@ -199,7 +237,7 @@ export async function updateRequestStatus(id: number, status: string) {
   const found = statuses.find((s) => s.name === status);
   const payload = found ? { status: found.id } : { status };
 
-  const updated = await client.patch(`/api/users/applications/${id}/`, payload);
+  const updated = await client.patch<BackendRequest>(`/api/users/applications/${id}/`, payload);
   const mapped = mapBackendRequest(updated, statuses);
   cacheBackendRequest(mapped);
   return mapped;

@@ -3,6 +3,8 @@ import { useWizard } from "../EventWizardModal";
 import type { DirectionModel } from "../types";
 import { getDirectionsByEvent, saveDirectionsForEvent as persistDirections } from "../../../api/directions";
 import { getEventById } from "../../../api/events";
+import type { Direction } from "../../../types/direction";
+import type { Event } from "../../../types/event";
 import type { User } from "../../../types/user";
 import { getAllUsers } from "../../../storage/storage";
 import { useToast } from "../../Toast/ToastProvider";
@@ -20,16 +22,24 @@ export default function DirectionForm() {
   const [loading, setLoading] = useState(false);
   const [usersList, setUsersList] = useState<User[]>([]);
 
+  const normalizeUser = (u: User | Record<string, unknown>): User => {
+    const obj = u as User & Record<string, unknown>;
+    return {
+      ...obj,
+      id: Number(obj.id),
+      email: String(obj.email ?? ""),
+      role: String(obj.role ?? ""),
+      name: obj.name ?? String(obj.firstName ?? obj.first_name ?? ""),
+      surname: obj.surname ?? String(obj.lastName ?? obj.last_name ?? ""),
+    };
+  };
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const users = await getAllUsers();
-        const mapped = (users || []).map((u: any) => ({
-          ...u,
-          name: u.name ?? u.firstName ?? u.first_name ?? "",
-          surname: u.surname ?? u.lastName ?? u.last_name ?? "",
-        }));
+        const mapped = (users || []).map((u) => normalizeUser(u));
         if (mounted) setUsersList(mapped);
       } catch {
         if (mounted) setUsersList([]);
@@ -55,21 +65,21 @@ export default function DirectionForm() {
         const apiDirs = await getDirectionsByEvent(Number(eventId));
         if (!mounted) return;
         setDirections(
-          apiDirs.map((d: any) => ({
+          apiDirs.map((d: Direction) => ({
             id: d.id,
             title: d.title,
             description: d.description ?? undefined,
             projects: d.projects ?? [],
-            organizer: d.organizer ?? ""
+            organizer: d.organizer ?? "",
           }))
         );
 
         const ev = await getEventById(Number(eventId));
         if (!mounted) return;
         if (ev) {
-          const leaderId = (ev as any).leader;
+          const leaderId = (ev as Event).leader;
           if (leaderId != null) {
-            const u = organizers.find((o) => String(o.id) === String(leaderId));
+            const u = usersList.find((o) => o.role === "organizer" && String(o.id) === String(leaderId));
             if (u) setSelectedOrganizer(`${u.surname} ${u.name}`);
             else setSelectedOrganizer(String(leaderId));
           }
@@ -82,7 +92,7 @@ export default function DirectionForm() {
     return () => {
       mounted = false;
     };
-  }, [savedDirections, eventId]);
+  }, [eventId, savedDirections, usersList]);
 
   const addDirection = () => {
     const title = input.trim();
@@ -139,7 +149,8 @@ export default function DirectionForm() {
       }
     }
 
-    const toSend = directions.map((d) => {
+    type DirectionDraft = Omit<Direction, "id"> & { id?: number };
+    const toSend = directions.map((d): DirectionDraft => {
       let leaderId: number | undefined = undefined;
       if (typeof d.organizer === "number") {
         leaderId = d.organizer;
@@ -152,18 +163,19 @@ export default function DirectionForm() {
         }
       }
 
-      const payload: any = {
+      const payload: DirectionDraft = {
         ...(d.id ? { id: d.id } : {}),
-        name: d.title,
+        title: d.title?.trim() ?? "",
         description: d.description ?? "",
+        organizer: typeof d.organizer === "string" ? d.organizer : String(d.organizer ?? ""),
       };
       if (typeof leaderId !== "undefined") payload.leader = leaderId;
       return payload;
     });
 
     try {
-      const saved = await persistDirections(Number(eventId), toSend as any);
-      saveDirections?.(saved as any);
+      const saved = await persistDirections(Number(eventId), toSend as Direction[]);
+      saveDirections?.(saved as DirectionModel[]);
       showToast("success", "Направления сохранены");
     } catch {
       showToast("error", "Ошибка при сохранении направлений");

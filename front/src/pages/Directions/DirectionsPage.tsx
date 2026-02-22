@@ -2,6 +2,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getDirectionsByEvent } from "../../api/directions";
 import { getEventById } from "../../api/events";
 import { useState, useEffect } from "react";
+import type { Direction } from "../../types/direction";
+import type { Event } from "../../types/event";
 
 import Table from "../../components/Table/Table";
 import TableHeader from "../../components/Layout/TableHeader";
@@ -17,18 +19,19 @@ export default function DirectionsPage() {
   const eventIdNum = Number(eventId);
   const [search, setSearch] = useState("");
 
-  const [event, setEvent] = useState<any | null>(null);
-  const [directions, setDirections] = useState<any[]>([]);
+  const [event, setEvent] = useState<Event | null>(null);
+  const [directions, setDirections] = useState<Direction[]>([]);
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([getEventById(eventIdNum), getDirectionsByEvent(eventIdNum)])
-      .then(([ev, dirs]) => {
-        if (!mounted) return;
-        setEvent(ev || null);
-        setDirections(dirs || []);
-      });
-    return () => { mounted = false; };
+    Promise.all([getEventById(eventIdNum), getDirectionsByEvent(eventIdNum)]).then(([ev, dirs]) => {
+      if (!mounted) return;
+      setEvent(ev || null);
+      setDirections(dirs || []);
+    });
+    return () => {
+      mounted = false;
+    };
   }, [eventIdNum]);
 
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -39,11 +42,12 @@ export default function DirectionsPage() {
   const [infoItem, setInfoItem] = useState<{ title?: string; description?: string } | null>(null);
 
   const filteredDirections = !search.trim()
-  ? directions
-  : directions.filter(d =>
-      (d.title || "").toLowerCase().includes(search.toLowerCase()) ||
-      (d.organizer || "").toLowerCase().includes(search.toLowerCase())
-    );
+    ? directions
+    : directions.filter(
+        (d) =>
+          (d.title || "").toLowerCase().includes(search.toLowerCase()) ||
+          (d.organizer || "").toLowerCase().includes(search.toLowerCase())
+      );
 
   return (
     <div className="page page--directions">
@@ -66,41 +70,28 @@ export default function DirectionsPage() {
       <Table
         columns={[
           { key: "title", title: "Название" },
-          { key: "organizer", title: "Организатор" }
+          { key: "organizer", title: "Организатор" },
         ]}
         data={filteredDirections}
-        onRowClick={(row) =>
-          navigate(`/events/${eventId}/directions/${row.id}/projects`)
-        }
+        onRowClick={(row) => navigate(`/events/${eventId}/directions/${row.id}/projects`)}
         onEdit={(row) => {
           setMode("edit");
           setWizardContext({
             type: "direction",
             eventId: eventIdNum,
-            directionId: row.id
+            directionId: row.id,
           });
           setWizardOpen(true);
         }}
         onInfoClick={(row) => {
-          setInfoItem({ title: (row as any).title || "—", description: (row as any).description || "Нет описания" });
+          setInfoItem({ title: row.title || "—", description: row.description || "Нет описания" });
           setInfoOpen(true);
         }}
       />
 
-      {wizardOpen && wizardContext && (
-        <EventWizardModal
-          mode={mode}
-          context={wizardContext}
-          onClose={() => setWizardOpen(false)}
-        />
-      )}
+      {wizardOpen && wizardContext && <EventWizardModal mode={mode} context={wizardContext} onClose={() => setWizardOpen(false)} />}
 
-      <InfoModal
-        isOpen={infoOpen}
-        onClose={() => setInfoOpen(false)}
-        title={infoItem?.title}
-        description={infoItem?.description}
-      />
+      <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} title={infoItem?.title} description={infoItem?.description} />
     </div>
   );
 }

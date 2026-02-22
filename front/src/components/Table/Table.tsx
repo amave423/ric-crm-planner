@@ -5,6 +5,7 @@ import { AuthContext } from "../../context/AuthContext";
 import "./table.scss";
 
 type Column = { key: string; title: string; width?: string };
+type RowWithId = { id?: number | string };
 
 interface Props<T> {
   columns: Column[];
@@ -23,6 +24,13 @@ function buildGridTemplate(columns: Column[], gridColumns?: string) {
   const cols = columns.map((c) => (c.width ? `minmax(${c.width}, ${c.width})` : "minmax(150px, 1fr)"));
   cols.push("60px");
   return cols.join(" ");
+}
+
+function getRowId(row: unknown): number | string | undefined {
+  if (!row || typeof row !== "object") return undefined;
+  const candidate = (row as RowWithId).id;
+  if (typeof candidate === "number" || typeof candidate === "string") return candidate;
+  return undefined;
 }
 
 export default function Table<T>({
@@ -59,8 +67,8 @@ export default function Table<T>({
         ) : (
           data.map((row, idx) => (
             <div
-              key={(row as any).id ?? idx}
-              className={`row-box table-grid${(row as any).id === selectedId ? " selected" : ""}`}
+              key={getRowId(row) ?? idx}
+              className={`row-box table-grid${getRowId(row) === selectedId ? " selected" : ""}`}
               style={gridStyle}
               onClick={() => onRowClick?.(row)}
             >
@@ -88,7 +96,7 @@ export default function Table<T>({
 
                 const raw = (row as Record<string, unknown>)[col.key];
                 const isBadge = badgeKeys.includes(col.key);
-                const display = raw == null ? "—" : Array.isArray(raw) ? (raw as any[]).map((x) => String(x)).join(", ") : String(raw);
+                const display = raw == null ? "—" : Array.isArray(raw) ? raw.map((x) => String(x)).join(", ") : String(raw);
 
                 return (
                   <div key={col.key} className="cell">

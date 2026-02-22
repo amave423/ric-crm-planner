@@ -77,6 +77,33 @@ function mapToBackendPayload(d: Direction): BackendDirectionPayload {
   return payload;
 }
 
+function normalizeDirectionForSave(value: unknown): Direction {
+  const dir = normalizeBackendDirection(value);
+  const title = (dir.title ?? dir.name ?? "").trim();
+  const description = (dir.description ?? "").trim();
+  const eventId = toNumber(dir.eventId ?? dir.event);
+  const leader = dir.leader ?? undefined;
+  const organizer =
+    typeof dir.organizer === "string"
+      ? dir.organizer
+      : typeof dir.organizer === "number"
+      ? String(dir.organizer)
+      : typeof leader === "number"
+      ? String(leader)
+      : typeof leader === "string"
+      ? leader
+      : undefined;
+
+  return {
+    id: Number(dir.id ?? 0),
+    title,
+    description,
+    organizer,
+    leader: leader ?? undefined,
+    eventId,
+  };
+}
+
 function toNumber(value: unknown): number | undefined {
   if (typeof value === "number" && !Number.isNaN(value)) return value;
   if (typeof value === "string") {
@@ -131,13 +158,21 @@ async function mapToUiDirections(raw: unknown[]): Promise<Direction[]> {
 }
 
 export async function getDirectionsByEvent(eventId: number): Promise<Direction[]> {
-  if (USE_MOCK) return _getDirectionsByEvent(eventId);
+  if (USE_MOCK) {
+    const raw = await _getDirectionsByEvent(eventId);
+    return mapToUiDirections(Array.isArray(raw) ? raw : []);
+  }
   const raw = await client.get(`/api/users/events/${eventId}/directions/`);
   return mapToUiDirections(Array.isArray(raw) ? raw : []);
 }
 
 export async function getDirectionById(id: number): Promise<Direction | undefined> {
-  if (USE_MOCK) return _getDirectionById(id);
+  if (USE_MOCK) {
+    const one = await _getDirectionById(id);
+    if (!one) return undefined;
+    const mapped = await mapToUiDirections([one]);
+    return mapped[0];
+  }
 
   try {
     const list = await client.get("/api/users/directions/");
@@ -149,7 +184,11 @@ export async function getDirectionById(id: number): Promise<Direction | undefine
 }
 
 export async function saveDirectionsForEvent(eventId: number, dirs: Direction[]) {
-  if (USE_MOCK) return _saveDirectionsForEvent(eventId, dirs);
+  if (USE_MOCK) {
+    const normalized = dirs.map((d) => normalizeDirectionForSave(d));
+    const saved = await _saveDirectionsForEvent(eventId, normalized);
+    return mapToUiDirections(Array.isArray(saved) ? saved : []);
+  }
 
   const created: unknown[] = [];
   for (const d of dirs) {

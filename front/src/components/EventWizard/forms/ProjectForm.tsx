@@ -1,27 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { getDirectionsByEvent } from "../../../api/directions";
 import { getProjectsByDirection, saveProjectsForDirection } from "../../../api/projects";
 import { getAllUsers } from "../../../storage/storage";
+import type { Project } from "../../../types/project";
 import type { User } from "../../../types/user";
 import { useToast } from "../../Toast/ToastProvider";
 import { useWizard } from "../EventWizardModal";
+import type { DirectionModel, ProjectModel } from "../types";
 
-interface Project {
-  id: number;
-  title?: string;
-  description?: string;
-  directionId?: string;
-  curator?: string;
-  curatorId?: number;
-  teams?: number;
-}
+type LocalProject = ProjectModel & { directionId?: string };
 
 export default function ProjectForm() {
   const { eventId, savedDirections, directionId: ctxDirectionId } = useWizard();
 
-  const [directions, setDirections] = useState<any[]>([]);
+  const [directions, setDirections] = useState<DirectionModel[]>([]);
   const [directionId, setDirectionId] = useState<string>(ctxDirectionId ? String(ctxDirectionId) : "");
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<LocalProject[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [curatorId, setCuratorId] = useState("");
@@ -33,28 +27,45 @@ export default function ProjectForm() {
   const [loadingDirs, setLoadingDirs] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
 
-  const userNameById = new Map<number, string>(
-    usersList.map((u) => [Number(u.id), `${u.surname ?? ""} ${u.name ?? ""}`.trim()])
+  const userNameById = useMemo(
+    () => new Map<number, string>(usersList.map((u) => [Number(u.id), `${u.surname ?? ""} ${u.name ?? ""}`.trim()])),
+    [usersList]
   );
-  const userIdByName = new Map<string, number>(
-    usersList.map((u) => [`${u.surname ?? ""} ${u.name ?? ""}`.trim(), Number(u.id)])
+  const userIdByName = useMemo(
+    () => new Map<string, number>(usersList.map((u) => [`${u.surname ?? ""} ${u.name ?? ""}`.trim(), Number(u.id)])),
+    [usersList]
   );
 
-  const resolveCuratorId = (value: any): number | undefined => {
-    if (typeof value === "number" && !Number.isNaN(value)) return value;
-    if (typeof value === "string") {
-      const n = Number(value);
-      if (!Number.isNaN(n)) return n;
-      const byName = userIdByName.get(value.trim());
-      if (typeof byName !== "undefined") return byName;
-    }
-    return undefined;
-  };
+  const resolveCuratorId = useCallback(
+    (value: unknown): number | undefined => {
+      if (typeof value === "number" && !Number.isNaN(value)) return value;
+      if (typeof value === "string") {
+        const n = Number(value);
+        if (!Number.isNaN(n)) return n;
+        const byName = userIdByName.get(value.trim());
+        if (typeof byName !== "undefined") return byName;
+      }
+      return undefined;
+    },
+    [userIdByName]
+  );
 
-  const curatorLabel = (p: Project) => {
-    const id = resolveCuratorId((p as any).curatorId ?? p.curator);
+  const curatorLabel = (p: LocalProject) => {
+    const id = resolveCuratorId(p.curatorId ?? p.curator);
     if (typeof id !== "undefined") return userNameById.get(id) ?? String(id);
     return p.curator ?? "";
+  };
+
+  const normalizeUser = (u: User | Record<string, unknown>): User => {
+    const obj = u as User & Record<string, unknown>;
+    return {
+      ...obj,
+      id: Number(obj.id),
+      email: String(obj.email ?? ""),
+      role: String(obj.role ?? ""),
+      name: obj.name ?? String(obj.firstName ?? obj.first_name ?? ""),
+      surname: obj.surname ?? String(obj.lastName ?? obj.last_name ?? ""),
+    };
   };
 
   useEffect(() => {
@@ -62,11 +73,7 @@ export default function ProjectForm() {
     (async () => {
       try {
         const users = await getAllUsers();
-        const mapped = (users || []).map((u: any) => ({
-          ...u,
-          name: u.name ?? u.firstName ?? u.first_name ?? "",
-          surname: u.surname ?? u.lastName ?? u.last_name ?? "",
-        }));
+        const mapped = (users || []).map((u) => normalizeUser(u));
         if (mounted) setUsersList(mapped);
       } catch {
         if (mounted) setUsersList([]);
@@ -114,11 +121,11 @@ export default function ProjectForm() {
         return;
       }
 
-      const dirFromSaved = (savedDirections || []).find((d: any) => String(d.id) === String(directionId));
+      const dirFromSaved = (savedDirections || []).find((d: DirectionModel) => String(d.id) === String(directionId));
       if (dirFromSaved && dirFromSaved.projects && dirFromSaved.projects.length > 0) {
         if (!mounted) return;
         setProjects(
-          dirFromSaved.projects.map((p: any) => ({
+          dirFromSaved.projects.map((p: ProjectModel) => ({
             ...p,
             directionId: String(directionId),
             curatorId: resolveCuratorId(p.curatorId ?? p.curator),
@@ -132,7 +139,7 @@ export default function ProjectForm() {
         const apiProjects = await getProjectsByDirection(Number(directionId));
         if (!mounted) return;
         setProjects(
-          (apiProjects || []).map((p: any) => ({
+          (apiProjects || []).map((p: Project) => ({
             id: p.id,
             title: p.title ?? "",
             description: p.description ?? "",
@@ -151,7 +158,7 @@ export default function ProjectForm() {
     return () => {
       mounted = false;
     };
-  }, [directionId, savedDirections, usersList]);
+  }, [directionId, resolveCuratorId, savedDirections, usersList]);
 
   useEffect(() => {
     if (ctxDirectionId) setDirectionId(String(ctxDirectionId));
@@ -215,16 +222,25 @@ export default function ProjectForm() {
         showToast("error", "У одного из проектов нет названия");
         return;
       }
-      if (!resolveCuratorId((p as any).curatorId ?? p.curator)) {
+      if (!resolveCuratorId(p.curatorId ?? p.curator)) {
         showToast("error", "У одного из проектов не выбран куратор");
         return;
       }
     }
 
     try {
-      const saved = await saveProjectsForDirection(Number(directionId), projects as any);
+      const toSave: Project[] = projects.map((p) => ({
+        id: Number(p.id),
+        title: p.title ?? "",
+        description: p.description ?? "",
+        curatorId: resolveCuratorId(p.curatorId ?? p.curator),
+        curator: p.curator ?? "",
+        teams: p.teams,
+        directionId: Number(directionId),
+      }));
+      const saved = await saveProjectsForDirection(Number(directionId), toSave);
       setProjects(
-        (saved || []).map((p: any) => ({
+        (saved || []).map((p: Project) => ({
           id: p.id,
           title: p.title ?? "",
           description: p.description ?? "",
@@ -264,7 +280,7 @@ export default function ProjectForm() {
             {loadingDirs ? (
               <option>Загрузка...</option>
             ) : (
-              directions.map((d: any) => (
+              directions.map((d: DirectionModel) => (
                 <option key={d.id} value={d.id}>
                   {d.title}
                 </option>
@@ -326,7 +342,7 @@ export default function ProjectForm() {
           <input
             type="number"
             min={0}
-            value={teams as any}
+            value={teams}
             onChange={(e) => {
               setTeams(e.target.value === "" ? "" : Number(e.target.value));
               setErrors((p) => {

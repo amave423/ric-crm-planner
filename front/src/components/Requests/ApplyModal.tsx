@@ -5,6 +5,14 @@ import { AuthContext } from "../../context/AuthContext";
 import Modal from "../Modal/Modal";
 import { useToast } from "../Toast/ToastProvider";
 
+type ProfileResponse = {
+  telegram?: string;
+  university?: string;
+  course?: string | number;
+  specialty?: string;
+  about?: string;
+};
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -43,15 +51,15 @@ export default function ApplyModal({
 
     (async () => {
       try {
-        const prof = user && !client.USE_MOCK ? await client.get("/api/users/profile/") : undefined;
+        const prof = user && !client.USE_MOCK ? await client.get<ProfileResponse>("/api/users/profile/") : undefined;
         if (!mounted) return;
 
         setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");
-        setTelegram(prof?.telegram || "");
-        setUniversity(prof?.university || "");
-        setCourse(prof?.course || "");
-        setSpecialization(prof?.specialty || specializations[0]?.title || "");
-        setAbout(prof?.about || "");
+        setTelegram(String(prof?.telegram ?? ""));
+        setUniversity(String(prof?.university ?? ""));
+        setCourse(String(prof?.course ?? ""));
+        setSpecialization(String(prof?.specialty ?? specializations[0]?.title ?? ""));
+        setAbout(String(prof?.about ?? ""));
         setErrors({});
       } catch {
         setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");

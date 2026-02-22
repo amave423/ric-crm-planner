@@ -4,6 +4,43 @@ import { useToast } from "../../components/Toast/ToastProvider";
 import { AuthContext } from "../../context/AuthContext";
 import "../../styles/profile.scss";
 
+type ProfileResponse = {
+  name?: string;
+  surname?: string;
+  university?: string;
+  course?: string | number;
+  specialty?: string;
+  job?: string;
+  workplace?: string;
+  about?: string;
+  telegram?: string;
+  vk?: string;
+  email?: string;
+};
+
+type ProfileUpdatePayload = Record<string, string | undefined>;
+
+const AVATAR_COLORS = [
+  "#f44336",
+  "#e91e63",
+  "#9c27b0",
+  "#673ab7",
+  "#3f51b5",
+  "#2196f3",
+  "#03a9f4",
+  "#00bcd4",
+  "#009688",
+  "#4caf50",
+  "#8bc34a",
+  "#cddc39",
+  "#ffeb3b",
+  "#ffc107",
+  "#ff9800",
+  "#ff5722",
+  "#795548",
+  "#607d8b",
+];
+
 export default function ProfilePage() {
   const { user, updateProfile } = useContext(AuthContext);
   const [editing, setEditing] = useState(false);
@@ -47,13 +84,13 @@ export default function ProfilePage() {
       }
 
       try {
-        const data = await client.get("/api/users/profile/");
+        const data = await client.get<ProfileResponse>("/api/users/profile/");
         if (!mounted) return;
         setProfile({
           name: data?.name || user.name || "Имя",
           surname: data?.surname || user.surname || "Фамилия",
           university: data?.university || "",
-          course: data?.course || "",
+          course: data?.course != null ? String(data.course) : "",
           specialty: data?.specialty || "",
           workplace: data?.job || data?.workplace || "",
           about: data?.about || "",
@@ -88,7 +125,7 @@ export default function ProfilePage() {
   const onSave = async () => {
     if (!user) return;
     try {
-      const payload: Record<string, any> = {
+      const payload: ProfileUpdatePayload = {
         name: profile.name,
         surname: profile.surname,
         telegram: profile.telegram || undefined,
@@ -100,7 +137,8 @@ export default function ProfilePage() {
       };
 
       Object.keys(payload).forEach((k) => {
-        if (typeof payload[k] === "undefined" || payload[k] === "") delete payload[k];
+        const value = payload[k];
+        if (typeof value === "undefined" || value === "") delete payload[k];
       });
 
       await updateProfile(payload);
@@ -111,34 +149,6 @@ export default function ProfilePage() {
     }
   };
 
-  const COLORS = [
-    "#f44336",
-    "#e91e63",
-    "#9c27b0",
-    "#673ab7",
-    "#3f51b5",
-    "#2196f3",
-    "#03a9f4",
-    "#00bcd4",
-    "#009688",
-    "#4caf50",
-    "#8bc34a",
-    "#cddc39",
-    "#ffeb3b",
-    "#ffc107",
-    "#ff9800",
-    "#ff5722",
-    "#795548",
-    "#607d8b",
-  ];
-
-  const pickColor = (seed: string | number | undefined) => {
-    const s = String(seed ?? profile.email ?? profile.name ?? Math.random());
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-    return COLORS[Math.abs(h) % COLORS.length];
-  };
-
   const initials = useMemo(() => {
     const s = (profile.surname || "").trim();
     const n = (profile.name || "").trim();
@@ -147,7 +157,12 @@ export default function ProfilePage() {
     return (a + b) || "—";
   }, [profile.name, profile.surname]);
 
-  const avatarBg = useMemo(() => pickColor(user?.id ?? profile.email), [profile.email, user?.id]);
+  const avatarBg = useMemo(() => {
+    const s = String(user?.id ?? profile.email ?? profile.name ?? "default");
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+  }, [profile, user]);
 
   return (
     <div className="page profile-page">

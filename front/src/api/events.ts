@@ -12,6 +12,8 @@ import type { User } from "../types/user";
 
 const USE_MOCK = client.USE_MOCK;
 
+type UnknownRecord = Record<string, unknown>;
+
 type BackendSpecialization = {
   id: number;
   name?: string;
@@ -19,7 +21,46 @@ type BackendSpecialization = {
   description?: string;
 };
 
+type BackendEvent = {
+  id?: number | string;
+  title?: string;
+  name?: string;
+  description?: string;
+  startDate?: string;
+  start_date?: string;
+  endDate?: string;
+  end_date?: string;
+  applyDeadline?: string;
+  end_app_date?: string;
+  leader?: number | string;
+  organizer?: number | string;
+  stage?: string;
+  specializations?: unknown[];
+  specialization?: number | string;
+  specializationId?: number | string;
+};
+
+type BackendEventPayload = {
+  name?: string;
+  description: string;
+  start_date?: string;
+  end_date?: string;
+  end_app_date?: string;
+  stage: string;
+  specialization?: number;
+};
+
 let specializationCache: BackendSpecialization[] | null = null;
+
+function asRecord(value: unknown): UnknownRecord {
+  return value && typeof value === "object" ? (value as UnknownRecord) : {};
+}
+
+function toStringValue(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return undefined;
+}
 
 function getSpecName(s: BackendSpecialization): string {
   return String(s.name ?? s.title ?? "").trim();
@@ -31,7 +72,7 @@ function computeStatus(endDate?: string) {
   return end >= new Date() ? "Активно" : "Неактивно";
 }
 
-function toNumber(value: any): number | undefined {
+function toNumber(value: unknown): number | undefined {
   if (typeof value === "number" && !Number.isNaN(value)) return value;
   if (typeof value === "string") {
     const n = Number(value);
@@ -40,13 +81,50 @@ function toNumber(value: any): number | undefined {
   return undefined;
 }
 
-function normalizeSpecList(data: any, specs: BackendSpecialization[]): Array<{ id: number; title: string }> {
+function normalizeBackendEvent(data: unknown): BackendEvent {
+  const obj = asRecord(data);
+  return {
+    id: typeof obj.id === "number" || typeof obj.id === "string" ? obj.id : undefined,
+    title: toStringValue(obj.title),
+    name: toStringValue(obj.name),
+    description: toStringValue(obj.description),
+    startDate: toStringValue(obj.startDate),
+    start_date: toStringValue(obj.start_date),
+    endDate: toStringValue(obj.endDate),
+    end_date: toStringValue(obj.end_date),
+    applyDeadline: toStringValue(obj.applyDeadline),
+    end_app_date: toStringValue(obj.end_app_date),
+    leader: typeof obj.leader === "number" || typeof obj.leader === "string" ? obj.leader : undefined,
+    organizer: typeof obj.organizer === "number" || typeof obj.organizer === "string" ? obj.organizer : undefined,
+    stage: toStringValue(obj.stage),
+    specializations: Array.isArray(obj.specializations) ? obj.specializations : undefined,
+    specialization:
+      typeof obj.specialization === "number" || typeof obj.specialization === "string" ? obj.specialization : undefined,
+    specializationId:
+      typeof obj.specializationId === "number" || typeof obj.specializationId === "string"
+        ? obj.specializationId
+        : undefined,
+  };
+}
+
+function normalizeSpecList(data: BackendEvent, specs: BackendSpecialization[]): Array<{ id: number; title: string }> {
   if (Array.isArray(data.specializations) && data.specializations.length > 0) {
     return data.specializations
-      .map((s: any) => {
-        const id = toNumber(s?.id ?? s?.specializationId ?? s);
-        const title = s?.title ?? s?.name;
+      .map((item) => {
+        if (typeof item === "number" || typeof item === "string") {
+          const idFromPrimitive = toNumber(item);
+          if (typeof idFromPrimitive === "undefined") return null;
+          const fromCache = specs.find((x) => x.id === idFromPrimitive);
+          return {
+            id: idFromPrimitive,
+            title: (fromCache ? getSpecName(fromCache) : "") || String(idFromPrimitive),
+          };
+        }
+
+        const specObj = asRecord(item);
+        const id = toNumber(specObj.id ?? specObj.specializationId);
         if (typeof id === "undefined") return null;
+        const title = toStringValue(specObj.title ?? specObj.name);
         const fromCache = specs.find((x) => x.id === id);
         return { id, title: title ? String(title) : (fromCache ? getSpecName(fromCache) : "") || String(id) };
       })
@@ -67,13 +145,17 @@ async function getSpecializations(): Promise<BackendSpecialization[]> {
   if (specializationCache) return specializationCache;
   try {
     const raw = await client.get("/api/users/specializations/");
-    specializationCache = (Array.isArray(raw) ? raw : [])
-      .map((s: any) => ({
-        id: Number(s?.id),
-        name: String(s?.name ?? s?.title ?? "").trim(),
-        title: String(s?.title ?? s?.name ?? "").trim(),
-        description: s?.description ? String(s.description) : undefined,
-      }))
+    const list = Array.isArray(raw) ? raw : [];
+    specializationCache = list
+      .map((item) => {
+        const spec = asRecord(item);
+        return {
+          id: Number(spec.id),
+          name: String(spec.name ?? spec.title ?? "").trim(),
+          title: String(spec.title ?? spec.name ?? "").trim(),
+          description: spec.description ? String(spec.description) : undefined,
+        };
+      })
       .filter((s: BackendSpecialization) => Number.isFinite(s.id) && getSpecName(s));
     return specializationCache;
   } catch {
@@ -82,48 +164,61 @@ async function getSpecializations(): Promise<BackendSpecialization[]> {
   }
 }
 
-async function resolveOrganizer(e: any): Promise<string | undefined> {
-  const leaderId = e.leader ?? e.organizer;
-  let id = leaderId;
-  if (id == null && e.id != null) {
+function extractUserDisplay(u: User): string {
+  const obj = u as User & UnknownRecord;
+  const name = u.name ?? toStringValue(obj.firstName ?? obj.first_name) ?? "";
+  const surname = u.surname ?? toStringValue(obj.lastName ?? obj.last_name) ?? "";
+  return `${surname} ${name}`.trim();
+}
+
+async function resolveOrganizer(e: BackendEvent): Promise<string | undefined> {
+  let id: number | string | undefined = e.leader ?? e.organizer;
+  if (typeof id === "undefined" && typeof e.id !== "undefined") {
     try {
       const dirs = await _getDirectionsByEvent(Number(e.id));
-      if (Array.isArray(dirs) && dirs.length > 0) id = (dirs[0] as any).leader ?? dirs[0].organizer;
+      if (Array.isArray(dirs) && dirs.length > 0) id = dirs[0].leader ?? dirs[0].organizer;
     } catch {
     }
   }
-  if (id == null) return undefined;
+  if (typeof id === "undefined") return undefined;
 
   try {
-    const users: User[] = await getAllUsers();
+    const users = await getAllUsers();
     const u = users.find((x) => String(x.id) === String(id));
     if (!u) return String(id);
-    const name = (u as any).name ?? (u as any).firstName ?? (u as any).first_name ?? "";
-    const surname = (u as any).surname ?? (u as any).lastName ?? (u as any).last_name ?? "";
-    const display = `${surname} ${name}`.trim();
+    const display = extractUserDisplay(u);
     return display || String(id);
   } catch {
     return String(id);
   }
 }
 
-async function mapEventToUi(data: any): Promise<Event> {
+async function mapEventToUi(data: unknown): Promise<Event> {
+  const event = normalizeBackendEvent(data);
   const specs = await getSpecializations();
+
   return {
-    ...data,
-    specializations: normalizeSpecList(data, specs),
-    status: computeStatus(data.endDate ?? data.end_date),
-    organizer: await resolveOrganizer(data),
+    id: Number(event.id ?? 0),
+    title: event.title ?? event.name ?? "",
+    description: event.description ?? "",
+    startDate: event.startDate ?? event.start_date,
+    endDate: event.endDate ?? event.end_date,
+    applyDeadline: event.applyDeadline ?? event.end_app_date,
+    leader: typeof event.leader !== "undefined" ? String(event.leader) : undefined,
+    specializations: normalizeSpecList(event, specs),
+    status: computeStatus(event.endDate ?? event.end_date),
+    organizer: await resolveOrganizer(event),
   };
 }
 
 export async function getEvents(): Promise<Event[]> {
-  const raw: Event[] = USE_MOCK ? await _getEvents() : await client.get("/api/users/events/");
-  return Promise.all((raw || []).map((e: any) => mapEventToUi(e)));
+  const raw = USE_MOCK ? await _getEvents() : await client.get("/api/users/events/");
+  const list = Array.isArray(raw) ? raw : [];
+  return Promise.all(list.map((e) => mapEventToUi(e)));
 }
 
 export async function getEventById(id: number): Promise<Event | undefined> {
-  const data: any = USE_MOCK ? await _getEventById(id) : await client.get(`/api/users/events/${id}/`);
+  const data = USE_MOCK ? await _getEventById(id) : await client.get(`/api/users/events/${id}/`);
   if (!data) return undefined;
   return mapEventToUi(data);
 }
@@ -135,17 +230,18 @@ const fmtEndApp = (v?: string) => {
   return d.toISOString();
 };
 
-async function resolveSpecializationId(data: any): Promise<number | undefined> {
-  const fromDirect = toNumber(data.specialization ?? data.specializationId);
+async function resolveSpecializationId(data: Event): Promise<number | undefined> {
+  const obj = data as Event & UnknownRecord;
+  const fromDirect = toNumber(obj.specialization ?? obj.specializationId);
   if (typeof fromDirect !== "undefined") return fromDirect;
 
   const first = Array.isArray(data.specializations) && data.specializations.length > 0 ? data.specializations[0] : null;
   if (!first) return undefined;
 
-  const fromFirstId = toNumber(first.id ?? first.specializationId);
+  const fromFirstId = toNumber(first.id);
   if (typeof fromFirstId !== "undefined") return fromFirstId;
 
-  const title = String(first.title ?? first.name ?? "").trim();
+  const title = String(first.title ?? "").trim();
   if (!title) return undefined;
 
   const specs = await getSpecializations();
@@ -155,14 +251,16 @@ async function resolveSpecializationId(data: any): Promise<number | undefined> {
   throw new Error(`Специализация "${title}" не найдена на сервере. Выберите специализацию из существующих.`);
 }
 
-async function toBackendEvent(data: any) {
-  const payload: any = {
-    name: data.title ?? data.name,
+async function toBackendEvent(data: Event): Promise<BackendEventPayload> {
+  const obj = data as Event & UnknownRecord;
+  const stageValue = toStringValue(obj.stage);
+  const payload: BackendEventPayload = {
+    name: data.title,
     description: data.description ?? "",
-    start_date: data.startDate ?? data.start_date,
-    end_date: data.endDate ?? data.end_date,
-    end_app_date: fmtEndApp(data.applyDeadline) ?? data.end_app_date,
-    stage: data.stage && String(data.stage).trim() ? data.stage : "—",
+    start_date: data.startDate,
+    end_date: data.endDate,
+    end_app_date: fmtEndApp(data.applyDeadline),
+    stage: stageValue && stageValue.trim() ? stageValue : "—",
   };
 
   const specializationId = await resolveSpecializationId(data);
@@ -172,17 +270,17 @@ async function toBackendEvent(data: any) {
 }
 
 export async function saveEvent(data: Event): Promise<Event> {
-  if (USE_MOCK) return _saveEvent({ ...data } as any);
+  if (USE_MOCK) return _saveEvent({ ...data });
 
-  const payload = await toBackendEvent(data as any);
-  const saved = (data as any).id
-    ? await client.put(`/api/users/events/${(data as any).id}/`, payload)
+  const payload = await toBackendEvent(data);
+  const saved = data.id
+    ? await client.put(`/api/users/events/${data.id}/`, payload)
     : await client.post("/api/users/events/", payload);
 
   return mapEventToUi(saved);
 }
 
-export async function removeEvent(id: number): Promise<any> {
+export async function removeEvent(id: number): Promise<unknown> {
   if (USE_MOCK) return _removeEvent(id);
   return client.del(`/api/users/events/${id}/`);
 }

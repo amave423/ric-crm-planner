@@ -123,10 +123,10 @@ export async function saveProjectsForDirection(directionId: number, projects: Pr
     if (typeof curatorId !== "undefined") payload.curator = curatorId;
 
     if (p.id && !isTempId(p.id)) {
-      const updated = await client.put(`/api/users/projects/${p.id}/`, payload);
+      const updated = await client.put<BackendProject>(`/api/users/projects/${p.id}/`, payload);
       results.push(mapBackendProject(updated, userNameById));
     } else {
-      const created = await client.post("/api/users/projects/", {
+      const created = await client.post<BackendProject>("/api/users/projects/", {
         ...payload,
         direction_id: directionId,
       });
