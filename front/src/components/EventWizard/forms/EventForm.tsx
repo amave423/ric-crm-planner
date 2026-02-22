@@ -32,7 +32,6 @@ export default function EventForm() {
   const [title, setTitle] = useState("");
   const [usersList, setUsersList] = useState<User[]>([]);
   const { showToast } = useToast();
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -70,7 +69,6 @@ export default function EventForm() {
       }
 
       if (mode === "edit" && eventId) {
-        setLoading(true);
         try {
           const e = await getEventById(Number(eventId));
           if (!mounted) return;
@@ -85,8 +83,6 @@ export default function EventForm() {
             setTitle(e.title || "");
           }
         } catch {
-        } finally {
-          if (mounted) setLoading(false);
         }
       } else {
         if (!se && mode === "create") {

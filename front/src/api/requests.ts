@@ -24,7 +24,40 @@ type BackendStatus = {
 
 let statusCache: BackendStatus[] | null = null;
 
-function toNumber(value: any): number | undefined {
+type BackendRequest = {
+  id?: number | string;
+  ownerId?: number | string;
+  user?: number | string;
+  studentName?: string;
+  userName?: string;
+  userEmail?: string;
+  user_email?: string;
+  projectId?: number | string;
+  project?: number | string;
+  projectTitle?: string;
+  projectName?: string;
+  eventId?: number | string;
+  event?: number | string;
+  eventTitle?: string;
+  eventName?: string;
+  event_name?: string;
+  directionId?: number | string;
+  direction?: number | string;
+  specialization?: string | { name?: string };
+  about?: string;
+  message?: string;
+  status?: string | number;
+  createdAt?: string;
+  dateSub?: string;
+  date_sub?: string;
+};
+
+type BackendError = {
+  detail?: string;
+  message?: string;
+};
+
+function toNumber(value: unknown): number | undefined {
   if (typeof value === "number" && !Number.isNaN(value)) return value;
   if (typeof value === "string") {
     const n = Number(value);
@@ -33,9 +66,12 @@ function toNumber(value: any): number | undefined {
   return undefined;
 }
 
-function isForbidden(err: any): boolean {
-  const txt = String(err?.detail || err?.message || err || "").toLowerCase();
-  return txt.includes("permission") || txt.includes("forbidden") || txt.includes("403");
+function isForbidden(err: unknown): boolean {
+  const e = (err ?? {}) as BackendError;
+  const raw = e.detail ?? e.message ?? err;
+  if (typeof raw === "undefined") return false;
+  const txt2 = String(raw).toLowerCase();
+  return txt2.includes("permission") || txt2.includes("forbidden") || txt2.includes("403");
 }
 
 async function loadStatuses(): Promise<BackendStatus[]> {
@@ -50,7 +86,7 @@ async function loadStatuses(): Promise<BackendStatus[]> {
   }
 }
 
-function resolveStatusName(statusValue: any, statuses: BackendStatus[]): { status?: string; statusId?: number } {
+function resolveStatusName(statusValue: unknown, statuses: BackendStatus[]): { status?: string; statusId?: number } {
   if (statusValue == null) return {};
 
   if (typeof statusValue === "string") {
@@ -64,7 +100,7 @@ function resolveStatusName(statusValue: any, statuses: BackendStatus[]): { statu
   return { status: byId?.name ?? String(id), statusId: id };
 }
 
-function mapBackendRequest(item: any, statuses: BackendStatus[]): ReqType {
+function mapBackendRequest(item: BackendRequest, statuses: BackendStatus[]): ReqType {
   const ownerId = toNumber(item.ownerId ?? item.user);
   const eventId = toNumber(item.eventId ?? item.event);
   const directionId = toNumber(item.directionId ?? item.direction);
@@ -98,10 +134,10 @@ export async function getRequests(options: GetRequestsOptions = {}): Promise<Req
 
   const statuses = await loadStatuses();
   try {
-    const raw = await client.get("/api/users/applications/");
+    const raw = (await client.get("/api/users/applications/")) as unknown;
     if (!Array.isArray(raw)) return [];
 
-    const mapped = raw.map((x) => mapBackendRequest(x, statuses));
+    const mapped = (raw as BackendRequest[]).map((x) => mapBackendRequest(x, statuses));
     const filtered =
       typeof options.ownerId === "undefined"
         ? mapped
@@ -129,7 +165,7 @@ export async function saveRequest(req: ReqType): Promise<ReqType> {
     throw new Error("Нельзя отправить заявку без eventId и directionId.");
   }
 
-  const payload: Record<string, any> = {
+  const payload: Record<string, unknown> = {
     message: req.about ?? "",
     is_link: false,
     comment: "",

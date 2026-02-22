@@ -9,20 +9,62 @@ import {
 
 const USE_MOCK = client.USE_MOCK;
 
-function isTempId(id: any) {
+type UnknownRecord = Record<string, unknown>;
+
+type BackendDirection = {
+  id?: number | string;
+  title?: string;
+  name?: string;
+  description?: string;
+  leader?: number | string | null;
+  organizer?: number | string | null;
+  organizerName?: string;
+  eventId?: number | string;
+  event?: number | string;
+};
+
+type BackendDirectionPayload = {
+  id?: number | string;
+  name: string;
+  description: string;
+  leader?: number;
+};
+
+type BackendUser = {
+  id?: number | string;
+  name?: string;
+  firstName?: string;
+  first_name?: string;
+  surname?: string;
+  lastName?: string;
+  last_name?: string;
+  role?: string;
+};
+
+function asRecord(value: unknown): UnknownRecord {
+  return value && typeof value === "object" ? (value as UnknownRecord) : {};
+}
+
+function toStringValue(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return undefined;
+}
+
+function isTempId(id: unknown) {
   if (id == null) return false;
   const n = Number(id);
   if (Number.isNaN(n)) return true;
   return String(n).length >= 12 || n > 1e11;
 }
 
-function mapToBackendPayload(d: any) {
-  const payload: any = {
-    name: d.title ?? d.name ?? "",
+function mapToBackendPayload(d: Direction): BackendDirectionPayload {
+  const payload: BackendDirectionPayload = {
+    name: d.title ?? "",
     description: d.description ?? "",
   };
 
-  const leaderVal = d.leader ?? d.organizer;
+  const leaderVal = d.leader ?? d.organizer ?? undefined;
   if (typeof leaderVal === "number") {
     payload.leader = leaderVal;
   } else if (typeof leaderVal === "string") {
@@ -35,7 +77,7 @@ function mapToBackendPayload(d: any) {
   return payload;
 }
 
-function toNumber(value: any): number | undefined {
+function toNumber(value: unknown): number | undefined {
   if (typeof value === "number" && !Number.isNaN(value)) return value;
   if (typeof value === "string") {
     const n = Number(value);
@@ -44,29 +86,46 @@ function toNumber(value: any): number | undefined {
   return undefined;
 }
 
-async function mapToUiDirections(raw: any[]): Promise<Direction[]> {
-  const users = await getAllUsers().catch(() => []);
+function normalizeBackendDirection(value: unknown): BackendDirection {
+  const obj = asRecord(value);
+  return {
+    id: toStringValue(obj.id) ?? (typeof obj.id === "number" ? obj.id : undefined),
+    title: toStringValue(obj.title),
+    name: toStringValue(obj.name),
+    description: toStringValue(obj.description),
+    leader: (typeof obj.leader === "number" || typeof obj.leader === "string" ? obj.leader : null) ?? null,
+    organizer: (typeof obj.organizer === "number" || typeof obj.organizer === "string" ? obj.organizer : null) ?? null,
+    organizerName: toStringValue(obj.organizerName),
+    eventId: typeof obj.eventId === "number" || typeof obj.eventId === "string" ? obj.eventId : undefined,
+    event: typeof obj.event === "number" || typeof obj.event === "string" ? obj.event : undefined,
+  };
+}
+
+async function mapToUiDirections(raw: unknown[]): Promise<Direction[]> {
+  const users = (await getAllUsers().catch(() => [])) as BackendUser[];
   const userNameById = new Map<number, string>();
 
-  users.forEach((u: any) => {
+  users.forEach((u) => {
     const display = `${u.surname ?? u.lastName ?? u.last_name ?? ""} ${u.name ?? u.firstName ?? u.first_name ?? ""}`.trim();
-    if (display) userNameById.set(Number(u.id), display);
+    const userId = toNumber(u.id);
+    if (display && typeof userId !== "undefined") userNameById.set(userId, display);
   });
 
-  return raw.map((item: any) => {
-    const leaderId = toNumber(item.leader ?? item.organizer);
+  return raw.map((item) => {
+    const dir = normalizeBackendDirection(item);
+    const leaderId = toNumber(dir.leader ?? dir.organizer);
     const organizerName =
       (typeof leaderId !== "undefined" ? userNameById.get(leaderId) : undefined) ??
-      item.organizerName ??
-      (item.organizer != null ? String(item.organizer) : undefined);
+      dir.organizerName ??
+      (dir.organizer != null ? String(dir.organizer) : undefined);
 
     return {
-      ...item,
-      id: Number(item.id),
-      title: item.title ?? item.name ?? "",
-      description: item.description ?? "",
+      ...dir,
+      id: Number(dir.id ?? 0),
+      title: dir.title ?? dir.name ?? "",
+      description: dir.description ?? "",
       organizer: organizerName,
-      eventId: toNumber(item.eventId ?? item.event),
+      eventId: toNumber(dir.eventId ?? dir.event),
     } as Direction;
   });
 }
@@ -92,7 +151,7 @@ export async function getDirectionById(id: number): Promise<Direction | undefine
 export async function saveDirectionsForEvent(eventId: number, dirs: Direction[]) {
   if (USE_MOCK) return _saveDirectionsForEvent(eventId, dirs);
 
-  const created: any[] = [];
+  const created: unknown[] = [];
   for (const d of dirs) {
     const payload = mapToBackendPayload(d);
     if (d.id && !isTempId(d.id)) {
