@@ -42,3 +42,6 @@ a:hover {
   color: #888;
   font-size: 16px;
 }
+
+@import "./responsive-desktop.scss";
+@import "./responsive-mobile.scss";

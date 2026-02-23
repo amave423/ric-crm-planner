@@ -1,0 +1,76 @@
+@media (max-width: 1600px) {
+  body .page {
+    padding: 16px;
+  }
+
+  body .page--events {
+    --table-grid: 260px 210px 210px 220px 170px 0px;
+  }
+
+  body .page--directions {
+    --table-grid: 500px 420px 0px;
+  }
+
+  body .page--projects {
+    --table-grid: 380px 320px 220px 0px;
+  }
+}
+
+@media (max-width: 1280px) {
+  body .app-header {
+    margin: 8px 10px;
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  body .head-btn {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  body .head-btn span {
+    font-size: 13px;
+  }
+
+  body .profile-box {
+    padding: 8px 10px;
+  }
+
+  body .table-header {
+    margin-bottom: 14px;
+  }
+
+  body .search-box {
+    width: 210px;
+  }
+
+  body .custom-table-container {
+    padding: 10px;
+  }
+
+  body .table-grid-head {
+    padding: 10px 12px;
+  }
+
+  body .row-box {
+    padding: 12px;
+  }
+
+  body .wizard {
+    width: 92%;
+    height: 88%;
+  }
+
+  body .wizard-nav {
+    width: 220px;
+    padding: 16px;
+  }
+
+  body .wizard-content {
+    padding: 20px;
+  }
+
+  body .profile-page {
+    padding: 16px;
+  }
+}
