@@ -3,6 +3,7 @@ export interface Project {
   title?: string;
   description?: string;
   curator?: string;
+  curatorId?: number;
   teams?: number;
   directionId?: number;
 }

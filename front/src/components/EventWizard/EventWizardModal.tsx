@@ -13,6 +13,7 @@ import type {
   WizardTab,
   DirectionModel
 } from "./types";
+import type { Event } from "../../types/event";
 
 export interface WizardLaunchContext {
   type?: string;
@@ -62,13 +63,13 @@ export default function EventWizardModal({
   const [activeTab, setActiveTab] = useState<WizardTab>(initialTab);
 
   const [isEventSaved, setIsEventSaved] = useState(false);
-  const [savedEvent, setSavedEvent] = useState<any>(null);
+  const [savedEvent, setSavedEvent] = useState<Event | null>(null);
 
   const [savedDirections, setSavedDirections] = useState<DirectionModel[]>([]);
   const [isDirectionsSaved, setIsDirectionsSaved] = useState(false);
   const [eventIdState, setEventIdState] = useState<number | undefined>(initialEventId ?? context?.eventId);
 
-  const saveEvent = (data: any) => {
+  const saveEvent = (data: Event) => {
     setSavedEvent(data);
     setIsEventSaved(true);
     if (data?.id) setEventIdState(Number(data.id));

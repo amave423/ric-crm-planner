@@ -7,16 +7,28 @@ from django.urls import reverse
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import serializers
+from .models import CRMRole, ROLE_PROJECTANT, ROLE_CURATOR, ROLE_ADMIN
 from rest_framework.serializers import ModelSerializer, Serializer
 
 from .models import Application, Direction, Event, Profile, Project, Specialization, Status
 
 
 class UserSerializer(ModelSerializer):
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = get_user_model()
-        fields = ("id", "email", "username", "first_name", "last_name")
+        fields = ("id", "email", "username", "first_name", "last_name", "role")
+
+    def get_role(self, obj):
+        role_obj = CRMRole.objects.filter(user=obj).first()
+        if not role_obj:
+            return "student"
+        if role_obj.role_type == ROLE_PROJECTANT:
+            return "student"
+        if role_obj.role_type in (ROLE_CURATOR, ROLE_ADMIN):
+            return "organizer"
+        return "student"
 
 
 class RegisterUserSerializer(ModelSerializer):
@@ -48,27 +60,9 @@ class RegisterUserSerializer(ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        validated_data.pop("password_confirmation")
-        user = get_user_model().objects.create_user(
-            **validated_data, is_active=False
-        )
+        validated_data.pop("password_confirmation", None)
 
-        token = default_token_generator.make_token(user)
-        request = self.context.get("request")
-        confirmation_path = reverse("email-confirmation")
-        confirmation_link = (
-            request.build_absolute_uri(f"{confirmation_path}?email={user.email}&token={token}")
-            if request
-            else f"{confirmation_path}?email={user.email}&token={token}"
-        )
-
-        send_mail(
-            subject="Подтверждение регистрации",
-            message=f"Для подтверждения аккаунта перейдите по ссылке: {confirmation_link}",
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-            recipient_list=[user.email],
-            fail_silently=True,
-        )
+        user = get_user_model().objects.create_user(**validated_data, is_active=True)
 
         return user
 
@@ -234,7 +228,9 @@ class DirectionSerializer(ModelSerializer):
 
 class ProjectSerializer(ModelSerializer):
     direction = serializers.PrimaryKeyRelatedField(read_only=True)
-
+    direction_id = serializers.PrimaryKeyRelatedField(
+        queryset=Direction.objects.all(), write_only=True, source="direction", required=False
+    )
     class Meta:
         model = Project
         fields = (
@@ -242,6 +238,7 @@ class ProjectSerializer(ModelSerializer):
             "name",
             "description",
             "direction",
+            "direction_id",
             "curator",
             "teams",
             "created_at",
@@ -250,7 +247,7 @@ class ProjectSerializer(ModelSerializer):
         read_only_fields = ("id", "created_at", "updated_at", "direction")
 
     def create(self, validated_data):
-        direction = self.context.get("direction")
+        direction = validated_data.get("direction") or self.context.get("direction")
         if not direction:
             raise serializers.ValidationError({"direction": "Направление не найдено"})
 
@@ -258,6 +255,12 @@ class ProjectSerializer(ModelSerializer):
         return super().create(validated_data)
 
 class ApplicationCreateSerializer(ModelSerializer):
+    event_id = serializers.PrimaryKeyRelatedField(
+        queryset=Event.objects.all(), write_only=True, source="event", required=False
+    )
+    direction_id = serializers.PrimaryKeyRelatedField(
+        queryset=Direction.objects.all(), write_only=True, source="direction", required=False
+    )
     project = serializers.PrimaryKeyRelatedField(
         queryset=Project.objects.all(), required=False, allow_null=True
     )
@@ -278,18 +281,23 @@ class ApplicationCreateSerializer(ModelSerializer):
             "date_sub",
             "date_end",
             "direction",
+            "direction_id",
             "event",
+            "event_id",
             "project",
             "project_ref",
         )
         read_only_fields = ("id", "date_sub", "date_end", "direction", "event")
 
     def create(self, validated_data):
-        event = self.context.get("event")
-        direction = self.context.get("direction")
+        event = validated_data.get("event") or self.context.get("event")
+        direction = validated_data.get("direction") or self.context.get("direction")
         if not event or not direction:
             raise serializers.ValidationError({"direction": "Направление или мероприятие не найдено"})
-
+        if direction.event_id != event.id:
+            raise serializers.ValidationError(
+                {"direction": "Направление не принадлежит мероприятию"}
+            )
         if timezone.now() > event.end_app_date:
             raise serializers.ValidationError(
                 {"event": "Дедлайн подачи заявок истёк"}

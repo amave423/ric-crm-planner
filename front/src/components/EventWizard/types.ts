@@ -1,23 +1,26 @@
+import type { Event } from "../../types/event";
+
 export type WizardMode = "create" | "edit";
 export type WizardTab = "event" | "directions" | "projects";
 
 export type WizardPage = "events" | "directions" | "projects";
-
-export interface DirectionModel {
-  id: number;
-  title: string;
-  description?: string;
-  organizer?: string;
-  projects?: any[];
-}
 
 export interface ProjectModel {
   id: number;
   title?: string;
   description?: string;
   curator?: string;
+  curatorId?: number;
   teams?: number;
   directionId?: number | string;
+}
+
+export interface DirectionModel {
+  id: number;
+  title: string;
+  description?: string;
+  organizer?: string;
+  projects?: ProjectModel[];
 }
 
 export interface WizardContextState {
@@ -32,10 +35,10 @@ export interface WizardContextState {
   setActiveTab: (tab: WizardTab) => void;
 
   isEventSaved?: boolean;
-  saveEvent?: (data: any) => void;
+  saveEvent?: (data: Event) => void;
 
   savedDirections?: DirectionModel[];
-  savedEvent?: any;
+  savedEvent?: Event | null;
   isDirectionsSaved?: boolean;
   saveDirections?: (dirs: DirectionModel[]) => void;
 }

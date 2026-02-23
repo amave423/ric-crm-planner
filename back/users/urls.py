@@ -21,9 +21,13 @@ from .views import (
     ProfileView,
     UserInfoView,
     UserRegistrationView,
+    UserDirectionListView,
+    UserListView,
+    UserProjectListCreateView,
 )
 
 urlpatterns = [
+    path("", UserListView.as_view(), name="user-list"),
     path("user-info/", UserInfoView.as_view(), name="user-info"),
     path("register/", UserRegistrationView.as_view(), name="registration"),
     path("login/", LoginView.as_view(), name="user-login"),
@@ -60,6 +64,8 @@ urlpatterns = [
         ProjectDetailView.as_view(),
         name="project-detail",
     ),
+    path("projects/", UserProjectListCreateView.as_view(), name="user-project-list-create"),
+    path("directions/", UserDirectionListView.as_view(), name="user-direction-list"),
     path("applications/", ApplicationListView.as_view(), name="application-list"),
     path(
         "applications/<int:application_id>/",

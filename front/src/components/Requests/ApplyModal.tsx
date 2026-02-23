@@ -1,9 +1,17 @@
-import { useState, useEffect, useContext } from "react";
-import Modal from "../Modal/Modal";
+import { useContext, useEffect, useState } from "react";
+import client from "../../api/client";
 import type { Request } from "../../types/request";
 import { AuthContext } from "../../context/AuthContext";
-import { getProfile } from "../../storage/storage";
+import Modal from "../Modal/Modal";
 import { useToast } from "../Toast/ToastProvider";
+
+type ProfileResponse = {
+  telegram?: string;
+  university?: string;
+  course?: string | number;
+  specialty?: string;
+  about?: string;
+};
 
 interface Props {
   isOpen: boolean;
@@ -11,11 +19,21 @@ interface Props {
   projectId?: number;
   projectTitle?: string;
   eventId?: number;
+  directionId?: number;
   specializations?: { id: number; title: string }[];
   onSubmit: (req: Request) => boolean | Promise<boolean>;
 }
 
-export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, eventId, specializations = [], onSubmit }: Props) {
+export default function ApplyModal({
+  isOpen,
+  onClose,
+  projectId,
+  projectTitle,
+  eventId,
+  directionId,
+  specializations = [],
+  onSubmit,
+}: Props) {
   const { user } = useContext(AuthContext);
 
   const [studentName, setStudentName] = useState("");
@@ -29,15 +47,35 @@ export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, e
 
   useEffect(() => {
     if (!isOpen) return;
-    const prof = user ? getProfile(user.id) : undefined;
-    setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");
-    setTelegram(prof?.telegram || "");
-    setUniversity(prof?.university || "");
-    setCourse(prof?.course || "");
-    setSpecialization(prof?.specialty || specializations[0]?.title || "");
-    setAbout(prof?.about || "");
-    setErrors({});
-  }, [isOpen]);
+    let mounted = true;
+
+    (async () => {
+      try {
+        const prof = user && !client.USE_MOCK ? await client.get<ProfileResponse>("/api/users/profile/") : undefined;
+        if (!mounted) return;
+
+        setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");
+        setTelegram(String(prof?.telegram ?? ""));
+        setUniversity(String(prof?.university ?? ""));
+        setCourse(String(prof?.course ?? ""));
+        setSpecialization(String(prof?.specialty ?? specializations[0]?.title ?? ""));
+        setAbout(String(prof?.about ?? ""));
+        setErrors({});
+      } catch {
+        setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");
+        setTelegram("");
+        setUniversity("");
+        setCourse("");
+        setSpecialization(specializations[0]?.title || "");
+        setAbout("");
+        setErrors({});
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [isOpen, specializations, user]);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -47,6 +85,8 @@ export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, e
     if (!course.trim()) e.course = "Укажите курс";
     if (!specialization.trim()) e.specialization = "Выберите специализацию";
     if (!projectTitle) e.project = "Проект не выбран";
+    if (!eventId) e.event = "Не найдено мероприятие";
+    if (!directionId) e.direction = "Не найдено направление";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -66,19 +106,17 @@ export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, e
       projectId,
       projectTitle,
       eventId,
+      directionId,
       specialization,
       about: about.trim(),
       status: "Прислал заявку",
       createdAt: new Date().toISOString(),
-      ownerId: user?.id
+      ownerId: user?.id,
     };
 
     const res = onSubmit(req);
     Promise.resolve(res).then((ok) => {
-      if (ok) {
-        onClose();
-      } else {
-      }
+      if (ok) onClose();
     });
   };
 
@@ -97,7 +135,11 @@ export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, e
               value={studentName}
               onChange={(e) => {
                 setStudentName(e.target.value);
-                setErrors(prev => { const p = { ...prev }; delete p.studentName; return p; });
+                setErrors((prev) => {
+                  const p = { ...prev };
+                  delete p.studentName;
+                  return p;
+                });
               }}
               aria-invalid={!!errors.studentName}
             />
@@ -111,7 +153,11 @@ export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, e
               value={telegram}
               onChange={(e) => {
                 setTelegram(e.target.value);
-                setErrors(prev => { const p = { ...prev }; delete p.telegram; return p; });
+                setErrors((prev) => {
+                  const p = { ...prev };
+                  delete p.telegram;
+                  return p;
+                });
               }}
               aria-invalid={!!errors.telegram}
             />
@@ -125,7 +171,11 @@ export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, e
               value={university}
               onChange={(e) => {
                 setUniversity(e.target.value);
-                setErrors(prev => { const p = { ...prev }; delete p.university; return p; });
+                setErrors((prev) => {
+                  const p = { ...prev };
+                  delete p.university;
+                  return p;
+                });
               }}
               aria-invalid={!!errors.university}
             />
@@ -139,7 +189,11 @@ export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, e
               value={course}
               onChange={(e) => {
                 setCourse(e.target.value);
-                setErrors(prev => { const p = { ...prev }; delete p.course; return p; });
+                setErrors((prev) => {
+                  const p = { ...prev };
+                  delete p.course;
+                  return p;
+                });
               }}
               aria-invalid={!!errors.course}
             />
@@ -153,13 +207,19 @@ export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, e
               value={specialization}
               onChange={(e) => {
                 setSpecialization(e.target.value);
-                setErrors(prev => { const p = { ...prev }; delete p.specialization; return p; });
+                setErrors((prev) => {
+                  const p = { ...prev };
+                  delete p.specialization;
+                  return p;
+                });
               }}
               aria-invalid={!!errors.specialization}
             >
               <option value="">—</option>
               {specializations.map((s) => (
-                <option key={s.id} value={s.title}>{s.title}</option>
+                <option key={s.id} value={s.title}>
+                  {s.title}
+                </option>
               ))}
             </select>
             {errors.specialization && <div className="field-error">{errors.specialization}</div>}
@@ -167,16 +227,17 @@ export default function ApplyModal({ isOpen, onClose, projectId, projectTitle, e
 
           <div className="form-field">
             <label className="text-small">О вас (необязательно)</label>
-            <textarea
-              value={about}
-              onChange={(e) => setAbout(e.target.value)}
-            />
+            <textarea value={about} onChange={(e) => setAbout(e.target.value)} />
           </div>
         </div>
 
         <div className="apply-actions">
-          <button type="button" className="btn-cancel" onClick={onClose}>Отмена</button>
-          <button type="button" className="btn-send" onClick={handleSend}>Отправить</button>
+          <button type="button" className="btn-cancel" onClick={onClose}>
+            Отмена
+          </button>
+          <button type="button" className="btn-send" onClick={handleSend}>
+            Отправить
+          </button>
         </div>
       </div>
     </Modal>

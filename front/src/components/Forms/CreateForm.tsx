@@ -9,14 +9,14 @@ export type Field = {
 
 interface Props {
   fields: Field[];
-  onCreate: (data: any) => void;
+  onCreate: (data: Record<string, string>) => void;
 }
 
 export default function CreateForm({ fields, onCreate }: Props) {
-  const [form, setForm] = useState<any>({});
+  const [form, setForm] = useState<Record<string, string>>({});
 
   const update = (key: string, value: string) =>
-    setForm((prev: any) => ({ ...prev, [key]: value }));
+    setForm((prev) => ({ ...prev, [key]: value }));
 
   return (
     <form

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { getEvents } from "../../api/events";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import type { Event } from "../../types/event";
 
 import Table from "../../components/Table/Table";
 import TableHeader from "../../components/Layout/TableHeader";
@@ -16,20 +17,29 @@ export default function EventsPage() {
   const [wizardContext, setWizardContext] = useState<WizardLaunchContext | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [search, setSearch] = useState("");
+  const [allEvents, setAllEvents] = useState<Event[]>([]);
 
-  const allEvents = getEvents();
+  useEffect(() => {
+    let mounted = true;
+    getEvents()
+      .then((evs) => {
+        if (mounted) setAllEvents(evs || []);
+      })
+      .catch(() => {
+        if (mounted) setAllEvents([]);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const events = !search.trim()
     ? allEvents
-    : allEvents.filter(e =>
-        (e.title || "")
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
-        (e.organizer || "")
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
-        (e.status || "")
-          .toLowerCase()
-          .includes(search.toLowerCase())
+    : allEvents.filter(
+        (e) =>
+          (e.title || "").toLowerCase().includes(search.toLowerCase()) ||
+          (e.organizer || "").toLowerCase().includes(search.toLowerCase()) ||
+          (e.status || "").toLowerCase().includes(search.toLowerCase())
       );
 
   const [infoOpen, setInfoOpen] = useState(false);
@@ -54,38 +64,25 @@ export default function EventsPage() {
           { key: "startDate", title: "Дата начала" },
           { key: "endDate", title: "Дата окончания" },
           { key: "organizer", title: "Организатор" },
-          { key: "status", title: "Статус" }
+          { key: "status", title: "Статус" },
         ]}
         data={events}
         badgeKeys={["startDate", "endDate", "status"]}
-        onRowClick={(row) =>
-          navigate(`/events/${row.id}/directions`)
-        }
+        onRowClick={(row) => navigate(`/events/${row.id}/directions`)}
         onEdit={(row) => {
           setMode("edit");
           setWizardContext({ type: "event", eventId: row.id });
           setWizardOpen(true);
         }}
         onInfoClick={(row) => {
-          setInfoItem({ title: (row as any).title || "—", description: (row as any).description || "Нет описания" });
+          setInfoItem({ title: row.title || "—", description: row.description || "Нет описания" });
           setInfoOpen(true);
         }}
       />
 
-      {wizardOpen && wizardContext && (
-        <EventWizardModal
-          mode={mode}
-          context={wizardContext}
-          onClose={() => setWizardOpen(false)}
-        />
-      )}
+      {wizardOpen && wizardContext && <EventWizardModal mode={mode} context={wizardContext} onClose={() => setWizardOpen(false)} />}
 
-      <InfoModal
-        isOpen={infoOpen}
-        onClose={() => setInfoOpen(false)}
-        title={infoItem?.title}
-        description={infoItem?.description}
-      />
+      <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} title={infoItem?.title} description={infoItem?.description} />
     </div>
   );
 }

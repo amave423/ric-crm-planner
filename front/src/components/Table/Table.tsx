@@ -1,10 +1,11 @@
 import React, { useContext } from "react";
-import { AuthContext } from "../../context/AuthContext";
 import editIcon from "../../assets/icons/edit.svg";
 import infoIcon from "../../assets/icons/info.svg";
+import { AuthContext } from "../../context/AuthContext";
 import "./table.scss";
 
 type Column = { key: string; title: string; width?: string };
+type RowWithId = { id?: number | string };
 
 interface Props<T> {
   columns: Column[];
@@ -18,6 +19,26 @@ interface Props<T> {
   renderCell?: (row: T, colKey: string) => React.ReactNode | undefined;
 }
 
+function buildGridTemplate(columns: Column[], gridColumns?: string) {
+  if (gridColumns && gridColumns.trim()) return gridColumns;
+  const cols = columns.map((c) => (c.width ? `minmax(${c.width}, ${c.width})` : "minmax(150px, 1fr)"));
+  cols.push("60px");
+  return cols.join(" ");
+}
+
+function getRowId(row: unknown): number | string | undefined {
+  if (!row || typeof row !== "object") return undefined;
+  const candidate = (row as RowWithId).id;
+  if (typeof candidate === "number" || typeof candidate === "string") return candidate;
+  return undefined;
+}
+
+function toDisplay(value: unknown): string {
+  if (value == null) return "—";
+  if (Array.isArray(value)) return value.map((x) => String(x)).join(", ");
+  return String(value);
+}
+
 export default function Table<T>({
   columns,
   data,
@@ -27,107 +48,225 @@ export default function Table<T>({
   onInfoClick,
   selectedId,
   gridColumns = "",
-  renderCell
+  renderCell,
 }: Props<T>) {
   const { user } = useContext(AuthContext);
   const isOrganizer = user?.role === "organizer";
+  const columnKeys = columns.map((c) => c.key);
+  const isEventMobileLayout = ["title", "startDate", "endDate", "organizer", "status"].every((k) => columnKeys.includes(k));
+  const isDirectionMobileLayout = ["title", "organizer"].every((k) => columnKeys.includes(k)) && !isEventMobileLayout;
+  const isProjectMobileLayout = ["title", "curator", "teams"].every((k) => columnKeys.includes(k)) && !isEventMobileLayout;
+  const isRequestMobileLayout = ["studentName", "event", "project", "specialization", "status"].every((k) => columnKeys.includes(k));
+
+  const template = buildGridTemplate(columns, gridColumns);
+  const gridStyle = { "--table-grid": template } as React.CSSProperties;
 
   return (
     <div className="custom-table-container">
-      <table className="custom-table">
-        <thead>
-          <tr>
-            {columns.map((c) => (
-              <th key={c.key} style={{ width: c.width }} className="text-small"> {c.title}</th>
-            ))}
-            <th style={{ width: "60px" }} />
-          </tr>
-        </thead>
+      <div className="custom-table">
+        <div className="table-grid table-grid-head" style={gridStyle}>
+          {columns.map((c) => (
+            <div key={c.key} className="head-cell text-small">
+              {c.title}
+            </div>
+          ))}
+          <div className="head-cell head-cell-actions" />
+        </div>
 
-        <tbody>
-          {data.length === 0 ? (
-            <tr>
-              <td colSpan={columns.length + 1} className="td-full">
-                <div className="table-placeholder">Нет данных</div>
-              </td>
-            </tr>
-          ) : (
-            data.map((row, idx) => (
-              <tr key={(row as any).id ?? idx}>
-                <td colSpan={columns.length + 1} className="td-full">
-                  <div
-                    className={`row-box${(row as any).id === selectedId ? " selected" : ""}`}
-                    style={{ "--table-grid": gridColumns } as React.CSSProperties}
-                    onClick={() => onRowClick?.(row)}
-                  >
-                    {columns.map((col) => {
-                      if (renderCell) {
-                        const custom = renderCell(row, col.key);
-                        if (custom !== undefined) {
-                          return (
-                            <div key={col.key} className="cell" style={{ width: col.width }}>
-                              {custom}
-                            </div>
-                          );
-                        }
-                      }
+        {data.length === 0 ? (
+          <div className="table-placeholder">Нет данных</div>
+        ) : (
+          data.map((row, idx) => {
+            const rowRecord = row as Record<string, unknown>;
+            const statusRaw = rowRecord.status;
+            const statusText = toDisplay(statusRaw);
+            const isActiveStatus = String(statusRaw ?? "").toLowerCase() === "активно";
+            const statusCustom = renderCell?.(row, "status");
 
-                      if (col.key === "status") {
-                        const statusRaw = (row as Record<string, unknown>)[col.key];
-                        const isActive = String(statusRaw ?? "").toLowerCase() === "активно";
-                        return (
-                          <div key={col.key} className="cell status-cell" style={{ width: col.width }}>
-                            <span className={`cell-badge status-${isActive ? "active" : "inactive"}`}>
-                              {String(statusRaw ?? "—")}
-                            </span>
-                          </div>
-                        );
-                      }
+            const actionButton =
+              isOrganizer && onEdit ? (
+                <button
+                  className="edit-btn-icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(row);
+                  }}
+                >
+                  <img src={editIcon} alt="edit" />
+                </button>
+              ) : !isOrganizer && onInfoClick ? (
+                <button
+                  className="info-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onInfoClick(row);
+                  }}
+                  aria-label="Информация"
+                >
+                  <img src={infoIcon} alt="info" />
+                </button>
+              ) : null;
 
-                      const raw = (row as Record<string, unknown>)[col.key];
-                      const isBadge = badgeKeys.includes(col.key);
-                      const display = raw == null ? "—" : Array.isArray(raw) ? (raw as any[]).map((x) => String(x)).join(", ") : String(raw);
-
+            return (
+              <div
+                key={getRowId(row) ?? idx}
+                className={`row-box table-grid${getRowId(row) === selectedId ? " selected" : ""}${
+                  isEventMobileLayout ? " row-box--event-mobile" : ""
+                }${isDirectionMobileLayout ? " row-box--direction-mobile" : ""}${
+                  isProjectMobileLayout ? " row-box--project-mobile" : ""
+                }${isRequestMobileLayout ? " row-box--request-mobile" : ""}`}
+                style={gridStyle}
+                onClick={() => onRowClick?.(row)}
+              >
+                {columns.map((col) => {
+                  if (renderCell) {
+                    const custom = renderCell(row, col.key);
+                    if (custom !== undefined) {
                       return (
-                        <div key={col.key} className="cell" style={{ width: col.width }}>
-                          {isBadge ? <span className="cell-badge">{display}</span> : <div className="title-text">{display}</div>}
+                        <div key={col.key} className="cell" data-label={col.title}>
+                          {custom}
                         </div>
                       );
-                    })}
+                    }
+                  }
 
-                    <div className="cell" style={{ width: 60 }}>
-                      {isOrganizer && onEdit && (
-                        <button
-                          className="edit-btn-icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit(row);
-                          }}
-                        >
-                          <img src={editIcon} alt="edit" />
-                        </button>
-                      )}
+                  if (col.key === "status") {
+                    return (
+                      <div key={col.key} className="cell status-cell" data-label={col.title}>
+                        <span className={`cell-badge status-${isActiveStatus ? "active" : "inactive"}`}>{statusText}</span>
+                      </div>
+                    );
+                  }
 
-                      {!isOrganizer && onInfoClick && (
-                        <button
-                          className="info-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onInfoClick(row);
-                          }}
-                          aria-label="Информация"
-                        >
-                          <img src={infoIcon} alt="info" />
-                        </button>
-                      )}
+                  const raw = rowRecord[col.key];
+                  const isBadge = badgeKeys.includes(col.key);
+                  const display = toDisplay(raw);
+
+                  return (
+                    <div key={col.key} className="cell" data-label={col.title}>
+                      {isBadge ? <span className="cell-badge">{display}</span> : <div className="title-text">{display}</div>}
+                    </div>
+                  );
+                })}
+
+                <div className="cell cell-actions cell-actions-desktop" data-label="Действие">
+                  {actionButton}
+                </div>
+
+                {isEventMobileLayout && (
+                  <div className="event-card-mobile">
+                    <div className="event-card-mobile__main">
+                      <div className="event-card-mobile__title">{toDisplay(rowRecord.title)}</div>
+
+                      <div className="event-card-mobile__row event-card-mobile__row--dates">
+                        <div className="event-card-mobile__pair">
+                          <span className="event-card-mobile__label">Дата начала</span>
+                          <span className="cell-badge">{toDisplay(rowRecord.startDate)}</span>
+                        </div>
+                        <div className="event-card-mobile__pair">
+                          <span className="event-card-mobile__label">Дата окончания</span>
+                          <span className="cell-badge">{toDisplay(rowRecord.endDate)}</span>
+                        </div>
+                      </div>
+
+                      <div className="event-card-mobile__row event-card-mobile__row--meta">
+                        <div className="event-card-mobile__pair">
+                          <span className="event-card-mobile__label">Организатор</span>
+                          <span className="event-card-mobile__value">{toDisplay(rowRecord.organizer)}</span>
+                        </div>
+                        <div className="event-card-mobile__pair">
+                          <span className="event-card-mobile__label">Статус</span>
+                          <span className={`cell-badge status-${isActiveStatus ? "active" : "inactive"}`}>{statusText}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="event-card-mobile__action">
+                      <div className="event-card-mobile__divider" />
+                      {actionButton}
                     </div>
                   </div>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+                )}
+
+                {isDirectionMobileLayout && (
+                  <div className="event-card-mobile">
+                    <div className="event-card-mobile__main">
+                      <div className="event-card-mobile__title">{toDisplay(rowRecord.title)}</div>
+                      <div className="event-card-mobile__row event-card-mobile__row--single">
+                        <div className="event-card-mobile__pair">
+                          <span className="event-card-mobile__label">Организатор</span>
+                          <span className="event-card-mobile__value">{toDisplay(rowRecord.organizer)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="event-card-mobile__action">
+                      <div className="event-card-mobile__divider" />
+                      {actionButton}
+                    </div>
+                  </div>
+                )}
+
+                {isProjectMobileLayout && (
+                  <div className="event-card-mobile">
+                    <div className="event-card-mobile__main">
+                      <div className="event-card-mobile__title">{toDisplay(rowRecord.title)}</div>
+                      <div className="event-card-mobile__row event-card-mobile__row--meta">
+                        <div className="event-card-mobile__pair">
+                          <span className="event-card-mobile__label">Куратор</span>
+                          <span className="event-card-mobile__value">{toDisplay(rowRecord.curator)}</span>
+                        </div>
+                        <div className="event-card-mobile__pair">
+                          <span className="event-card-mobile__label">Команды</span>
+                          <span className="event-card-mobile__value">{toDisplay(rowRecord.teams)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="event-card-mobile__action">
+                      <div className="event-card-mobile__divider" />
+                      {actionButton}
+                    </div>
+                  </div>
+                )}
+
+                {isRequestMobileLayout && (
+                  <div className="request-card-mobile">
+                    <div className="request-card-mobile__title">{toDisplay(rowRecord.studentName)}</div>
+
+                    <div className="request-card-mobile__row">
+                      <div className="request-card-mobile__pair">
+                        <span className="request-card-mobile__label">Мероприятие</span>
+                        <span className="request-card-mobile__value">{toDisplay(rowRecord.event)}</span>
+                      </div>
+                      <div className="request-card-mobile__pair">
+                        <span className="request-card-mobile__label">Проект</span>
+                        <span className="request-card-mobile__value">{toDisplay(rowRecord.project)}</span>
+                      </div>
+                    </div>
+
+                    <div className="request-card-mobile__row request-card-mobile__row--single">
+                      <div className="request-card-mobile__pair">
+                        <span className="request-card-mobile__label">Специализация</span>
+                        <span className="request-card-mobile__value">{toDisplay(rowRecord.specialization)}</span>
+                      </div>
+                    </div>
+
+                    <div className="request-card-mobile__row request-card-mobile__row--single">
+                      <div className="request-card-mobile__pair">
+                        <span className="request-card-mobile__label">Статус</span>
+                        <div className="request-card-mobile__status-body">
+                          {statusCustom !== undefined ? statusCustom : <span className="request-card-mobile__value">{statusText}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }

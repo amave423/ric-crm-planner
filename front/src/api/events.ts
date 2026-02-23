@@ -1,8 +1,70 @@
-import { getEvents as _getEvents, getEventById as _getEventById } from "../storage/storage";
-import { getAllUsers } from "../storage/storage";
+import client from "../api/client";
+import {
+  getAllUsers,
+  getDirectionsByEvent as _getDirectionsByEvent,
+  getEventById as _getEventById,
+  getEvents as _getEvents,
+  removeEvent as _removeEvent,
+  saveEvent as _saveEvent,
+} from "../storage/storage";
 import type { Event } from "../types/event";
-import { saveEvent as _saveEvent } from "../storage/storage";
-import { removeEvent as _removeEvent } from "../storage/storage"
+import type { User } from "../types/user";
+
+const USE_MOCK = client.USE_MOCK;
+
+type UnknownRecord = Record<string, unknown>;
+
+type BackendSpecialization = {
+  id: number;
+  name?: string;
+  title?: string;
+  description?: string;
+};
+
+type BackendEvent = {
+  id?: number | string;
+  title?: string;
+  name?: string;
+  description?: string;
+  startDate?: string;
+  start_date?: string;
+  endDate?: string;
+  end_date?: string;
+  applyDeadline?: string;
+  end_app_date?: string;
+  leader?: number | string;
+  organizer?: number | string;
+  stage?: string;
+  specializations?: unknown[];
+  specialization?: number | string;
+  specializationId?: number | string;
+};
+
+type BackendEventPayload = {
+  name?: string;
+  description: string;
+  start_date?: string;
+  end_date?: string;
+  end_app_date?: string;
+  stage: string;
+  specialization?: number;
+};
+
+let specializationCache: BackendSpecialization[] | null = null;
+
+function asRecord(value: unknown): UnknownRecord {
+  return value && typeof value === "object" ? (value as UnknownRecord) : {};
+}
+
+function toStringValue(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return undefined;
+}
+
+function getSpecName(s: BackendSpecialization): string {
+  return String(s.name ?? s.title ?? "").trim();
+}
 
 function computeStatus(endDate?: string) {
   if (!endDate) return "Неактивно";
@@ -10,33 +72,215 @@ function computeStatus(endDate?: string) {
   return end >= new Date() ? "Активно" : "Неактивно";
 }
 
-function resolveOrganizer(e: any) {
-  if (e.organizer) return e.organizer;
-  const users = getAllUsers();
-  const leaderId = e.leader;
-  if (leaderId == null) return undefined;
-  const u = users.find((x) => String(x.id) === String(leaderId));
-  if (!u) return String(leaderId);
-  return `${u.surname} ${u.name}`;
+function toNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && !Number.isNaN(value)) return value;
+  if (typeof value === "string") {
+    const n = Number(value);
+    if (!Number.isNaN(n)) return n;
+  }
+  return undefined;
 }
 
-export function getEvents(): Event[] {
-  return _getEvents().map((e: any) => ({
-    ...e,
-    status: computeStatus(e.endDate),
-    organizer: resolveOrganizer(e),
-  }));
-}
-
-export function getEventById(id: number): Event | undefined {
-  const e = _getEventById(id);
-  if (!e) return undefined;
+function normalizeBackendEvent(data: unknown): BackendEvent {
+  const obj = asRecord(data);
   return {
-    ...e,
-    status: computeStatus(e.endDate),
-    organizer: resolveOrganizer(e),
+    id: typeof obj.id === "number" || typeof obj.id === "string" ? obj.id : undefined,
+    title: toStringValue(obj.title),
+    name: toStringValue(obj.name),
+    description: toStringValue(obj.description),
+    startDate: toStringValue(obj.startDate),
+    start_date: toStringValue(obj.start_date),
+    endDate: toStringValue(obj.endDate),
+    end_date: toStringValue(obj.end_date),
+    applyDeadline: toStringValue(obj.applyDeadline),
+    end_app_date: toStringValue(obj.end_app_date),
+    leader: typeof obj.leader === "number" || typeof obj.leader === "string" ? obj.leader : undefined,
+    organizer: typeof obj.organizer === "number" || typeof obj.organizer === "string" ? obj.organizer : undefined,
+    stage: toStringValue(obj.stage),
+    specializations: Array.isArray(obj.specializations) ? obj.specializations : undefined,
+    specialization:
+      typeof obj.specialization === "number" || typeof obj.specialization === "string" ? obj.specialization : undefined,
+    specializationId:
+      typeof obj.specializationId === "number" || typeof obj.specializationId === "string"
+        ? obj.specializationId
+        : undefined,
   };
 }
 
-export function saveEvent(data: Event) { return _saveEvent({ ...data }); }
-export function removeEvent(id: number) { return _removeEvent(id); }
+function normalizeSpecList(data: BackendEvent, specs: BackendSpecialization[]): Array<{ id: number; title: string }> {
+  if (Array.isArray(data.specializations) && data.specializations.length > 0) {
+    return data.specializations
+      .map((item) => {
+        if (typeof item === "number" || typeof item === "string") {
+          const idFromPrimitive = toNumber(item);
+          if (typeof idFromPrimitive === "undefined") return null;
+          const fromCache = specs.find((x) => x.id === idFromPrimitive);
+          return {
+            id: idFromPrimitive,
+            title: (fromCache ? getSpecName(fromCache) : "") || String(idFromPrimitive),
+          };
+        }
+
+        const specObj = asRecord(item);
+        const id = toNumber(specObj.id ?? specObj.specializationId);
+        if (typeof id === "undefined") return null;
+        const title = toStringValue(specObj.title ?? specObj.name);
+        const fromCache = specs.find((x) => x.id === id);
+        return { id, title: title ? String(title) : (fromCache ? getSpecName(fromCache) : "") || String(id) };
+      })
+      .filter(Boolean) as Array<{ id: number; title: string }>;
+  }
+
+  const specId = toNumber(data.specialization ?? data.specializationId);
+  if (typeof specId !== "undefined") {
+    const found = specs.find((x) => Number(x.id) === Number(specId));
+    return [{ id: specId, title: (found ? getSpecName(found) : "") || String(specId) }];
+  }
+
+  return [];
+}
+
+async function getSpecializations(): Promise<BackendSpecialization[]> {
+  if (USE_MOCK) return [];
+  if (specializationCache) return specializationCache;
+  try {
+    const raw = await client.get("/api/users/specializations/");
+    const list = Array.isArray(raw) ? raw : [];
+    specializationCache = list
+      .map((item) => {
+        const spec = asRecord(item);
+        return {
+          id: Number(spec.id),
+          name: String(spec.name ?? spec.title ?? "").trim(),
+          title: String(spec.title ?? spec.name ?? "").trim(),
+          description: spec.description ? String(spec.description) : undefined,
+        };
+      })
+      .filter((s: BackendSpecialization) => Number.isFinite(s.id) && getSpecName(s));
+    return specializationCache;
+  } catch {
+    specializationCache = [];
+    return specializationCache;
+  }
+}
+
+function extractUserDisplay(u: User): string {
+  const obj = u as User & UnknownRecord;
+  const name = u.name ?? toStringValue(obj.firstName ?? obj.first_name) ?? "";
+  const surname = u.surname ?? toStringValue(obj.lastName ?? obj.last_name) ?? "";
+  return `${surname} ${name}`.trim();
+}
+
+async function resolveOrganizer(e: BackendEvent): Promise<string | undefined> {
+  let id: number | string | undefined = e.leader ?? e.organizer;
+  if (typeof id === "undefined" && typeof e.id !== "undefined") {
+    try {
+      const dirs = await _getDirectionsByEvent(Number(e.id));
+      if (Array.isArray(dirs) && dirs.length > 0) id = dirs[0].leader ?? dirs[0].organizer;
+    } catch {
+    }
+  }
+  if (typeof id === "undefined") return undefined;
+
+  try {
+    const users = await getAllUsers();
+    const u = users.find((x) => String(x.id) === String(id));
+    if (!u) return String(id);
+    const display = extractUserDisplay(u);
+    return display || String(id);
+  } catch {
+    return String(id);
+  }
+}
+
+async function mapEventToUi(data: unknown): Promise<Event> {
+  const event = normalizeBackendEvent(data);
+  const specs = await getSpecializations();
+
+  return {
+    id: Number(event.id ?? 0),
+    title: event.title ?? event.name ?? "",
+    description: event.description ?? "",
+    startDate: event.startDate ?? event.start_date,
+    endDate: event.endDate ?? event.end_date,
+    applyDeadline: event.applyDeadline ?? event.end_app_date,
+    leader: typeof event.leader !== "undefined" ? String(event.leader) : undefined,
+    specializations: normalizeSpecList(event, specs),
+    status: computeStatus(event.endDate ?? event.end_date),
+    organizer: await resolveOrganizer(event),
+  };
+}
+
+export async function getEvents(): Promise<Event[]> {
+  const raw = USE_MOCK ? await _getEvents() : await client.get("/api/users/events/");
+  const list = Array.isArray(raw) ? raw : [];
+  return Promise.all(list.map((e) => mapEventToUi(e)));
+}
+
+export async function getEventById(id: number): Promise<Event | undefined> {
+  const data = USE_MOCK ? await _getEventById(id) : await client.get(`/api/users/events/${id}/`);
+  if (!data) return undefined;
+  return mapEventToUi(data);
+}
+
+const fmtEndApp = (v?: string) => {
+  if (!v) return undefined;
+  if (v.includes("T")) return v;
+  const d = new Date(`${v}T23:59:59`);
+  return d.toISOString();
+};
+
+async function resolveSpecializationId(data: Event): Promise<number | undefined> {
+  const obj = data as Event & UnknownRecord;
+  const fromDirect = toNumber(obj.specialization ?? obj.specializationId);
+  if (typeof fromDirect !== "undefined") return fromDirect;
+
+  const first = Array.isArray(data.specializations) && data.specializations.length > 0 ? data.specializations[0] : null;
+  if (!first) return undefined;
+
+  const fromFirstId = toNumber(first.id);
+  if (typeof fromFirstId !== "undefined") return fromFirstId;
+
+  const title = String(first.title ?? "").trim();
+  if (!title) return undefined;
+
+  const specs = await getSpecializations();
+  const found = specs.find((s) => getSpecName(s).toLowerCase() === title.toLowerCase());
+  if (found) return found.id;
+
+  throw new Error(`Специализация "${title}" не найдена на сервере. Выберите специализацию из существующих.`);
+}
+
+async function toBackendEvent(data: Event): Promise<BackendEventPayload> {
+  const obj = data as Event & UnknownRecord;
+  const stageValue = toStringValue(obj.stage);
+  const payload: BackendEventPayload = {
+    name: data.title,
+    description: data.description ?? "",
+    start_date: data.startDate,
+    end_date: data.endDate,
+    end_app_date: fmtEndApp(data.applyDeadline),
+    stage: stageValue && stageValue.trim() ? stageValue : "—",
+  };
+
+  const specializationId = await resolveSpecializationId(data);
+  if (typeof specializationId !== "undefined") payload.specialization = specializationId;
+
+  return payload;
+}
+
+export async function saveEvent(data: Event): Promise<Event> {
+  if (USE_MOCK) return _saveEvent({ ...data });
+
+  const payload = await toBackendEvent(data);
+  const saved = data.id
+    ? await client.put(`/api/users/events/${data.id}/`, payload)
+    : await client.post("/api/users/events/", payload);
+
+  return mapEventToUi(saved);
+}
+
+export async function removeEvent(id: number): Promise<unknown> {
+  if (USE_MOCK) return _removeEvent(id);
+  return client.del(`/api/users/events/${id}/`);
+}

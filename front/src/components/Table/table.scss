@@ -5,40 +5,51 @@
   background: #fff;
   border-radius: 12px;
   padding: 12px;
+  overflow-x: auto;
 }
 
 .custom-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 10px;
+  min-width: 100%;
 }
 
-.custom-table thead th {
-  padding: 12px;
-  height: 36px;
+.table-grid {
+  display: grid;
+  grid-template-columns: var(--table-grid);
+  align-items: center;
+  column-gap: 0;
+  min-width: max-content;
+}
+
+.table-grid-head {
+  padding: 12px 16px;
+  margin-bottom: 10px;
+}
+
+.head-cell {
   text-align: left;
   font-weight: 500;
   color: #333;
+  min-width: 0;
+  white-space: nowrap;
 }
 
-.td-full {
-  padding: 0;
-  border: none;
+.head-cell-actions {
+  text-align: right;
 }
 
 .row-box {
-  display: grid;
   position: relative;
-  grid-template-columns: var(--table-grid);
-  gap: 0;
   padding: 14px 16px;
-
+  margin-bottom: 10px;
   border: 1px solid var(--row-border-color);
   border-radius: 12px;
-
   background: #fff;
   transition: background 0.15s ease;
-  animation: fade-in .80s ease;
+  animation: fade-in 0.8s ease;
+}
+
+.row-box:last-child {
+  margin-bottom: 0;
 }
 
 @keyframes fade-in {
@@ -60,15 +71,12 @@
 .cell {
   display: flex;
   align-items: center;
-  width: 100%;
+  justify-content: flex-start;
   min-width: 0;
 }
 
-.title-with-icon {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
+.cell-actions {
+  justify-content: flex-end;
 }
 
 .title-text {
@@ -79,56 +87,48 @@
   text-overflow: ellipsis;
 }
 
-.info-btn {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.info-btn img {
-  width: 40px;
-  height: 40px;
-  transition: transform .15s ease;
-}
-
-.info-btn:hover img {
-  transform: scale(1.5);
-}
-
 .cell-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   padding: 6px 10px;
   border-radius: 12px;
   border: 1px solid var(--row-border-color);
   background: var(--badge-bg);
-
   white-space: nowrap;
   font-size: 14px;
 }
 
-.empty-row td {
+.cell-badge.status-active {
+  color: var(--event-color);
+  background: var(--badge-bg);
+  border: 1px solid rgba(100, 149, 237, 0.25);
+}
+
+.cell-badge.status-inactive {
+  color: #c53030;
+  background: rgba(245, 110, 110, 0.06);
+  border: 1px solid rgba(197, 75, 75, 0.18);
+}
+
+.status-cell {
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table-placeholder {
   text-align: center;
   padding: 20px;
   color: #777;
 }
 
 .edit-btn-icon {
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-
   width: 34px;
   height: 34px;
   border-radius: 8px;
   border: none;
   background: transparent;
   cursor: pointer;
-
   display: flex;
   align-items: center;
   justify-content: center;
@@ -146,19 +146,23 @@
   }
 }
 
-.cell-badge.status-active {
-  color: var(--event-color);
-  background: var(--badge-bg);
-  border: 1px solid rgba(100,149,237,0.25);
+.info-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
 }
 
-.cell-badge.status-inactive {
-  color: #c53030;
-  background: rgba(245, 110, 110, 0.06);
-  border: 1px solid rgba(197, 75, 75, 0.18);
+.info-btn img {
+  width: 40px;
+  height: 40px;
+  transition: transform 0.15s ease;
 }
 
-.status-cell { text-align: left; vertical-align: middle; }
+.info-btn:hover img {
+  transform: scale(1.5);
+}
 
 .apply-container {
   display: flex;
@@ -175,7 +179,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background .12s ease, color .12s ease, border-color .12s ease;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
   border-radius: 10px;
 }
 
@@ -186,9 +190,9 @@
 }
 
 .row-box.selected {
-  box-shadow: 0 6px 20px rgba(183,123,220,0.18);
+  box-shadow: 0 6px 20px rgba(183, 123, 220, 0.18);
   border-radius: 12px;
-  outline: 2px solid rgba(183,123,220,0.12);
+  outline: 2px solid rgba(183, 123, 220, 0.12);
 }
 
 .status-select {
@@ -197,4 +201,12 @@
   border: 1px solid $gray;
   background: white;
   font-size: 14px;
+}
+
+.event-card-mobile {
+  display: none;
+}
+
+.request-card-mobile {
+  display: none;
 }

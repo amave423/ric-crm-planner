@@ -1,0 +1,20 @@
+@media (max-width: 1280px) {
+  body .app-header {
+    margin: 8px 10px;
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  body .head-btn {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  body .head-btn span {
+    font-size: 13px;
+  }
+
+  body .profile-box {
+    padding: 8px 10px;
+  }
+}

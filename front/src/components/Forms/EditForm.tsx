@@ -9,15 +9,15 @@ export type Field = {
 
 interface Props {
   fields: Field[];
-  initial: any;
-  onSave: (data: any) => void;
+  initial: Record<string, string> | null | undefined;
+  onSave: (data: Record<string, string>) => void;
 }
 
 export default function EditForm({ fields, initial, onSave }: Props) {
-  const [form, setForm] = useState<any>(initial || {});
+  const [form, setForm] = useState<Record<string, string>>(initial || {});
 
   const update = (key: string, value: string) =>
-    setForm((prev: any) => ({ ...prev, [key]: value }));
+    setForm((prev) => ({ ...prev, [key]: value }));
 
   return (
     <form

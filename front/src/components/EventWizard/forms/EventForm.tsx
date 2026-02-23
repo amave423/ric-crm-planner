@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import { useWizard } from "../EventWizardModal";
 import calendarIcon from "../../../assets/icons/calendar.svg";
-import users from "../../../mock-data/users.json";
+import type { User } from "../../../types/user";
+import { getAllUsers } from "../../../storage/storage";
 import Calendar from "../../UI/Calendar";
-import { getEventById, saveEvent as persistEvent } from "../../../api/events";
+import { getEventById, saveEvent as persistEvent, removeEvent as apiRemoveEvent } from "../../../api/events";
 import type { Event } from "../../../types/event";
-import { removeEvent } from "../../../api/events";
 import Modal from "../../Modal/Modal";
 import { useToast } from "../../../components/Toast/ToastProvider";
 
@@ -25,49 +26,84 @@ export default function EventForm() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [applyDeadline, setApplyDeadline] = useState("");
-  const [leader, setLeader] = useState("");
+  const [leader, setLeader] = useState<string>("");
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [usersList, setUsersList] = useState<User[]>([]);
   const { showToast } = useToast();
 
-  const organizers = users.filter((u) => u.role === "organizer");
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const users = await getAllUsers();
+        const mapped = (users || []).map((u) => {
+          const raw = u as User & Record<string, unknown>;
+          return {
+            ...raw,
+            name: raw.name ?? String(raw.firstName ?? raw.first_name ?? ""),
+            surname: raw.surname ?? String(raw.lastName ?? raw.last_name ?? ""),
+          };
+        });
+        if (mounted) setUsersList(mapped);
+      } catch {
+        if (mounted) setUsersList([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+  
+  const organizers = usersList.filter((u) => u.role === "organizer");
 
   useEffect(() => {
-    if (se) {
-      if (titleRef.current) titleRef.current.value = se.title || "";
-      setDescription(se.description || "");
-      setStartDate(se.startDate || "");
-      setEndDate(se.endDate || "");
-      setApplyDeadline(se.applyDeadline || "");
-      setLeader(se.leader ?? "");
-      setSpecializations(se.specializations || []);
-      setTitle(se.title || "");
-    } else if (mode === "edit" && eventId) {
-      const e = getEventById(Number(eventId));
-      if (e) {
-        if (titleRef.current) titleRef.current.value = e.title || "";
-        setDescription(e.description || "");
-        setStartDate(e.startDate || "");
-        setEndDate(e.endDate || "");
-        setApplyDeadline(e.applyDeadline || "");
-        setLeader(e.leader ?? "");
-        setSpecializations(e.specializations || []);
-        setTitle(e.title || "");
+    let mounted = true;
+    (async () => {
+      if (se) {
+        if (titleRef.current) titleRef.current.value = se.title || "";
+        setDescription(se.description || "");
+        setStartDate(se.startDate || "");
+        setEndDate(se.endDate || "");
+        setApplyDeadline(se.applyDeadline || "");
+        setLeader(se.leader ?? "");
+        setSpecializations(se.specializations || []);
+        setTitle(se.title || "");
+        return;
       }
-    } else {
-      if (!se && mode === "create") {
-        if (titleRef.current) titleRef.current.value = "";
-        setDescription("");
-        setStartDate("");
-        setEndDate("");
-        setApplyDeadline("");
-        setLeader("");
-        setTitle("");
-        setSpecializations([]);
+
+      if (mode === "edit" && eventId) {
+        try {
+          const e = await getEventById(Number(eventId));
+          if (!mounted) return;
+          if (e) {
+            if (titleRef.current) titleRef.current.value = e.title || "";
+            setDescription(e.description || "");
+            setStartDate(e.startDate || "");
+            setEndDate(e.endDate || "");
+            setApplyDeadline(e.applyDeadline || "");
+            setLeader(e.leader ?? "");
+            setSpecializations(e.specializations || []);
+            setTitle(e.title || "");
+          }
+        } catch {
+        }
+      } else {
+        if (!se && mode === "create") {
+          if (titleRef.current) titleRef.current.value = "";
+          setDescription("");
+          setStartDate("");
+          setEndDate("");
+          setApplyDeadline("");
+          setLeader("");
+          setTitle("");
+          setSpecializations([]);
+        }
       }
-    }
+    })();
+    return () => {
+      mounted = false;
+    };
   }, [se, mode, eventId]);
 
   const addSpec = () => {
@@ -94,7 +130,7 @@ export default function EventForm() {
     return Object.keys(e).length === 0;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validate()) return;
 
     const computedStatus = (() => {
@@ -102,7 +138,8 @@ export default function EventForm() {
       return endObj >= new Date() ? "Активно" : "Неактивно";
     })();
 
-    const payload: any = {
+    const payload: Event = {
+      id: mode === "edit" && eventId ? Number(eventId) : 0,
       title: (title || "").trim(),
       description: description.trim(),
       startDate,
@@ -112,13 +149,16 @@ export default function EventForm() {
       specializations,
       status: computedStatus
     };
-    if (mode === "edit" && eventId) payload.id = eventId;
-    const saved = persistEvent(payload);
-    saveEvent?.(saved);
-    showToast("success", "Мероприятие сохранено");
+    try {
+      const saved = await persistEvent(payload);
+      saveEvent?.(saved);
+      showToast("success", "Мероприятие сохранено");
+    } catch {
+      showToast("error", "Ошибка при сохранении мероприятия");
+    }
   };
 
-  const FieldWrap = ({ name, children }: { name: string; children: React.ReactNode }) => (
+  const FieldWrap = ({ name, children }: { name: string; children: ReactNode }) => (
     <div className={`field-wrap ${errors[name] ? "error" : ""}`} style={{ marginBottom: 8 }}>
       {children}
       {errors[name] && <div className="field-error">{errors[name]}</div>}
@@ -222,11 +262,15 @@ export default function EventForm() {
             <button className="close-btn" onClick={() => setConfirmOpen(false)}>Отмена</button>
             <button
                 className="danger-outline"
-                onClick={() => {
+                onClick={async () => {
                 if (eventId) {
-                    showToast("success", "Мероприятие успешно удалено");
-                    removeEvent(Number(eventId));
-                    window.location.reload();
+                    try {
+                      await apiRemoveEvent(Number(eventId));
+                      showToast("success", "Мероприятие успешно удалено");
+                      window.location.reload();
+                    } catch {
+                      showToast("error", "Ошибка при удалении мероприятия");
+                    }
                 } else {
                     showToast("error", "Невозможно удалить: id мероприятия не найден");
                 }

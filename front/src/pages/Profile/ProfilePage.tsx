@@ -1,8 +1,45 @@
-import { useState, useEffect, useContext, useMemo } from "react";
-import "../../styles/profile.scss";
-import { AuthContext } from "../../context/AuthContext";
-import { getProfile, saveProfile } from "../../storage/storage";
+import { useContext, useEffect, useMemo, useState } from "react";
+import client from "../../api/client";
 import { useToast } from "../../components/Toast/ToastProvider";
+import { AuthContext } from "../../context/AuthContext";
+import "../../styles/profile.scss";
+
+type ProfileResponse = {
+  name?: string;
+  surname?: string;
+  university?: string;
+  course?: string | number;
+  specialty?: string;
+  job?: string;
+  workplace?: string;
+  about?: string;
+  telegram?: string;
+  vk?: string;
+  email?: string;
+};
+
+type ProfileUpdatePayload = Record<string, string | undefined>;
+
+const AVATAR_COLORS = [
+  "#f44336",
+  "#e91e63",
+  "#9c27b0",
+  "#673ab7",
+  "#3f51b5",
+  "#2196f3",
+  "#03a9f4",
+  "#00bcd4",
+  "#009688",
+  "#4caf50",
+  "#8bc34a",
+  "#cddc39",
+  "#ffeb3b",
+  "#ffc107",
+  "#ff9800",
+  "#ff5722",
+  "#795548",
+  "#607d8b",
+];
 
 export default function ProfilePage() {
   const { user, updateProfile } = useContext(AuthContext);
@@ -23,51 +60,93 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    if (!user) return;
-    const stored = getProfile(user.id);
-    setProfile({
-      name: user.name || "Имя",
-      surname: user.surname || "Фамилия",
-      university: stored?.university || "",
-      course: stored?.course || "",
-      specialty: stored?.specialty || "",
-      workplace: stored?.workplace || "",
-      about: stored?.about || "",
-      telegram: stored?.telegram || "",
-      vk: stored?.vk || "",
-      email: user.email || "",
-    });
+    let mounted = true;
+    (async () => {
+      if (!user) {
+        setProfile((p) => ({ ...p, email: "example@mail.ru" }));
+        return;
+      }
+
+      if (client.USE_MOCK) {
+        setProfile({
+          name: user.name || "Имя",
+          surname: user.surname || "Фамилия",
+          university: "",
+          course: "",
+          specialty: "",
+          workplace: "",
+          about: "",
+          telegram: "",
+          vk: "",
+          email: user.email || "",
+        });
+        return;
+      }
+
+      try {
+        const data = await client.get<ProfileResponse>("/api/users/profile/");
+        if (!mounted) return;
+        setProfile({
+          name: data?.name || user.name || "Имя",
+          surname: data?.surname || user.surname || "Фамилия",
+          university: data?.university || "",
+          course: data?.course != null ? String(data.course) : "",
+          specialty: data?.specialty || "",
+          workplace: data?.job || data?.workplace || "",
+          about: data?.about || "",
+          telegram: data?.telegram || "",
+          vk: data?.vk || "",
+          email: data?.email || user.email || "",
+        });
+      } catch {
+        if (!mounted) return;
+        setProfile({
+          name: user.name || "Имя",
+          surname: user.surname || "Фамилия",
+          university: "",
+          course: "",
+          specialty: "",
+          workplace: "",
+          about: "",
+          telegram: "",
+          vk: "",
+          email: user.email || "",
+        });
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
   }, [user]);
 
   const update = (key: string, value: string) => setProfile({ ...profile, [key]: value });
 
-  const onSave = () => {
+  const onSave = async () => {
     if (!user) return;
-    updateProfile({ name: profile.name, surname: profile.surname });
-    saveProfile(user.id, {
-      university: profile.university,
-      course: profile.course,
-      specialty: profile.specialty,
-      workplace: profile.workplace,
-      about: profile.about,
-      telegram: profile.telegram,
-      vk: profile.vk,
-    });
-    setEditing(false);
-    showToast("success", "Профиль сохранён");
-  };
+    try {
+      const payload: ProfileUpdatePayload = {
+        name: profile.name,
+        surname: profile.surname,
+        telegram: profile.telegram || undefined,
+        email: profile.email || undefined,
+        course: profile.course || undefined,
+        university: profile.university || undefined,
+        vk: profile.vk || undefined,
+        job: profile.workplace || undefined,
+      };
 
-  const COLORS = [
-    "#f44336","#e91e63","#9c27b0","#673ab7","#3f51b5","#2196f3","#03a9f4","#00bcd4",
-    "#009688","#4caf50","#8bc34a","#cddc39","#ffeb3b","#ffc107","#ff9800","#ff5722",
-    "#795548","#607d8b"
-  ];
+      Object.keys(payload).forEach((k) => {
+        const value = payload[k];
+        if (typeof value === "undefined" || value === "") delete payload[k];
+      });
 
-  const pickColor = (seed: string | number | undefined) => {
-    const s = String(seed ?? profile.email ?? profile.name ?? Math.random());
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-    return COLORS[Math.abs(h) % COLORS.length];
+      await updateProfile(payload);
+      setEditing(false);
+      showToast("success", "Профиль сохранён");
+    } catch {
+      showToast("error", "Ошибка при сохранении профиля");
+    }
   };
 
   const initials = useMemo(() => {
@@ -78,7 +157,12 @@ export default function ProfilePage() {
     return (a + b) || "—";
   }, [profile.name, profile.surname]);
 
-  const avatarBg = useMemo(() => pickColor(user?.id ?? profile.email), [user, profile.email]);
+  const avatarBg = useMemo(() => {
+    const s = String(user?.id ?? profile.email ?? profile.name ?? "default");
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+  }, [profile, user]);
 
   return (
     <div className="page profile-page">
@@ -89,20 +173,29 @@ export default function ProfilePage() {
           <h4 className="h4">Личная информация</h4>
 
           <div className="avatar-wrap">
-            <div className="avatar" style={{ background: avatarBg }}>{initials}</div>
+            <div className="avatar" style={{ background: avatarBg }}>
+              {initials}
+            </div>
           </div>
 
           <div className="inputs">
             <input className="text-regular" disabled={!editing} value={profile.name} onChange={(e) => update("name", e.target.value)} />
-
             <input className="text-regular" disabled={!editing} value={profile.surname} onChange={(e) => update("surname", e.target.value)} />
-
-            <input className="text-regular" disabled={!editing} value={profile.university} onChange={(e) => update("university", e.target.value)} placeholder="Учебное заведение" />
-
+            <input
+              className="text-regular"
+              disabled={!editing}
+              value={profile.university}
+              onChange={(e) => update("university", e.target.value)}
+              placeholder="Учебное заведение"
+            />
             <input className="text-regular" disabled={!editing} value={profile.course} onChange={(e) => update("course", e.target.value)} placeholder="Курс" />
-
-            <input className="text-regular" disabled={!editing} value={profile.specialty} onChange={(e) => update("specialty", e.target.value)} placeholder="Специальность" />
-
+            <input
+              className="text-regular"
+              disabled={!editing}
+              value={profile.specialty}
+              onChange={(e) => update("specialty", e.target.value)}
+              placeholder="Специальность"
+            />
             <textarea className="text-regular" disabled={!editing} value={profile.about} onChange={(e) => update("about", e.target.value)} placeholder="О себе" />
           </div>
         </div>
@@ -112,9 +205,7 @@ export default function ProfilePage() {
 
           <div className="inputs">
             <input className="text-regular" disabled={!editing} value={profile.telegram} onChange={(e) => update("telegram", e.target.value)} placeholder="Telegram" />
-
             <input className="text-regular" disabled={!editing} value={profile.vk} onChange={(e) => update("vk", e.target.value)} placeholder="ВКонтакте" />
-
             <input className="text-regular" disabled value={profile.email} />
           </div>
         </div>
@@ -123,7 +214,7 @@ export default function ProfilePage() {
       <button
         className="edit-btn h3"
         onClick={() => {
-          if (editing) onSave();
+          if (editing) void onSave();
           else setEditing(true);
         }}
       >
