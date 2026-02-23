@@ -1,0 +1,121 @@
+@media (max-width: 1024px) {
+  body .wizard {
+    width: 96%;
+    height: 92%;
+  }
+
+  body .date-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  body .modal {
+    width: min(560px, calc(100% - 20px));
+    padding: 18px;
+  }
+
+  body .toast-root {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+  }
+
+  body .toast {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  body .wizard-overlay {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  body .wizard {
+    width: 100%;
+    height: 100%;
+    max-height: 100dvh;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body .wizard-close {
+    top: 8px;
+    right: 10px;
+    z-index: 40;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  }
+
+  body .wizard-nav {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #eee;
+    padding: 44px 10px 10px;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 8px;
+    background: #fff;
+  }
+
+  body .wizard-nav .wizard-nav-btn {
+    width: auto;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+
+  body .wizard-nav .wizard-nav-btn.active {
+    transform: none;
+  }
+
+  body .wizard-content {
+    padding: 14px;
+    overflow-y: auto;
+  }
+
+  body .date-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  body .wizard-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  body .wizard-actions .primary,
+  body .wizard-actions .secondary,
+  body .danger-outline {
+    width: 100%;
+  }
+
+  body .modal {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  body .modal-title {
+    font-size: 18px;
+    margin-bottom: 12px;
+    padding-right: 28px;
+  }
+
+  body .apply-form {
+    padding: 12px;
+  }
+
+  body .apply-actions,
+  body .confirm-actions {
+    flex-direction: column-reverse;
+  }
+
+  body .btn-cancel,
+  body .btn-send,
+  body .close-btn {
+    width: 100%;
+  }
+}

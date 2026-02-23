@@ -54,6 +54,8 @@ export default function Table<T>({
   const isOrganizer = user?.role === "organizer";
   const columnKeys = columns.map((c) => c.key);
   const isEventMobileLayout = ["title", "startDate", "endDate", "organizer", "status"].every((k) => columnKeys.includes(k));
+  const isDirectionMobileLayout = ["title", "organizer"].every((k) => columnKeys.includes(k)) && !isEventMobileLayout;
+  const isProjectMobileLayout = ["title", "curator", "teams"].every((k) => columnKeys.includes(k)) && !isEventMobileLayout;
   const isRequestMobileLayout = ["studentName", "event", "project", "specialization", "status"].every((k) => columnKeys.includes(k));
 
   const template = buildGridTemplate(columns, gridColumns);
@@ -110,6 +112,8 @@ export default function Table<T>({
                 key={getRowId(row) ?? idx}
                 className={`row-box table-grid${getRowId(row) === selectedId ? " selected" : ""}${
                   isEventMobileLayout ? " row-box--event-mobile" : ""
+                }${isDirectionMobileLayout ? " row-box--direction-mobile" : ""}${
+                  isProjectMobileLayout ? " row-box--project-mobile" : ""
                 }${isRequestMobileLayout ? " row-box--request-mobile" : ""}`}
                 style={gridStyle}
                 onClick={() => onRowClick?.(row)}
@@ -173,6 +177,48 @@ export default function Table<T>({
                         <div className="event-card-mobile__pair">
                           <span className="event-card-mobile__label">Статус</span>
                           <span className={`cell-badge status-${isActiveStatus ? "active" : "inactive"}`}>{statusText}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="event-card-mobile__action">
+                      <div className="event-card-mobile__divider" />
+                      {actionButton}
+                    </div>
+                  </div>
+                )}
+
+                {isDirectionMobileLayout && (
+                  <div className="event-card-mobile">
+                    <div className="event-card-mobile__main">
+                      <div className="event-card-mobile__title">{toDisplay(rowRecord.title)}</div>
+                      <div className="event-card-mobile__row event-card-mobile__row--single">
+                        <div className="event-card-mobile__pair">
+                          <span className="event-card-mobile__label">Организатор</span>
+                          <span className="event-card-mobile__value">{toDisplay(rowRecord.organizer)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="event-card-mobile__action">
+                      <div className="event-card-mobile__divider" />
+                      {actionButton}
+                    </div>
+                  </div>
+                )}
+
+                {isProjectMobileLayout && (
+                  <div className="event-card-mobile">
+                    <div className="event-card-mobile__main">
+                      <div className="event-card-mobile__title">{toDisplay(rowRecord.title)}</div>
+                      <div className="event-card-mobile__row event-card-mobile__row--meta">
+                        <div className="event-card-mobile__pair">
+                          <span className="event-card-mobile__label">Куратор</span>
+                          <span className="event-card-mobile__value">{toDisplay(rowRecord.curator)}</span>
+                        </div>
+                        <div className="event-card-mobile__pair">
+                          <span className="event-card-mobile__label">Команды</span>
+                          <span className="event-card-mobile__value">{toDisplay(rowRecord.teams)}</span>
                         </div>
                       </div>
                     </div>

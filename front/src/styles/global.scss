@@ -1,5 +1,6 @@
 @import "./variables.scss";
 @import "./typography.scss";
+@import "./responsive/index.scss";
 
 * {
   margin: 0;
@@ -43,5 +44,3 @@ a:hover {
   font-size: 16px;
 }
 
-@import "./responsive-desktop.scss";
-@import "./responsive-mobile.scss";
