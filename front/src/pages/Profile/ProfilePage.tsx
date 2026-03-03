@@ -68,16 +68,17 @@ export default function ProfilePage() {
       }
 
       if (client.USE_MOCK) {
+        const userRecord = user as unknown as Record<string, unknown>;
         setProfile({
-          name: user.name || "Имя",
-          surname: user.surname || "Фамилия",
-          university: "",
-          course: "",
-          specialty: "",
-          workplace: "",
-          about: "",
-          telegram: "",
-          vk: "",
+          name: user.name || "\u0418\u043c\u044f",
+          surname: user.surname || "\u0424\u0430\u043c\u0438\u043b\u0438\u044f",
+          university: String(userRecord.university ?? ""),
+          course: String(userRecord.course ?? ""),
+          specialty: String(userRecord.specialty ?? ""),
+          workplace: String(userRecord.workplace ?? userRecord.job ?? ""),
+          about: String(userRecord.about ?? ""),
+          telegram: String(userRecord.telegram ?? ""),
+          vk: String(userRecord.vk ?? ""),
           email: user.email || "",
         });
         return;
@@ -133,6 +134,9 @@ export default function ProfilePage() {
         course: profile.course || undefined,
         university: profile.university || undefined,
         vk: profile.vk || undefined,
+        specialty: profile.specialty || undefined,
+        about: profile.about || undefined,
+        workplace: profile.workplace || undefined,
         job: profile.workplace || undefined,
       };
 
