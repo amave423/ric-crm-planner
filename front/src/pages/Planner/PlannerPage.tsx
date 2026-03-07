@@ -1,16 +1,17 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+﻿import { useContext, useEffect, useMemo, useState } from "react";
+import { buildParticipantsFromRequests, getPlannerState, savePlannerState, syncParticipants } from "../../api/planner";
 import { getRequests } from "../../api/requests";
 import { AuthContext } from "../../context/AuthContext";
-import { nextPlannerId, readPlannerState, removeTeamCascade, writePlannerState } from "../../storage/planner";
+import { DEFAULT_KANBAN_COLUMNS, nextPlannerId, removeTeamCascade } from "../../storage/planner";
 import { getAllUsers } from "../../storage/storage";
 import type { PlannerState, PlannerSubtask, PlannerTeam } from "../../types/planner";
 import type { Request } from "../../types/request";
 import type { User } from "../../types/user";
+import Modal from "../../components/Modal/Modal";
 import "./planner.scss";
 
 type Tab = "teams" | "backlog" | "kanban" | "gantt";
 
-const hasStartedWork = (status?: string) => String(status || "").toLowerCase().includes("приступ");
 const fullName = (u: User) => `${u.surname || ""} ${u.name || ""}`.trim();
 
 function roleFlags(roleRaw?: string) {
@@ -31,7 +32,14 @@ export default function PlannerPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [teamFilter, setTeamFilter] = useState("all");
-  const [state, setState] = useState<PlannerState>(() => readPlannerState());
+  const [state, setState] = useState<PlannerState>({
+    enrollmentClosed: false,
+    participants: [],
+    teams: [],
+    parentTasks: [],
+    subtasks: [],
+    columns: [],
+  });
   const [users, setUsers] = useState<User[]>([]);
   const [requests, setRequests] = useState<Request[]>([]);
 
@@ -52,15 +60,27 @@ export default function PlannerPage() {
   const [subStatus, setSubStatus] = useState("");
   const [subInSprint, setSubInSprint] = useState(false);
   const [newColumn, setNewColumn] = useState("");
+  const [confirmCloseEnrollmentOpen, setConfirmCloseEnrollmentOpen] = useState(false);
 
-  useEffect(() => writePlannerState(state), [state]);
+  useEffect(() => {
+    void savePlannerState(state);
+  }, [state]);
 
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    Promise.all([getAllUsers(), getRequests({ role: user?.role, ownerId: isOrganizer ? undefined : user?.id })])
-      .then(([us, rs]) => {
+    Promise.all([
+      getPlannerState(),
+      getAllUsers(),
+      getRequests({ role: user?.role, ownerId: isOrganizer ? undefined : user?.id }),
+    ])
+      .then(([planner, us, rs]) => {
         if (!mounted) return;
+        const usersData = Array.isArray(us) ? us : [];
+        const requestsData = Array.isArray(rs) ? rs : [];
+        const synced =
+          isOrganizer && planner.enrollmentClosed ? syncParticipants(planner, buildParticipantsFromRequests(usersData, requestsData)) : planner;
+        setState(synced);
         setUsers(Array.isArray(us) ? us : []);
         setRequests(Array.isArray(rs) ? rs : []);
       })
@@ -97,13 +117,7 @@ export default function PlannerPage() {
   if (loading) return <div className="page planner-page"><div className="planner-empty">Загрузка...</div></div>;
   if (isStudent && memberTeamIds.length === 0) return <div className="page planner-page"><div className="planner-empty">Доступ откроется после подтверждения команды.</div></div>;
 
-  const snapshotParticipants = () => {
-    const students = new Set(users.filter((u) => String(u.role).toLowerCase().includes("student") || String(u.role).toLowerCase().includes("project")).map((u) => Number(u.id)));
-    return Array.from(new Set(requests.filter((r) => hasStartedWork(r.status)).map((r) => Number(r.ownerId)).filter((id) => students.has(id)))).map((id) => ({
-      id,
-      fullName: userNameById.get(id) || `Участник #${id}`,
-    }));
-  };
+  const snapshotParticipants = () => buildParticipantsFromRequests(users, requests);
 
   const addTeam = () => {
     if (!teamName.trim()) return setError("Введите название команды");
@@ -173,6 +187,35 @@ export default function PlannerPage() {
   const maxDate = ganttRows.reduce((acc, r) => (!acc || r.end > acc ? r.end : acc), "");
   const span = minDate && maxDate ? Math.max(1, Math.floor((Date.parse(maxDate) - Date.parse(minDate)) / 86400000) + 1) : 1;
 
+  const removeKanbanColumn = (title: string) => {
+    if (DEFAULT_KANBAN_COLUMNS.includes(title)) {
+      setError("Базовые колонки удалить нельзя");
+      return;
+    }
+    if (state.columns.length <= 1) {
+      setError("Должна остаться хотя бы одна колонка");
+      return;
+    }
+
+    const nextColumns = state.columns.filter((c) => c !== title);
+    const fallbackStatus = nextColumns[0] || DEFAULT_KANBAN_COLUMNS[0];
+
+    setState((prev) => ({
+      ...prev,
+      columns: nextColumns,
+      subtasks: prev.subtasks.map((s) => (s.status === title ? { ...s, status: fallbackStatus } : s)),
+    }));
+
+    if (subStatus === title) setSubStatus(fallbackStatus);
+    setError("");
+  };
+
+  const confirmCloseEnrollment = () => {
+    setState((prev) => ({ ...prev, enrollmentClosed: true, participants: snapshotParticipants() }));
+    setConfirmCloseEnrollmentOpen(false);
+    setError("");
+  };
+
   return (
     <div className="page planner-page">
       <div className="planner-head">
@@ -195,18 +238,18 @@ export default function PlannerPage() {
       {error && <div className="planner-error">{error}</div>}
 
       {tab === "teams" && <div className="planner-card">
-        {isOrganizer && <div className="planner-row">
-          {!state.enrollmentClosed
-            ? <button className="primary" onClick={() => setState((p) => ({ ...p, enrollmentClosed: true, participants: snapshotParticipants() }))}>Завершить набор</button>
-            : <button className="primary" onClick={() => setState((p) => ({ ...p, participants: snapshotParticipants() }))}>Обновить пул</button>}
-        </div>}
-        {isOrganizer && <div className="planner-grid planner-grid--3">
+        {isOrganizer && <div className="planner-grid planner-grid--team-create">
           <input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Название команды" />
           <select value={teamCuratorId} onChange={(e) => setTeamCuratorId(e.target.value)}>
             <option value="">Куратор</option>
             {curators.map((c) => <option key={c.id} value={String(c.id)}>{fullName(c)}</option>)}
           </select>
-          <button className="primary" onClick={addTeam}>Сформировать команду</button>
+          <div className="planner-team-actions">
+            {!state.enrollmentClosed
+              ? <button className="primary" onClick={() => setConfirmCloseEnrollmentOpen(true)}>Завершить набор</button>
+              : <button className="primary" onClick={() => setState((p) => ({ ...p, participants: snapshotParticipants() }))}>Обновить пул</button>}
+            <button className="primary" onClick={addTeam}>Сформировать команду</button>
+          </div>
         </div>}
         {isOrganizer && <div className="planner-members-grid">{state.participants.map((p) => (
           <label key={p.id} className="planner-check"><input type="checkbox" checked={teamMembers.includes(p.id)} onChange={() => setTeamMembers((prev) => prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id])} /><span>{p.fullName}</span></label>
@@ -228,13 +271,13 @@ export default function PlannerPage() {
 
       {tab === "backlog" && <div className="planner-stack">
         <div className="planner-card">
-          <div className="planner-grid planner-grid--4">
+          <div className="planner-grid planner-grid--parent-create">
             <select value={parentTeamId} onChange={(e) => setParentTeamId(e.target.value)}><option value="">Команда</option>{visibleTeams.map((t) => <option key={t.id} value={String(t.id)}>{t.name}</option>)}</select>
             <input value={parentTitle} onChange={(e) => setParentTitle(e.target.value)} placeholder="Большая задача" />
             <input type="date" value={parentStart} onChange={(e) => setParentStart(e.target.value)} />
             <input type="date" value={parentEnd} onChange={(e) => setParentEnd(e.target.value)} />
+            <button className="primary" onClick={addParentTask}>Добавить большую задачу</button>
           </div>
-          <button className="primary" onClick={addParentTask}>Добавить большую задачу</button>
           <div className="backlog-list">{filteredParents.map((p) => <div key={p.id} className={`backlog-parent ${selectedParentId === p.id ? "active" : ""}`}>
             <div className="backlog-parent-main" onClick={() => setSelectedParentId(p.id)}>
               <div className="title">{p.title}</div><div className="meta"><span>{p.startDate}</span><span>{p.endDate}</span></div>
@@ -261,15 +304,20 @@ export default function PlannerPage() {
       </div>}
 
       {tab === "kanban" && <div className="planner-stack">
-        <div className="planner-card planner-row"><input value={newColumn} onChange={(e) => setNewColumn(e.target.value)} placeholder="Кастомный статус" /><button className="primary" onClick={() => {
-          const title = newColumn.trim();
-          if (!title) return;
-          if (state.columns.some((c) => c.toLowerCase() === title.toLowerCase())) return;
-          setState((p) => ({ ...p, columns: [...p.columns, title] }));
-          setNewColumn("");
-        }}>Добавить</button></div>
+        <div className="planner-card">
+          <div className="planner-inline-form">
+            <input value={newColumn} onChange={(e) => setNewColumn(e.target.value)} placeholder="Кастомный статус" />
+            <button className="primary" onClick={() => {
+              const title = newColumn.trim();
+              if (!title) return;
+              if (state.columns.some((c) => c.toLowerCase() === title.toLowerCase())) return;
+              setState((p) => ({ ...p, columns: [...p.columns, title] }));
+              setNewColumn("");
+            }}>Добавить</button>
+          </div>
+        </div>
         <div className="kanban-board">{state.columns.map((col) => <div key={col} className="kanban-column">
-          <div className="kanban-column-title">{col}</div>
+          <div className="kanban-column-title"><span>{col}</span><button className="kanban-column-remove" onClick={() => removeKanbanColumn(col)} title="Удалить колонку" aria-label="Удалить колонку">×</button></div>
           <div className="kanban-column-body">{filteredSubtasks.filter((s) => s.inSprint && s.status === col).map((s) => <div key={s.id} className="kanban-card">
             <div className="kanban-card-title">{s.title}</div><div className="kanban-card-meta">{s.startDate} — {s.endDate}</div>
             {canEditTeam(s.teamId) && <select value={s.status} onChange={(e) => setState((p) => ({ ...p, subtasks: p.subtasks.map((x) => x.id === s.id ? { ...x, status: e.target.value } : x) }))}>{state.columns.map((c) => <option key={c}>{c}</option>)}</select>}
@@ -290,6 +338,21 @@ export default function PlannerPage() {
           })}</div>
         </>}
       </div>}
+
+      <Modal isOpen={confirmCloseEnrollmentOpen} onClose={() => setConfirmCloseEnrollmentOpen(false)} title="Подтверждение">
+        <div className="confirm-body">
+          <div className="confirm-text">Завершить набор участников и зафиксировать текущий пул?</div>
+          <div className="confirm-actions">
+            <button className="link-btn" onClick={() => setConfirmCloseEnrollmentOpen(false)}>
+              Отмена
+            </button>
+            <button className="primary" onClick={confirmCloseEnrollment}>
+              Подтвердить
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
+

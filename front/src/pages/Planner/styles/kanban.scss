@@ -15,6 +15,10 @@
   padding: 10px;
   border-bottom: 1px solid #e5e7eb;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .kanban-column-body {
@@ -46,4 +50,35 @@
 .kanban-empty {
   color: #9ca3af;
   font-size: 13px;
+}
+
+.kanban-column-remove {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  color: #6b7280;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  font-size: 18px;
+  font-weight: 500;
+  font-family: inherit;
+  line-height: 1;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+}
+
+.kanban-column-remove:hover {
+  border-color: #ef4444;
+  color: #b91c1c;
+  background: #fff5f5;
+  transform: translateY(-1px);
+}
+
+.kanban-column-remove:active {
+  transform: translateY(0);
 }

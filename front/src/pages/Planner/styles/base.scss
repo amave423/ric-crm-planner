@@ -9,6 +9,18 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.planner-head .h1 {
+  margin: 0;
+}
+
+.planner-head .planner-label {
+  min-width: 220px;
 }
 
 .planner-tabs {
@@ -57,6 +69,10 @@
   align-items: center;
 }
 
+.planner-row--right {
+  justify-content: flex-end;
+}
+
 .planner-grid {
   display: grid;
   gap: 8px;
@@ -70,6 +86,44 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.planner-grid--team-create {
+  grid-template-columns: minmax(240px, 1fr) minmax(200px, 320px) auto;
+  align-items: end;
+}
+
+.planner-team-actions {
+  display: flex;
+  gap: 8px;
+  justify-self: end;
+  align-items: end;
+}
+
+.planner-team-actions .primary {
+  justify-self: end;
+  min-width: 200px;
+}
+
+.planner-grid--parent-create {
+  grid-template-columns: minmax(180px, 220px) minmax(260px, 1fr) minmax(160px, 180px) minmax(160px, 180px) auto;
+  align-items: end;
+}
+
+.planner-grid--parent-create .primary {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.planner-inline-form {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.planner-inline-form .primary {
+  white-space: nowrap;
+}
+
 .planner-label {
   display: flex;
   flex-direction: column;
@@ -80,12 +134,43 @@
 
 .planner-card input,
 .planner-card select,
-.planner-card textarea {
+.planner-card textarea,
+.planner-head .planner-label select {
   width: 100%;
   border: 1px solid #d1d5db;
   border-radius: 10px;
   padding: 8px 10px;
   background: #fff;
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.planner-card select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #6b7280 50%), linear-gradient(135deg, #6b7280 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 28px;
+}
+
+.planner-head .planner-label select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #6b7280 50%), linear-gradient(135deg, #6b7280 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 28px;
+}
+
+.planner-card input:focus,
+.planner-card select:focus,
+.planner-card textarea:focus,
+.planner-head .planner-label select:focus {
+  outline: none;
+  border-color: #6495ed;
+  box-shadow: 0 0 0 3px rgba(100, 149, 237, 0.2);
 }
 
 .planner-card textarea {
@@ -99,12 +184,52 @@
   gap: 8px;
 }
 
+.primary,
+.danger-outline {
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.2;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.primary {
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+.primary:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.2);
+}
+
+.danger-outline {
+  border: 1px solid #ef4444;
+  background: #fff;
+  color: #b91c1c;
+}
+
+.danger-outline:hover {
+  background: #fff5f5;
+  transform: translateY(-1px);
+}
+
 .link-btn {
   border: 1px solid #d1d5db;
   background: #fff;
   border-radius: 8px;
   padding: 6px 10px;
   cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.link-btn:hover {
+  background: #f8fafc;
+  border-color: #9ca3af;
 }
 
 .link-btn.danger {
@@ -150,8 +275,37 @@
     grid-template-columns: 1fr;
   }
 
+  .planner-grid--team-create,
+  .planner-grid--parent-create,
+  .planner-inline-form {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-team-actions {
+    width: 100%;
+    justify-self: stretch;
+    flex-direction: column;
+  }
+
+  .planner-team-actions .primary,
+  .planner-grid--parent-create .primary,
+  .planner-inline-form .primary {
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+  }
+
   .planner-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .planner-head .planner-label {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .planner-row--right {
+    justify-content: flex-start;
   }
 }
