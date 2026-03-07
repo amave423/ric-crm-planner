@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState, useCallback } from "react";
+﻿import { useContext, useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getDirectionById } from "../../api/directions";
 import { getEventById } from "../../api/events";
@@ -7,16 +7,39 @@ import { getRequests as apiGetRequests, saveRequest } from "../../api/requests";
 import EventWizardModal, { type WizardLaunchContext } from "../../components/EventWizard/EventWizardModal";
 import TableHeader from "../../components/Layout/TableHeader";
 import InfoModal from "../../components/Modal/InfoModal";
+import Modal from "../../components/Modal/Modal";
 import ApplyModal from "../../components/Requests/ApplyModal";
 import Table from "../../components/Table/Table";
 import { useToast } from "../../components/Toast/ToastProvider";
 import BackButton from "../../components/UI/BackButton";
 import { AuthContext } from "../../context/AuthContext";
+import { useNotifications } from "../../context/NotificationsContext";
 import type { Direction } from "../../types/direction";
 import type { Event } from "../../types/event";
 import type { Project } from "../../types/project";
 import type { Request as RequestType } from "../../types/request";
 import "../../styles/page-colors.scss";
+
+interface TestingImportMetaEnv {
+  VITE_TESTING_URL?: string;
+}
+
+const TESTING_BASE_URL =
+  ((import.meta as ImportMeta & { env?: TestingImportMetaEnv }).env?.VITE_TESTING_URL || "").trim() || "https://example.com/testing";
+
+function buildTestingUrl(req: RequestType) {
+  try {
+    const url = new URL(TESTING_BASE_URL, window.location.origin);
+    if (req.id) url.searchParams.set("applicationId", String(req.id));
+    if (req.eventId) url.searchParams.set("eventId", String(req.eventId));
+    if (req.directionId) url.searchParams.set("directionId", String(req.directionId));
+    if (req.projectId) url.searchParams.set("projectId", String(req.projectId));
+    if (req.ownerId) url.searchParams.set("ownerId", String(req.ownerId));
+    return url.toString();
+  } catch {
+    return TESTING_BASE_URL;
+  }
+}
 
 export default function ProjectsPage() {
   const { eventId, directionId } = useParams();
@@ -40,10 +63,15 @@ export default function ProjectsPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [applyOpen, setApplyOpen] = useState(false);
 
+  const [testingPromptOpen, setTestingPromptOpen] = useState(false);
+  const [testingPromptStep, setTestingPromptStep] = useState<"ask" | "info">("ask");
+  const [testingLink, setTestingLink] = useState("");
+
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoItem, setInfoItem] = useState<{ title?: string; description?: string } | null>(null);
 
   const { showToast } = useToast();
+  const { addNotification } = useNotifications();
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -70,9 +98,19 @@ export default function ProjectsPage() {
 
   const filteredProjects = !search.trim()
     ? projects
-    : projects.filter(
-        (p) => (p.title || "").toLowerCase().includes(search.toLowerCase()) || (p.curator || "").toLowerCase().includes(search.toLowerCase())
-      );
+    : projects.filter((p) => (p.title || "").toLowerCase().includes(search.toLowerCase()) || (p.curator || "").toLowerCase().includes(search.toLowerCase()));
+
+  const closeTestingPrompt = () => {
+    setTestingPromptOpen(false);
+    setTestingPromptStep("ask");
+  };
+
+  const goToTesting = () => {
+    const url = testingLink.trim();
+    closeTestingPrompt();
+    if (!url) return;
+    window.location.assign(url);
+  };
 
   return (
     <div className="page page--projects">
@@ -157,7 +195,20 @@ export default function ProjectsPage() {
           }
 
           try {
-            await saveRequest(req);
+            const created = await saveRequest(req);
+            const testUrl = buildTestingUrl(created);
+
+            addNotification({
+              userId: ownerId,
+              title: "Приглашение на тестирование",
+              message: "Для продолжения откройте ссылку и пройдите тест.",
+              link: testUrl,
+            });
+
+            setTestingLink(testUrl);
+            setTestingPromptStep("ask");
+            setTestingPromptOpen(true);
+
             showToast("success", "Заявка отправлена");
             const rs = await apiGetRequests({ ownerId, role: user?.role }).catch(() => []);
             setRequests(Array.isArray(rs) ? rs : []);
@@ -171,7 +222,33 @@ export default function ProjectsPage() {
 
       <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} title={infoItem?.title} description={infoItem?.description} />
 
+      <Modal isOpen={testingPromptOpen} onClose={closeTestingPrompt} title="Тестирование">
+        {testingPromptStep === "ask" ? (
+          <div className="confirm-body">
+            <div className="confirm-text">Перейти к прохождению теста?</div>
+            <div className="confirm-actions">
+              <button className="close-btn" onClick={() => setTestingPromptStep("info")}>
+                Нет
+              </button>
+              <button className="btn-send" onClick={goToTesting}>
+                Да
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="confirm-body">
+            <div className="confirm-text">Ссылка для прохождения находится в центре уведомлений</div>
+            <div className="confirm-actions">
+              <button className="close-btn" onClick={closeTestingPrompt}>
+                Понятно
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {loading && <div style={{ marginTop: 12 }}>Загрузка...</div>}
     </div>
   );
 }
+

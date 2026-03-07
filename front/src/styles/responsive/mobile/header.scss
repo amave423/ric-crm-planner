@@ -77,6 +77,11 @@
     font-size: 13px;
   }
 
+  body .head-btn--notify {
+    min-width: 40px;
+    justify-content: center;
+  }
+
   body .app-header--guest .head-btn--login {
     min-width: 104px;
     justify-content: center;
@@ -91,6 +96,10 @@
   }
 
   body .header-right .head-btn span {
+    display: none;
+  }
+
+  body .header-right .head-btn--notify span {
     display: none;
   }
 
