@@ -1,0 +1,53 @@
+.gantt-range {
+  display: flex;
+  justify-content: space-between;
+  color: #6b7280;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.gantt-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gantt-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.gantt-label {
+  font-size: 13px;
+  color: #374151;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gantt-track {
+  position: relative;
+  height: 20px;
+  background: repeating-linear-gradient(to right, #f3f4f6, #f3f4f6 18px, #f9fafb 18px, #f9fafb 36px);
+  border-radius: 999px;
+}
+
+.gantt-bar {
+  position: absolute;
+  top: 2px;
+  height: 16px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+}
+
+.gantt-row.sub .gantt-bar {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+@media (max-width: 900px) {
+  .gantt-row {
+    grid-template-columns: 1fr;
+  }
+}
