@@ -52,14 +52,15 @@ export default function ApplyModal({
     (async () => {
       try {
         const prof = user && !client.USE_MOCK ? await client.get<ProfileResponse>("/api/users/profile/") : undefined;
+        const userRecord = (user ?? {}) as Record<string, unknown>;
         if (!mounted) return;
 
         setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");
-        setTelegram(String(prof?.telegram ?? ""));
-        setUniversity(String(prof?.university ?? ""));
-        setCourse(String(prof?.course ?? ""));
-        setSpecialization(String(prof?.specialty ?? specializations[0]?.title ?? ""));
-        setAbout(String(prof?.about ?? ""));
+        setTelegram(String(prof?.telegram ?? userRecord.telegram ?? ""));
+        setUniversity(String(prof?.university ?? userRecord.university ?? ""));
+        setCourse(String(prof?.course ?? userRecord.course ?? ""));
+        setSpecialization(String(prof?.specialty ?? userRecord.specialty ?? specializations[0]?.title ?? ""));
+        setAbout(String(prof?.about ?? userRecord.about ?? ""));
         setErrors({});
       } catch {
         setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");
