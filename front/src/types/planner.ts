@@ -9,6 +9,10 @@ export interface PlannerTeam {
   curatorId?: number;
   memberIds: number[];
   confirmed: boolean;
+  eventId?: number;
+  directionId?: number;
+  projectId?: number;
+  sourceRequestIds?: number[];
 }
 
 export interface PlannerParentTask {

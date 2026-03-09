@@ -64,3 +64,42 @@
   color: #6b7280;
   font-size: 12px;
 }
+
+.planner-item-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.planner-inline-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planner-inline-edit-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.subtask-item .planner-inline-edit-row:last-of-type {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .backlog-parent,
+  .subtask-item {
+    flex-direction: column;
+  }
+
+  .planner-inline-edit-row,
+  .subtask-item .planner-inline-edit-row:last-of-type {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-item-actions {
+    width: 100%;
+  }
+}

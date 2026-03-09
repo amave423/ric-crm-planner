@@ -86,23 +86,6 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.planner-grid--team-create {
-  grid-template-columns: minmax(240px, 1fr) minmax(200px, 320px) auto;
-  align-items: end;
-}
-
-.planner-team-actions {
-  display: flex;
-  gap: 8px;
-  justify-self: end;
-  align-items: end;
-}
-
-.planner-team-actions .primary {
-  justify-self: end;
-  min-width: 200px;
-}
-
 .planner-grid--parent-create {
   grid-template-columns: minmax(180px, 220px) minmax(260px, 1fr) minmax(160px, 180px) minmax(160px, 180px) auto;
   align-items: end;
@@ -124,6 +107,16 @@
   white-space: nowrap;
 }
 
+.planner-grid--team-from-project {
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 260px) auto;
+  align-items: end;
+}
+
+.planner-grid--team-from-project .primary {
+  justify-self: end;
+  white-space: nowrap;
+}
+
 .planner-label {
   display: flex;
   flex-direction: column;
@@ -132,7 +125,7 @@
   color: #374151;
 }
 
-.planner-card input,
+.planner-card input:not([type="checkbox"]):not([type="radio"]),
 .planner-card select,
 .planner-card textarea,
 .planner-head .planner-label select {
@@ -164,7 +157,7 @@
   padding-right: 28px;
 }
 
-.planner-card input:focus,
+.planner-card input:not([type="checkbox"]):not([type="radio"]):focus,
 .planner-card select:focus,
 .planner-card textarea:focus,
 .planner-head .planner-label select:focus {
@@ -275,21 +268,15 @@
     grid-template-columns: 1fr;
   }
 
-  .planner-grid--team-create,
   .planner-grid--parent-create,
-  .planner-inline-form {
+  .planner-inline-form,
+  .planner-grid--team-from-project {
     grid-template-columns: 1fr;
   }
 
-  .planner-team-actions {
-    width: 100%;
-    justify-self: stretch;
-    flex-direction: column;
-  }
-
-  .planner-team-actions .primary,
   .planner-grid--parent-create .primary,
-  .planner-inline-form .primary {
+  .planner-inline-form .primary,
+  .planner-grid--team-from-project .primary {
     width: 100%;
     min-width: 0;
     justify-self: stretch;
