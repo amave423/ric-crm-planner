@@ -1,4 +1,4 @@
-﻿import { useContext, useEffect, useMemo, useState } from "react";
+﻿import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { buildParticipantsFromRequests, getPlannerState, savePlannerState, syncParticipants } from "../../api/planner";
 import { getRequests } from "../../api/requests";
 import { getEventById } from "../../api/events";
@@ -11,11 +11,12 @@ import type { PlannerState, PlannerSubtask, PlannerTeam } from "../../types/plan
 import type { Request } from "../../types/request";
 import type { User } from "../../types/user";
 import Modal from "../../components/Modal/Modal";
+import infoIcon from "../../assets/icons/info.svg";
 import "./planner.scss";
 
 type Tab = "teams" | "backlog" | "kanban" | "gantt";
 type ParentEditDraft = { title: string; startDate: string; endDate: string };
-type SubtaskEditDraft = { title: string; role: string; startDate: string; endDate: string; status: string; inSprint: boolean };
+type SubtaskEditDraft = { title: string; assigneeId?: number; startDate: string; endDate: string; status: string; inSprint: boolean };
 type ProjectApplicantsGroup = {
   key: string;
   eventId?: number;
@@ -26,6 +27,22 @@ type ProjectApplicantsGroup = {
   projectTitle: string;
   applicants: Array<{ ownerId: number; name: string; status?: string; requestIds: number[] }>;
 };
+
+function buildGanttTicks(minDate: string, maxDate: string, span: number) {
+  if (!minDate || !maxDate) return [];
+  const start = new Date(minDate);
+  const end = new Date(maxDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+  const days = Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86400000));
+  const step = days > 90 ? 14 : days > 45 ? 7 : days > 21 ? 3 : 1;
+  const ticks: Array<{ offset: number; label: string }> = [];
+  for (let d = 0; d <= days; d += step) {
+    const date = new Date(start.getTime() + d * 86400000);
+    const label = date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+    ticks.push({ offset: (d / span) * 100, label });
+  }
+  return ticks;
+}
 
 const fullName = (u: User) => `${u.surname || ""} ${u.name || ""}`.trim();
 
@@ -43,7 +60,11 @@ export default function PlannerPage() {
   const { isOrganizer, isCurator, isStudent } = roleFlags(user?.role);
   const userId = Number(user?.id || 0);
 
-  const [tab, setTab] = useState<Tab>("teams");
+  const [tab, setTab] = useState<Tab>(() => {
+    const raw = localStorage.getItem("planner_tab_v1");
+    if (raw === "teams" || raw === "backlog" || raw === "kanban" || raw === "gantt") return raw;
+    return "teams";
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isPlannerLoaded, setIsPlannerLoaded] = useState(false);
@@ -73,22 +94,82 @@ export default function PlannerPage() {
   const [selectedParentId, setSelectedParentId] = useState<number | null>(null);
 
   const [subTitle, setSubTitle] = useState("");
-  const [subRole, setSubRole] = useState("");
+  const [subAssigneeId, setSubAssigneeId] = useState("");
   const [subStart, setSubStart] = useState("");
   const [subEnd, setSubEnd] = useState("");
   const [subStatus, setSubStatus] = useState("");
   const [subInSprint, setSubInSprint] = useState(false);
   const [newColumn, setNewColumn] = useState("");
   const [confirmCloseEnrollmentOpen, setConfirmCloseEnrollmentOpen] = useState(false);
+  const [teamInfoOpen, setTeamInfoOpen] = useState(false);
+  const [teamInfoId, setTeamInfoId] = useState<number | null>(null);
+  const [draggingSubtaskId, setDraggingSubtaskId] = useState<number | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const [dragStartX, setDragStartX] = useState<number | null>(null);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ subtask: PlannerSubtask; x: number; y: number; width: number; tilt: number } | null>(null);
+  const dragTargetRef = useRef<{ x: number; y: number; tilt: number } | null>(null);
+  const dragPreviewRef = useRef<{ subtask: PlannerSubtask; x: number; y: number; width: number; tilt: number } | null>(null);
+  const dragAnimRef = useRef<number | null>(null);
+  const dragPreviewElRef = useRef<HTMLDivElement | null>(null);
   const [editingParentId, setEditingParentId] = useState<number | null>(null);
   const [editingParentDraft, setEditingParentDraft] = useState<ParentEditDraft | null>(null);
   const [editingSubtaskId, setEditingSubtaskId] = useState<number | null>(null);
   const [editingSubtaskDraft, setEditingSubtaskDraft] = useState<SubtaskEditDraft | null>(null);
+  const dragImageRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!isPlannerLoaded) return;
     void savePlannerState(state);
   }, [isPlannerLoaded, state]);
+
+  useEffect(() => {
+    localStorage.setItem("planner_tab_v1", tab);
+  }, [tab]);
+
+  useEffect(() => {
+    if (!dragOffset || dragStartX == null || !draggingSubtaskId) return;
+    const handleGlobalDragOver = (e: DragEvent) => {
+      if (!e.clientX && !e.clientY) return;
+      const deltaX = e.clientX - dragStartX;
+      const tilt = Math.abs(deltaX) >= 12 ? (deltaX > 0 ? 6 : -6) : 0;
+      dragTargetRef.current = {
+        x: e.clientX - dragOffset.x,
+        y: e.clientY - dragOffset.y,
+        tilt,
+      };
+    };
+    window.addEventListener("dragover", handleGlobalDragOver);
+    return () => window.removeEventListener("dragover", handleGlobalDragOver);
+  }, [dragOffset, dragStartX, draggingSubtaskId]);
+
+  useEffect(() => {
+    if (!draggingSubtaskId) return;
+    const step = () => {
+      const target = dragTargetRef.current;
+      const current = dragPreviewRef.current;
+      if (target && current) {
+        const lerp = (a: number, b: number) => a + (b - a) * 0.18;
+        const next = {
+          ...current,
+          x: lerp(current.x, target.x),
+          y: lerp(current.y, target.y),
+          tilt: lerp(current.tilt, target.tilt),
+        };
+        dragPreviewRef.current = next;
+        const el = dragPreviewElRef.current;
+        if (el) {
+          el.style.transform = `translate3d(${next.x}px, ${next.y}px, 0) rotate(${next.tilt}deg)`;
+        }
+      }
+      dragAnimRef.current = requestAnimationFrame(step);
+    };
+    dragAnimRef.current = requestAnimationFrame(step);
+    return () => {
+      if (dragAnimRef.current) cancelAnimationFrame(dragAnimRef.current);
+      dragAnimRef.current = null;
+    };
+  }, [draggingSubtaskId]);
 
   useEffect(() => {
     let mounted = true;
@@ -108,12 +189,9 @@ export default function PlannerPage() {
         setState(synced);
         setUsers(Array.isArray(us) ? us : []);
         setRequests(Array.isArray(rs) ? rs : []);
-      })
-      .finally(() => {
-        if (!mounted) return;
-        setLoading(false);
         setIsPlannerLoaded(true);
-      });
+      })
+      .finally(() => mounted && setLoading(false));
     return () => {
       mounted = false;
     };
@@ -129,11 +207,9 @@ export default function PlannerPage() {
 
       requests.forEach((r) => {
         const eventId = Number(r.eventId);
-        const directionId = Number(r.directionId);
         const projectId = Number(r.projectId);
         if (Number.isFinite(eventId) && r.eventTitle?.trim()) nextEventTitles[eventId] = r.eventTitle.trim();
         if (Number.isFinite(projectId) && r.projectTitle?.trim()) nextProjectTitles[projectId] = r.projectTitle.trim();
-        if (Number.isFinite(directionId) && r.specialization?.trim()) nextDirectionTitles[directionId] = r.specialization.trim();
       });
 
       const missingEventIds = Array.from(
@@ -213,10 +289,24 @@ export default function PlannerPage() {
   }, [requests]);
 
   const userNameById = useMemo(() => new Map(users.map((u) => [Number(u.id), fullName(u) || u.email])), [users]);
-  const memberTeamIds = useMemo(() => state.teams.filter((t) => t.confirmed && t.memberIds.includes(userId)).map((t) => t.id), [state.teams, userId]);
+  const participantNameById = useMemo(
+    () => new Map(state.participants.map((p) => [Number(p.id), String(p.fullName || "").trim()])),
+    [state.participants]
+  );
+  const specializationByOwnerId = useMemo(() => {
+    const map = new Map<number, string>();
+    requests.forEach((r) => {
+      const ownerId = Number(r.ownerId);
+      if (!Number.isFinite(ownerId)) return;
+      const spec = String(r.specialization || "").trim();
+      if (spec) map.set(ownerId, spec);
+    });
+    return map;
+  }, [requests]);
+  const memberTeamIdsAll = useMemo(() => state.teams.filter((t) => t.memberIds.includes(userId)).map((t) => t.id), [state.teams, userId]);
   const curatorTeamIds = useMemo(() => state.teams.filter((t) => Number(t.curatorId) === userId).map((t) => t.id), [state.teams, userId]);
-  const canViewTeam = (teamId: number) => isOrganizer || isCurator || (isStudent && memberTeamIds.includes(teamId));
-  const canEditTeam = (teamId: number) => isOrganizer || (isCurator && curatorTeamIds.includes(teamId)) || (isStudent && memberTeamIds.includes(teamId));
+  const canViewTeam = (teamId: number) => isOrganizer || isCurator || (isStudent && memberTeamIdsAll.includes(teamId));
+  const canEditTeam = (teamId: number) => isOrganizer || (isCurator && curatorTeamIds.includes(teamId)) || (isStudent && memberTeamIdsAll.includes(teamId));
 
   const visibleTeams = state.teams.filter((t) => canViewTeam(t.id));
   const filteredParents = state.parentTasks.filter(
@@ -226,11 +316,31 @@ export default function PlannerPage() {
   const filteredSubtasks = state.subtasks.filter(
     (s) => canViewTeam(s.teamId) && (teamFilter === "all" || Number(teamFilter) === Number(s.teamId))
   );
+  const displayNameForUserId = (id: number) =>
+    participantNameById.get(id) || userNameById.get(id) || `Участник #${id}`;
+  const displayAssigneeLabel = (id: number) => {
+    const base = displayNameForUserId(id);
+    const spec = specializationByOwnerId.get(id);
+    return spec ? `${base} — ${spec}` : base;
+  };
+  const getTeamMemberIds = (teamId: number) =>
+    state.teams.find((t) => Number(t.id) === Number(teamId))?.memberIds || [];
+  const selectedTeamMembers = selectedParent
+    ? state.teams.find((t) => Number(t.id) === Number(selectedParent.teamId))?.memberIds || []
+    : [];
   const sourceLabelForTeam = (team: PlannerTeam) => {
     const eventLabel = team.eventId ? eventTitleById[team.eventId] || `Мероприятие #${team.eventId}` : "";
     const directionLabel = team.directionId ? directionTitleById[team.directionId] || `Направление #${team.directionId}` : "";
     const projectLabel = team.projectId ? projectTitleById[team.projectId] || `Проект #${team.projectId}` : "";
     return [eventLabel, directionLabel, projectLabel].filter(Boolean).join(" / ");
+  };
+  const openTeamInfo = (teamId: number) => {
+    setTeamInfoId(teamId);
+    setTeamInfoOpen(true);
+  };
+  const closeTeamInfo = () => {
+    setTeamInfoOpen(false);
+    setTeamInfoId(null);
   };
 
   useEffect(() => {
@@ -445,14 +555,15 @@ export default function PlannerPage() {
   const addSubtask = () => {
     if (!selectedParent) return setError("Выберите большую задачу");
     if (!canEditTeam(selectedParent.teamId)) return setError("Нет прав на подзадачи этой команды");
-    if (!subTitle.trim() || !subRole.trim() || !subStart || !subEnd || subStart > subEnd) return setError("Проверьте поля подзадачи");
+    if (!subTitle.trim() || !subAssigneeId || !subStart || !subEnd || subStart > subEnd) return setError("Проверьте поля подзадачи");
     if (subStart < selectedParent.startDate || subEnd > selectedParent.endDate) return setError("Сроки подзадачи вне диапазона большой задачи");
     const created: PlannerSubtask = {
       id: nextPlannerId(state.subtasks),
       teamId: selectedParent.teamId,
       parentTaskId: selectedParent.id,
       title: subTitle.trim(),
-      role: subRole.trim(),
+      role: "",
+      assigneeId: Number(subAssigneeId),
       startDate: subStart,
       endDate: subEnd,
       status: subStatus || state.columns[0],
@@ -460,7 +571,7 @@ export default function PlannerPage() {
     };
     setState((prev) => ({ ...prev, subtasks: [...prev.subtasks, created] }));
     setSubTitle("");
-    setSubRole("");
+    setSubAssigneeId("");
     setSubStart("");
     setSubEnd("");
     setSubInSprint(false);
@@ -518,7 +629,7 @@ export default function PlannerPage() {
     setEditingSubtaskId(subtask.id);
     setEditingSubtaskDraft({
       title: subtask.title,
-      role: subtask.role,
+      assigneeId: subtask.assigneeId,
       startDate: subtask.startDate,
       endDate: subtask.endDate,
       status: subtask.status,
@@ -535,8 +646,7 @@ export default function PlannerPage() {
   const saveEditedSubtask = () => {
     if (!editingSubtaskId || !editingSubtaskDraft) return;
     const nextTitle = editingSubtaskDraft.title.trim();
-    const nextRole = editingSubtaskDraft.role.trim();
-    if (!nextTitle || !nextRole || !editingSubtaskDraft.startDate || !editingSubtaskDraft.endDate || editingSubtaskDraft.startDate > editingSubtaskDraft.endDate) {
+    if (!nextTitle || !editingSubtaskDraft.assigneeId || !editingSubtaskDraft.startDate || !editingSubtaskDraft.endDate || editingSubtaskDraft.startDate > editingSubtaskDraft.endDate) {
       setError("Проверьте поля подзадачи");
       return;
     }
@@ -555,7 +665,7 @@ export default function PlannerPage() {
           ? {
               ...s,
               title: nextTitle,
-              role: nextRole,
+              assigneeId: editingSubtaskDraft.assigneeId,
               startDate: editingSubtaskDraft.startDate,
               endDate: editingSubtaskDraft.endDate,
               status: safeStatus,
@@ -573,12 +683,13 @@ export default function PlannerPage() {
       { key: `p_${p.id}`, label: p.title, start: p.startDate, end: p.endDate, type: "parent" as const },
       ...filteredSubtasks
         .filter((s) => Number(s.parentTaskId) === Number(p.id))
-        .map((s) => ({ key: `s_${s.id}`, label: `└ ${s.title}`, start: s.startDate, end: s.endDate, type: "sub" as const })),
+        .map((s) => ({ key: `s_${s.id}`, label: `L ${s.title}`, start: s.startDate, end: s.endDate, type: "sub" as const })),
     ]
   );
   const minDate = ganttRows.reduce((acc, r) => (!acc || r.start < acc ? r.start : acc), "");
   const maxDate = ganttRows.reduce((acc, r) => (!acc || r.end > acc ? r.end : acc), "");
   const span = minDate && maxDate ? Math.max(1, Math.floor((Date.parse(maxDate) - Date.parse(minDate)) / 86400000) + 1) : 1;
+  const ganttTicks = buildGanttTicks(minDate, maxDate, span);
 
   const removeKanbanColumn = (title: string) => {
     if (DEFAULT_KANBAN_COLUMNS.includes(title)) {
@@ -609,9 +720,93 @@ export default function PlannerPage() {
     setError("");
   };
 
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, subtask: PlannerSubtask, teamId: number) => {
+    if (!canEditTeam(teamId)) return;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(subtask.id));
+    if (dragImageRef.current) e.dataTransfer.setDragImage(dragImageRef.current, 0, 0);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+    const offsetY = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+    setDragOffset({ x: offsetX, y: offsetY });
+    setDragStartX(e.clientX || null);
+    const preview = {
+      subtask,
+      x: e.clientX - offsetX,
+      y: e.clientY - offsetY,
+      width: rect.width,
+      tilt: 0,
+    };
+    dragPreviewRef.current = preview;
+    dragTargetRef.current = { x: preview.x, y: preview.y, tilt: 0 };
+    setDragPreview(preview);
+    setDraggingSubtaskId(subtask.id);
+  };
+
+  const handleDragMove = (e: React.DragEvent<HTMLDivElement>) => {
+    if (dragStartX == null || !dragOffset) return;
+    if (!e.clientX && !e.clientY) return;
+    const deltaX = e.clientX - dragStartX;
+    const tilt = Math.abs(deltaX) >= 12 ? (deltaX > 0 ? 6 : -6) : 0;
+    dragTargetRef.current = {
+      x: e.clientX - dragOffset.x,
+      y: e.clientY - dragOffset.y,
+      tilt,
+    };
+  };
+
+  const handleDragEnd = () => {
+    setDraggingSubtaskId(null);
+    setDragOverColumn(null);
+    setDragStartX(null);
+    setDragOffset(null);
+    setDragPreview(null);
+    dragTargetRef.current = null;
+    dragPreviewRef.current = null;
+    if (dragAnimRef.current) cancelAnimationFrame(dragAnimRef.current);
+    dragAnimRef.current = null;
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, column: string) => {
+    e.preventDefault();
+    if (dragOverColumn !== column) setDragOverColumn(column);
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>, column: string) => {
+    if (dragOverColumn !== column) return;
+    const related = e.relatedTarget as Node | null;
+    if (related && e.currentTarget.contains(related)) return;
+    setDragOverColumn(null);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, column: string) => {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData("text/plain");
+    const subtaskId = Number(raw);
+    if (!subtaskId) return;
+    setState((prev) => ({
+      ...prev,
+      subtasks: prev.subtasks.map((s) =>
+        Number(s.id) === Number(subtaskId)
+          ? { ...s, status: column, inSprint: true }
+          : s
+      ),
+    }));
+    setDraggingSubtaskId(null);
+    setDragOverColumn(null);
+    setDragStartX(null);
+    setDragOffset(null);
+    setDragPreview(null);
+    dragTargetRef.current = null;
+    dragPreviewRef.current = null;
+    if (dragAnimRef.current) cancelAnimationFrame(dragAnimRef.current);
+    dragAnimRef.current = null;
+  };
+
   if (!user) return <div className="page planner-page"><div className="planner-empty">Войдите для доступа к планировщику.</div></div>;
   if (loading) return <div className="page planner-page"><div className="planner-empty">Загрузка...</div></div>;
-  if (isStudent && memberTeamIds.length === 0) return <div className="page planner-page"><div className="planner-empty">Доступ откроется после подтверждения команды.</div></div>;
+  if (isStudent && memberTeamIdsAll.length === 0) return <div className="page planner-page"><div className="planner-empty">Доступ откроется после подтверждения команды.</div></div>;
 
   return (
     <div className="page planner-page">
@@ -620,7 +815,7 @@ export default function PlannerPage() {
         <label className="planner-label">
           Команда
           <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
-            <option value="all">Все команды</option>
+            {(isOrganizer || isCurator) && <option value="all">Все команды</option>}
             {visibleTeams.map((t) => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
           </select>
         </label>
@@ -700,15 +895,26 @@ export default function PlannerPage() {
           {state.teams.filter((t) => canViewTeam(t.id)).map((t) => <div key={t.id} className="team-item">
             <div className="team-top">
               {isOrganizer ? <input value={t.name} onChange={(e) => setState((p) => ({ ...p, teams: p.teams.map((x) => x.id === t.id ? { ...x, name: e.target.value } : x) }))} /> : <div className="team-title">{t.name}</div>}
-              <div className={`team-badge ${t.confirmed ? "ok" : "draft"}`}>{t.confirmed ? "Подтверждена" : "Черновик"}</div>
+              {isOrganizer ? (
+                <div className={`team-badge ${t.confirmed ? "ok" : "draft"}`}>{t.confirmed ? "Подтверждена" : "Черновик"}</div>
+              ) : (
+                <div className="team-badge-stack">
+                  <div className={`team-badge ${t.confirmed ? "ok" : "draft"}`}>{t.confirmed ? "Подтверждена" : "Черновик"}</div>
+                  <button className="info-icon-btn" onClick={() => openTeamInfo(t.id)} aria-label="Информация о команде">
+                    <img src={infoIcon} alt="info" />
+                  </button>
+                </div>
+              )}
             </div>
             <div className="team-value">Куратор: {t.curatorId ? userNameById.get(t.curatorId) || `ID ${t.curatorId}` : "—"}</div>
             <div className="team-value">Участники: {t.memberIds.length}</div>
             {sourceLabelForTeam(t) && <div className="team-value">Источник: {sourceLabelForTeam(t)}</div>}
-            {isOrganizer && <div className="team-actions">
-              <button className="primary" onClick={() => setState((p) => ({ ...p, teams: p.teams.map((x) => x.id === t.id ? { ...x, confirmed: !x.confirmed } : x) }))}>{t.confirmed ? "Снять подтверждение" : "Подтвердить"}</button>
-              <button className="danger-outline" onClick={() => setState((p) => removeTeamCascade(p, t.id))}>Удалить</button>
-            </div>}
+            {isOrganizer && (
+              <div className="team-actions">
+                <button className="primary" onClick={() => setState((p) => ({ ...p, teams: p.teams.map((x) => x.id === t.id ? { ...x, confirmed: !x.confirmed } : x) }))}>{t.confirmed ? "Снять подтверждение" : "Подтвердить"}</button>
+                <button className="danger-outline" onClick={() => setState((p) => removeTeamCascade(p, t.id))}>Удалить</button>
+              </div>
+            )}
           </div>)}
         </div>
       </div>}
@@ -764,7 +970,16 @@ export default function PlannerPage() {
         <div className="planner-card">
           <h3 className="h3">Подзадачи</h3>
           {selectedParent && <div className="planner-grid planner-grid--4">
-            <input value={subRole} onChange={(e) => setSubRole(e.target.value)} placeholder="Роль" />
+            <select
+              value={subAssigneeId}
+              onChange={(e) => setSubAssigneeId(e.target.value)}
+              disabled={selectedTeamMembers.length === 0}
+            >
+              <option value="" disabled>Ответственный</option>
+              {selectedTeamMembers.map((id) => (
+                <option key={`assignee-${id}`} value={String(id)}>{displayAssigneeLabel(Number(id))}</option>
+              ))}
+            </select>
             <input value={subTitle} onChange={(e) => setSubTitle(e.target.value)} placeholder="Подзадача" />
             <input type="date" value={subStart} onChange={(e) => setSubStart(e.target.value)} />
             <input type="date" value={subEnd} onChange={(e) => setSubEnd(e.target.value)} />
@@ -775,9 +990,17 @@ export default function PlannerPage() {
           <div className="subtask-list">{filteredSubtasks.filter((s) => Number(s.parentTaskId) === Number(selectedParentId)).map((s) => <div key={s.id} className="subtask-item">
             <div className="subtask-main">
               {editingSubtaskId === s.id && editingSubtaskDraft
-                ? <div className="planner-inline-edit">
+                  ? <div className="planner-inline-edit">
                     <div className="planner-inline-edit-row">
-                      <input value={editingSubtaskDraft.role} onChange={(e) => setEditingSubtaskDraft((prev) => prev ? { ...prev, role: e.target.value } : prev)} placeholder="Роль" />
+                      <select
+                        value={editingSubtaskDraft.assigneeId ?? ""}
+                        onChange={(e) => setEditingSubtaskDraft((prev) => prev ? { ...prev, assigneeId: Number(e.target.value) } : prev)}
+                      >
+                        <option value="" disabled>Ответственный</option>
+                        {getTeamMemberIds(s.teamId).map((id) => (
+                          <option key={`edit-assignee-${s.id}-${id}`} value={String(id)}>{displayAssigneeLabel(Number(id))}</option>
+                        ))}
+                      </select>
                       <input value={editingSubtaskDraft.title} onChange={(e) => setEditingSubtaskDraft((prev) => prev ? { ...prev, title: e.target.value } : prev)} placeholder="Подзадача" />
                     </div>
                     <div className="planner-inline-edit-row">
@@ -792,8 +1015,8 @@ export default function PlannerPage() {
                       <span>В спринт</span>
                     </label>
                   </div>
-                : <>
-                    <div className="title">{s.title}</div><div className="meta"><span>{s.role}</span><span>{s.startDate} — {s.endDate}</span><span>{s.status}</span></div>
+                  : <>
+                    <div className="title">{s.title}</div><div className="meta"><span>{s.assigneeId ? displayAssigneeLabel(s.assigneeId) : s.role}</span><span>{s.startDate} — {s.endDate}</span><span>{s.status}</span></div>
                   </>}
             </div>
             {canEditTeam(s.teamId) && <div className="planner-item-actions">
@@ -822,19 +1045,58 @@ export default function PlannerPage() {
             }}>Добавить</button>
           </div>
         </div>
-        <div className="kanban-board">{state.columns.map((col) => <div key={col} className="kanban-column">
-          <div className="kanban-column-title"><span>{col}</span><button className="kanban-column-remove" onClick={() => removeKanbanColumn(col)} title="Удалить колонку" aria-label="Удалить колонку">×</button></div>
-          <div className="kanban-column-body">{filteredSubtasks.filter((s) => s.inSprint && s.status === col).map((s) => <div key={s.id} className="kanban-card">
+        <div className="kanban-board">{state.columns.map((col) => <div key={col} className={`kanban-column${dragOverColumn === col ? " drag-over" : ""}`}>
+          <div className="kanban-column-title"><span>{col}</span><button className="kanban-column-remove" onClick={() => removeKanbanColumn(col)} title="Удалить колонку" aria-label="Удалить колонку">{"\u00d7"}</button></div>
+          <div
+            className="kanban-column-body"
+            onDragOver={(e) => handleDragOver(e, col)}
+            onDragLeave={(e) => handleDragLeave(e, col)}
+            onDrop={(e) => handleDrop(e, col)}
+          >
+            {filteredSubtasks.filter((s) => s.inSprint && s.status === col).map((s) => (
+              <div
+                key={s.id}
+                className={`kanban-card${draggingSubtaskId === s.id ? " dragging" : ""}`}
+                draggable={canEditTeam(s.teamId)}
+                onDragStart={(e) => handleDragStart(e, s, s.teamId)}
+                onDrag={handleDragMove}
+                onDragEnd={handleDragEnd}
+              >
             <div className="kanban-card-title">{s.title}</div><div className="kanban-card-meta">{s.startDate} — {s.endDate}</div>
-            {canEditTeam(s.teamId) && <select value={s.status} onChange={(e) => setState((p) => ({ ...p, subtasks: p.subtasks.map((x) => x.id === s.id ? { ...x, status: e.target.value } : x) }))}>{state.columns.map((c) => <option key={c}>{c}</option>)}</select>}
-          </div>)}</div>
+              </div>
+            ))}
+          </div>
         </div>)}</div>
+        {dragPreview && (
+          <div
+            className="kanban-card drag-preview"
+            ref={dragPreviewElRef}
+            style={{
+              width: dragPreview.width,
+              transform: `translate3d(${dragPreview.x}px, ${dragPreview.y}px, 0) rotate(${dragPreview.tilt}deg)`,
+            } as React.CSSProperties}
+          >
+            <div className="kanban-card-title">{dragPreview.subtask.title}</div>
+            <div className="kanban-card-meta">{dragPreview.subtask.startDate} — {dragPreview.subtask.endDate}</div>
+          </div>
+        )}
+        <div ref={dragImageRef} className="kanban-drag-image" />
       </div>}
 
       {tab === "gantt" && <div className="planner-card">
         <h3 className="h3">Диаграмма Ганта</h3>
         {ganttRows.length === 0 ? <div className="planner-empty-inline">Нет задач для отображения.</div> : <>
           <div className="gantt-range"><span>{minDate}</span><span>{maxDate}</span></div>
+          <div className="gantt-axis">
+            <div className="gantt-axis-spacer" />
+            <div className="gantt-axis-track">
+              {ganttTicks.map((t) => (
+                <div key={`${t.offset}-${t.label}`} className="gantt-axis-tick" style={{ left: `${t.offset}%` }}>
+                  <span>{t.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="gantt-rows">{ganttRows.map((r) => {
             const startOffset = Math.floor((Date.parse(r.start) - Date.parse(minDate)) / 86400000);
             const endOffset = Math.floor((Date.parse(r.end) - Date.parse(minDate)) / 86400000);
@@ -858,7 +1120,36 @@ export default function PlannerPage() {
           </div>
         </div>
       </Modal>
+
+      <Modal isOpen={teamInfoOpen} onClose={closeTeamInfo} title="Состав команды">
+        <div className="confirm-body">
+          {teamInfoId == null ? (
+            <div className="confirm-text">Команда не выбрана.</div>
+          ) : (
+            <>
+              <div className="confirm-text">
+                {state.teams.find((t) => t.id === teamInfoId)?.name || "Команда"}
+              </div>
+              <div className="planner-team-info-list">
+                {(state.teams.find((t) => t.id === teamInfoId)?.memberIds || []).map((id) => (
+                  <div key={`team-info-${teamInfoId}-${id}`} className="planner-team-info-row">
+                    <div className="planner-team-info-name">{displayNameForUserId(id)}</div>
+                    <div className="planner-team-info-role">{specializationByOwnerId.get(id) || "—"}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }
+
+
+
+
+
+
+
 

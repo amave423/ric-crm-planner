@@ -22,12 +22,23 @@ export function readPlannerState(): PlannerState {
   if (!raw) return clone(EMPTY_STATE);
   try {
     const parsed = JSON.parse(raw) as Partial<PlannerState>;
+    const subtasks = Array.isArray(parsed.subtasks)
+      ? parsed.subtasks.map((s) => {
+          const sub = s as PlannerSubtask & { in_sprint?: boolean | number | string };
+          const rawSprint = typeof sub.inSprint === "boolean" ? sub.inSprint : sub.in_sprint;
+          const inSprint =
+            typeof rawSprint === "boolean"
+              ? rawSprint
+              : rawSprint === 1 || rawSprint === "1" || String(rawSprint).toLowerCase() === "true";
+          return { ...sub, inSprint };
+        })
+      : [];
     return {
       enrollmentClosed: Boolean(parsed.enrollmentClosed),
       participants: Array.isArray(parsed.participants) ? parsed.participants : [],
       teams: Array.isArray(parsed.teams) ? parsed.teams : [],
       parentTasks: Array.isArray(parsed.parentTasks) ? parsed.parentTasks : [],
-      subtasks: Array.isArray(parsed.subtasks) ? parsed.subtasks : [],
+      subtasks,
       columns: Array.isArray(parsed.columns) && parsed.columns.length > 0 ? parsed.columns : [...DEFAULT_KANBAN_COLUMNS],
     };
   } catch {

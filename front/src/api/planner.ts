@@ -30,6 +30,22 @@ function mapBackendPlanner(raw: unknown): PlannerState {
   const fallback = readPlannerState();
   if (!raw || typeof raw !== "object") return fallback;
   const obj = raw as BackendPlanner;
+  const fallbackSubtasksById = new Map<number, PlannerState["subtasks"][number]>(
+    fallback.subtasks.map((s) => [Number(s.id), s])
+  );
+  const mappedSubtasks = Array.isArray(obj.subtasks)
+    ? obj.subtasks.map((s) => {
+        const sub = s as PlannerState["subtasks"][number];
+        const id = Number((sub as { id?: number | string }).id ?? 0);
+        const fallbackSub = fallbackSubtasksById.get(id);
+        return {
+          ...fallbackSub,
+          ...sub,
+          id: id || (fallbackSub?.id ?? 0),
+          inSprint: typeof sub.inSprint === "boolean" ? sub.inSprint : fallbackSub?.inSprint ?? false,
+        };
+      })
+    : fallback.subtasks;
   return {
     enrollmentClosed: Boolean(obj.enrollmentClosed ?? obj.enrollment_closed ?? false),
     participants: Array.isArray(obj.participants)
@@ -42,7 +58,7 @@ function mapBackendPlanner(raw: unknown): PlannerState {
       : fallback.participants,
     teams: Array.isArray(obj.teams) ? obj.teams : fallback.teams,
     parentTasks: Array.isArray(obj.parentTasks) ? obj.parentTasks : Array.isArray(obj.parent_tasks) ? obj.parent_tasks : fallback.parentTasks,
-    subtasks: Array.isArray(obj.subtasks) ? obj.subtasks : fallback.subtasks,
+    subtasks: mappedSubtasks,
     columns: Array.isArray(obj.columns) && obj.columns.length > 0 ? obj.columns : fallback.columns,
   };
 }

@@ -32,8 +32,10 @@ export default function AppRouter() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* ГОСТЬ МОЖЕТ СМОТРЕТЬ ТОЛЬКО МЕРОПРИЯТИЯ */}
+        {/* ГОСТЬ МОЖЕТ СМОТРЕТЬ МЕРОПРИЯТИЯ, НАПРАВЛЕНИЯ И ПРОЕКТЫ */}
         <Route path="/events" element={<EventsPage />} />
+        <Route path="/events/:eventId/directions" element={<DirectionsPage />} />
+        <Route path="/events/:eventId/directions/:directionId/projects" element={<ProjectsPage />} />
 
         {/* Если пользователь НЕ авторизован, ему запрещены остальные маршруты */}
         {isGuest ? (
@@ -42,17 +44,7 @@ export default function AppRouter() {
           </>
         ) : (
           <>
-            {/* Направления внутри мероприятия */}
-            <Route
-              path="/events/:eventId/directions"
-              element={<DirectionsPage />}
-            />
-
-            {/* Проекты внутри направления */}
-            <Route
-              path="/events/:eventId/directions/:directionId/projects"
-              element={<ProjectsPage />}
-            />
+            {/* Направления и проекты доступны всем */}
 
             {/* Только авторизованные */}
             <Route path="/planner" element={<PlannerPage />} />

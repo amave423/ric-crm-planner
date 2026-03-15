@@ -112,6 +112,37 @@
   font-size: 12px;
 }
 
+.team-badge-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.info-icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+}
+
+.info-icon-btn img {
+  width: 36px;
+  height: 36px;
+}
+
+.info-icon-btn:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  transform: translateY(-1px);
+}
+
 .team-badge.ok {
   color: #166534;
   border: 1px solid #86efac;
@@ -128,6 +159,39 @@
   margin-top: 10px;
   display: flex;
   gap: 8px;
+}
+
+.team-actions--info {
+  margin-top: 6px;
+}
+
+.planner-team-info-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planner-team-info-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(120px, 220px);
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.planner-team-info-name {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.planner-team-info-role {
+  color: #64748b;
+  font-size: 13px;
+  text-align: right;
 }
 
 .planner-members-grid {
