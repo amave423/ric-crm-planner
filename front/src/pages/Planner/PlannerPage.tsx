@@ -103,6 +103,11 @@ export default function PlannerPage() {
   const [confirmCloseEnrollmentOpen, setConfirmCloseEnrollmentOpen] = useState(false);
   const [teamInfoOpen, setTeamInfoOpen] = useState(false);
   const [teamInfoId, setTeamInfoId] = useState<number | null>(null);
+  const [teamEditOpen, setTeamEditOpen] = useState(false);
+  const [teamEditId, setTeamEditId] = useState<number | null>(null);
+  const [teamEditMembers, setTeamEditMembers] = useState<number[]>([]);
+  const [taskCardOpen, setTaskCardOpen] = useState(false);
+  const [taskCard, setTaskCard] = useState<{ type: "parent" | "subtask"; id: number } | null>(null);
   const [draggingSubtaskId, setDraggingSubtaskId] = useState<number | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [dragStartX, setDragStartX] = useState<number | null>(null);
@@ -341,6 +346,43 @@ export default function PlannerPage() {
   const closeTeamInfo = () => {
     setTeamInfoOpen(false);
     setTeamInfoId(null);
+  };
+  const openTeamEdit = (teamId: number) => {
+    const team = state.teams.find((t) => Number(t.id) === Number(teamId));
+    if (!team) return;
+    setTeamEditId(teamId);
+    setTeamEditMembers([...team.memberIds]);
+    setTeamEditOpen(true);
+  };
+  const closeTeamEdit = () => {
+    setTeamEditOpen(false);
+    setTeamEditId(null);
+    setTeamEditMembers([]);
+  };
+  const toggleTeamEditMember = (id: number) => {
+    setTeamEditMembers((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+  const saveTeamEdit = () => {
+    if (teamEditId == null) return;
+    const unique = Array.from(new Set(teamEditMembers));
+    if (unique.length === 0) {
+      setError("Выберите хотя бы одного участника");
+      return;
+    }
+    setState((prev) => ({
+      ...prev,
+      teams: prev.teams.map((t) => (Number(t.id) === Number(teamEditId) ? { ...t, memberIds: unique } : t)),
+    }));
+    setError("");
+    closeTeamEdit();
+  };
+  const openTaskCard = (type: "parent" | "subtask", id: number) => {
+    setTaskCard({ type, id });
+    setTaskCardOpen(true);
+  };
+  const closeTaskCard = () => {
+    setTaskCardOpen(false);
+    setTaskCard(null);
   };
 
   useEffect(() => {
@@ -804,6 +846,27 @@ export default function PlannerPage() {
     dragAnimRef.current = null;
   };
 
+  const taskCardParent = taskCard?.type === "parent"
+    ? state.parentTasks.find((p) => Number(p.id) === Number(taskCard.id))
+    : null;
+  const taskCardSubtask = taskCard?.type === "subtask"
+    ? state.subtasks.find((s) => Number(s.id) === Number(taskCard.id))
+    : null;
+  const taskCardTeamId = taskCardSubtask?.teamId ?? taskCardParent?.teamId;
+  const taskCardTeam = taskCardTeamId ? state.teams.find((t) => Number(t.id) === Number(taskCardTeamId)) : null;
+  const taskCardParentForSubtask = taskCardSubtask
+    ? state.parentTasks.find((p) => Number(p.id) === Number(taskCardSubtask.parentTaskId))
+    : null;
+  const taskCardSubtasksCount = taskCardParent
+    ? state.subtasks.filter((s) => Number(s.parentTaskId) === Number(taskCardParent.id)).length
+    : 0;
+  const teamEditTeam = teamEditId != null ? state.teams.find((t) => Number(t.id) === Number(teamEditId)) : null;
+  const teamEditCandidateIds = (() => {
+    const ids = new Set<number>(state.participants.map((p) => Number(p.id)));
+    (teamEditTeam?.memberIds || []).forEach((id) => ids.add(Number(id)));
+    return Array.from(ids).sort((a, b) => displayNameForUserId(a).localeCompare(displayNameForUserId(b)));
+  })();
+
   if (!user) return <div className="page planner-page"><div className="planner-empty">Войдите для доступа к планировщику.</div></div>;
   if (loading) return <div className="page planner-page"><div className="planner-empty">Загрузка...</div></div>;
   if (isStudent && memberTeamIdsAll.length === 0) return <div className="page planner-page"><div className="planner-empty">Доступ откроется после подтверждения команды.</div></div>;
@@ -912,6 +975,7 @@ export default function PlannerPage() {
             {isOrganizer && (
               <div className="team-actions">
                 <button className="primary" onClick={() => setState((p) => ({ ...p, teams: p.teams.map((x) => x.id === t.id ? { ...x, confirmed: !x.confirmed } : x) }))}>{t.confirmed ? "Снять подтверждение" : "Подтвердить"}</button>
+                <button className="link-btn" onClick={() => openTeamEdit(t.id)}>Состав</button>
                 <button className="danger-outline" onClick={() => setState((p) => removeTeamCascade(p, t.id))}>Удалить</button>
               </div>
             )}
@@ -956,15 +1020,20 @@ export default function PlannerPage() {
                     <div className="title">{p.title}</div><div className="meta"><span>{p.startDate}</span><span>{p.endDate}</span></div>
                   </>}
             </div>
-            {canEditTeam(p.teamId) && <div className="planner-item-actions">
-              {editingParentId === p.id
-                ? <>
-                    <button className="link-btn" onClick={saveEditedParent}>Сохранить</button>
-                    <button className="link-btn" onClick={cancelEditParent}>Отмена</button>
-                  </>
-                : <button className="link-btn" onClick={() => startEditParent(p.id)}>Редактировать</button>}
-              <button className="link-btn danger" onClick={() => setState((prev) => ({ ...prev, parentTasks: prev.parentTasks.filter((x) => x.id !== p.id), subtasks: prev.subtasks.filter((x) => x.parentTaskId !== p.id) }))}>Удалить</button>
-            </div>}
+            <div className="planner-item-actions">
+              <button className="link-btn" onClick={() => openTaskCard("parent", p.id)}>Карточка</button>
+              {canEditTeam(p.teamId) && (
+                <>
+                  {editingParentId === p.id
+                    ? <>
+                        <button className="link-btn" onClick={saveEditedParent}>Сохранить</button>
+                        <button className="link-btn" onClick={cancelEditParent}>Отмена</button>
+                      </>
+                    : <button className="link-btn" onClick={() => startEditParent(p.id)}>Редактировать</button>}
+                  <button className="link-btn danger" onClick={() => setState((prev) => ({ ...prev, parentTasks: prev.parentTasks.filter((x) => x.id !== p.id), subtasks: prev.subtasks.filter((x) => x.parentTaskId !== p.id) }))}>Удалить</button>
+                </>
+              )}
+            </div>
           </div>)}</div>
         </div>
         <div className="planner-card">
@@ -1019,15 +1088,20 @@ export default function PlannerPage() {
                     <div className="title">{s.title}</div><div className="meta"><span>{s.assigneeId ? displayAssigneeLabel(s.assigneeId) : s.role}</span><span>{s.startDate} — {s.endDate}</span><span>{s.status}</span></div>
                   </>}
             </div>
-            {canEditTeam(s.teamId) && <div className="planner-item-actions">
-              {editingSubtaskId === s.id
-                ? <>
-                    <button className="link-btn" onClick={saveEditedSubtask}>Сохранить</button>
-                    <button className="link-btn" onClick={cancelEditSubtask}>Отмена</button>
-                  </>
-                : <button className="link-btn" onClick={() => startEditSubtask(s.id)}>Редактировать</button>}
-              <button className="link-btn danger" onClick={() => setState((p) => ({ ...p, subtasks: p.subtasks.filter((x) => x.id !== s.id) }))}>Удалить</button>
-            </div>}
+            <div className="planner-item-actions">
+              <button className="link-btn" onClick={() => openTaskCard("subtask", s.id)}>Карточка</button>
+              {canEditTeam(s.teamId) && (
+                <>
+                  {editingSubtaskId === s.id
+                    ? <>
+                        <button className="link-btn" onClick={saveEditedSubtask}>Сохранить</button>
+                        <button className="link-btn" onClick={cancelEditSubtask}>Отмена</button>
+                      </>
+                    : <button className="link-btn" onClick={() => startEditSubtask(s.id)}>Редактировать</button>}
+                  <button className="link-btn danger" onClick={() => setState((p) => ({ ...p, subtasks: p.subtasks.filter((x) => x.id !== s.id) }))}>Удалить</button>
+                </>
+              )}
+            </div>
           </div>)}</div>
         </div>
       </div>}
@@ -1061,6 +1135,10 @@ export default function PlannerPage() {
                 onDragStart={(e) => handleDragStart(e, s, s.teamId)}
                 onDrag={handleDragMove}
                 onDragEnd={handleDragEnd}
+                onClick={() => {
+                  if (draggingSubtaskId != null) return;
+                  openTaskCard("subtask", s.id);
+                }}
               >
             <div className="kanban-card-title">{s.title}</div><div className="kanban-card-meta">{s.startDate} — {s.endDate}</div>
               </div>
@@ -1139,6 +1217,108 @@ export default function PlannerPage() {
                 ))}
               </div>
             </>
+          )}
+        </div>
+      </Modal>
+
+      <Modal isOpen={teamEditOpen} onClose={closeTeamEdit} title="Редактирование команды">
+        <div className="confirm-body">
+          {teamEditTeam == null ? (
+            <div className="confirm-text">Команда не выбрана.</div>
+          ) : (
+            <>
+              <div className="confirm-text">{teamEditTeam.name || "Команда"}</div>
+              <div className="planner-team-edit-meta">Участники: {teamEditMembers.length}</div>
+              {teamEditCandidateIds.length === 0 ? (
+                <div className="planner-empty-inline">Нет участников для выбора.</div>
+              ) : (
+                <div className="planner-team-edit-list">
+                  {teamEditCandidateIds.map((id) => (
+                    <label key={`team-edit-${teamEditTeam.id}-${id}`} className="planner-check planner-applicant-row">
+                      <input
+                        type="checkbox"
+                        checked={teamEditMembers.includes(id)}
+                        onChange={() => toggleTeamEditMember(id)}
+                      />
+                      <span>{displayAssigneeLabel(id)}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <div className="planner-team-edit-actions">
+                <button className="link-btn" onClick={closeTeamEdit}>Отмена</button>
+                <button className="primary" onClick={saveTeamEdit}>Сохранить</button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
+      <Modal isOpen={taskCardOpen} onClose={closeTaskCard} title="Карточка задачи">
+        <div className="confirm-body">
+          {!taskCardParent && !taskCardSubtask ? (
+            <div className="confirm-text">Задача не найдена.</div>
+          ) : (
+            <div className="planner-task-card">
+              <div className="planner-task-row">
+                <div className="planner-task-label">Тип</div>
+                <div className="planner-task-value">{taskCardSubtask ? "Подзадача" : "Большая задача"}</div>
+              </div>
+              <div className="planner-task-row">
+                <div className="planner-task-label">Название</div>
+                <div className="planner-task-value">{taskCardSubtask?.title || taskCardParent?.title}</div>
+              </div>
+              <div className="planner-task-row">
+                <div className="planner-task-label">Команда</div>
+                <div className="planner-task-value">{taskCardTeam?.name || "—"}</div>
+              </div>
+              {taskCardTeam && sourceLabelForTeam(taskCardTeam) && (
+                <div className="planner-task-row">
+                  <div className="planner-task-label">Источник</div>
+                  <div className="planner-task-value">{sourceLabelForTeam(taskCardTeam)}</div>
+                </div>
+              )}
+              <div className="planner-task-row">
+                <div className="planner-task-label">Сроки</div>
+                <div className="planner-task-value">
+                  {taskCardSubtask ? `${taskCardSubtask.startDate} — ${taskCardSubtask.endDate}` : `${taskCardParent?.startDate} — ${taskCardParent?.endDate}`}
+                </div>
+              </div>
+              {taskCardParent?.description && (
+                <div className="planner-task-row">
+                  <div className="planner-task-label">Описание</div>
+                  <div className="planner-task-value">{taskCardParent.description}</div>
+                </div>
+              )}
+              {taskCardParent && (
+                <div className="planner-task-row">
+                  <div className="planner-task-label">Подзадач</div>
+                  <div className="planner-task-value">{taskCardSubtasksCount}</div>
+                </div>
+              )}
+              {taskCardSubtask && (
+                <>
+                  <div className="planner-task-row">
+                    <div className="planner-task-label">Ответственный</div>
+                    <div className="planner-task-value">
+                      {taskCardSubtask.assigneeId ? displayAssigneeLabel(taskCardSubtask.assigneeId) : "—"}
+                    </div>
+                  </div>
+                  <div className="planner-task-row">
+                    <div className="planner-task-label">Статус</div>
+                    <div className="planner-task-value">{taskCardSubtask.status || "—"}</div>
+                  </div>
+                  <div className="planner-task-row">
+                    <div className="planner-task-label">В спринт</div>
+                    <div className="planner-task-value">{taskCardSubtask.inSprint ? "Да" : "Нет"}</div>
+                  </div>
+                  <div className="planner-task-row">
+                    <div className="planner-task-label">Большая задача</div>
+                    <div className="planner-task-value">{taskCardParentForSubtask?.title || "—"}</div>
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
       </Modal>

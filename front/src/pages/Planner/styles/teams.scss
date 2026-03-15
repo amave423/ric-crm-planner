@@ -194,6 +194,29 @@
   text-align: right;
 }
 
+.planner-team-edit-meta {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.planner-team-edit-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.planner-team-edit-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .planner-members-grid {
   margin-top: 2px;
   display: grid;
