@@ -384,7 +384,7 @@ class ApplicationListView(ListCreateAPIView):
     ]
     def get_permissions(self):
         if self.request.method.lower() == "get":
-            permissions = (CuratorOrAdminPermission,)
+            permissions = (IsAuthenticated,)
         else:
             permissions = (ProjectantOnlyPermission,)
         return [permission() for permission in permissions]
@@ -401,6 +401,9 @@ class ApplicationListView(ListCreateAPIView):
         queryset = Application.objects.select_related(
             "user", "direction", "event", "specialization", "status"
         ).order_by("-date_sub")
+        
+        if not CuratorOrAdminPermission().has_permission(self.request, self):
+            queryset = queryset.filter(user=self.request.user)
 
         filters = {
             "event": "event_id",
@@ -446,7 +449,9 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
     serializer_class = ApplicationSerializer
     lookup_url_kwarg = "application_id"
     def get_permissions(self):
-        if self.request.method.lower() in {"get", "patch", "delete"}:
+        if self.request.method.lower() == "get":
+            permissions = (IsAuthenticated,)
+        elif self.request.method.lower() in {"patch", "delete"}:
             permissions = (CuratorOrAdminPermission,)
         else:
             permissions = (IsAuthenticated,)
@@ -472,12 +477,7 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
         if CuratorOrAdminPermission().has_permission(self.request, self):
             return queryset
 
-        if self.request.method.lower() == "put" and not (
-            self.request.user.is_staff or self.request.user.is_superuser
-        ):
-            return queryset.filter(user=self.request.user)
-
-        return queryset
+        return queryset.filter(user=self.request.user)
 
 
 class DirectionApplicationCreateView(CreateAPIView):
