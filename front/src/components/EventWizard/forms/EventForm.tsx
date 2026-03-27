@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { useWizard } from "../EventWizardModal";
-import calendarIcon from "../../../assets/icons/calendar.svg";
 import type { User } from "../../../types/user";
 import { getAllUsers } from "../../../storage/storage";
-import Calendar from "../../UI/Calendar";
+import DateField from "../../UI/DateField";
 import { getEventById, saveEvent as persistEvent, removeEvent as apiRemoveEvent } from "../../../api/events";
 import type { Event } from "../../../types/event";
 import Modal from "../../Modal/Modal";
@@ -66,7 +65,7 @@ export default function EventForm() {
         setStartDate(se.startDate || "");
         setEndDate(se.endDate || "");
         setApplyDeadline(se.applyDeadline || "");
-        setLeader(se.leader ?? "");
+        setLeader(String(se.leader ?? ""));
         setSpecializations(se.specializations || []);
         setTitle(se.title || "");
         return;
@@ -82,7 +81,7 @@ export default function EventForm() {
             setStartDate(e.startDate || "");
             setEndDate(e.endDate || "");
             setApplyDeadline(e.applyDeadline || "");
-            setLeader(e.leader ?? "");
+            setLeader(String(e.leader ?? ""));
             setSpecializations(e.specializations || []);
             setTitle(e.title || "");
           }
@@ -282,59 +281,5 @@ export default function EventForm() {
         </div>
       </Modal>
     </div>
-  );
-}
-
-function DateField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (inputRef.current && value !== inputRef.current.value) {
-      inputRef.current.value = value || "";
-    }
-  }, [value]);
-
-  return (
-    <label className="date-field">
-      <span className="text-small">{label}</span>
-
-      <div className="date-input">
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder="YYYY-MM-DD"
-          defaultValue={value}
-          onBlur={() => {
-            const v = inputRef.current?.value ?? "";
-            if (v !== value) onChange(v);
-          }}
-          onFocus={() => setOpen(true)}
-        />
-
-        <button type="button" className="calendar-btn" onClick={() => setOpen((prev) => !prev)}>
-          <img src={calendarIcon} alt="calendar" />
-        </button>
-
-        {open && (
-          <Calendar
-            value={value}
-            onSelect={(date) => {
-              onChange(date);
-              setOpen(false);
-              if (inputRef.current) inputRef.current.value = date;
-            }}
-          />
-        )}
-      </div>
-    </label>
   );
 }

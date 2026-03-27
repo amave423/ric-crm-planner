@@ -86,6 +86,7 @@ export default function EventWizardModal({
     page: resolvedPage,
     eventId: eventIdState,
     directionId: initialDirectionId ?? context?.directionId,
+    projectId: context?.projectId,
     setActiveTab,
 
     isEventSaved,

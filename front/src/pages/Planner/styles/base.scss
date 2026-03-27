@@ -87,7 +87,7 @@
 }
 
 .planner-grid--parent-create {
-  grid-template-columns: minmax(180px, 220px) minmax(260px, 1fr) minmax(160px, 180px) minmax(160px, 180px) auto;
+  grid-template-columns: minmax(260px, 1fr) minmax(160px, 180px) minmax(160px, 180px) auto;
   align-items: end;
 }
 
@@ -250,6 +250,12 @@
   margin-top: 8px;
   color: #6b7280;
   font-size: 13px;
+}
+
+.planner-current-team {
+  margin-bottom: 10px;
+  color: #374151;
+  font-size: 14px;
 }
 
 .planner-check {

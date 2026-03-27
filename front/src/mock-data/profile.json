@@ -1,1 +1,152 @@
-{}
+﻿{
+    "1":  {
+              "email":  "org@mail.ru",
+              "telegram":  "@denis_smirnov",
+              "vk":  "vk.com/denis_smirnov",
+              "about":  "Курирует образовательные и проектные треки.",
+              "job":  "Руководитель программы",
+              "workplace":  "РИЦ"
+          },
+    "2":  {
+              "email":  "anna.orlova@mail.ru",
+              "telegram":  "@anna_orlova",
+              "vk":  "vk.com/anna_orlova",
+              "about":  "Отвечает за индустриальные и инженерные мероприятия.",
+              "job":  "Организатор трека",
+              "workplace":  "РИЦ"
+          },
+    "3":  {
+              "email":  "maxim.kuznetsov@mail.ru",
+              "telegram":  "@maxim_kuznetsov",
+              "vk":  "vk.com/maxim_kuznetsov",
+              "about":  "Координирует проекты по цифровой городской среде.",
+              "job":  "Организатор трека",
+              "workplace":  "РИЦ"
+          },
+    "11":  {
+               "email":  "curator.front@mail.ru",
+               "telegram":  "@maria_belova",
+               "vk":  "vk.com/maria_belova",
+               "about":  "Сопровождает команды по веб-продуктам и UX.",
+               "specialty":  "Frontend",
+               "job":  "Куратор продуктов",
+               "workplace":  "РИЦ"
+           },
+    "12":  {
+               "email":  "curator.data@mail.ru",
+               "telegram":  "@kirill_egorov",
+               "vk":  "vk.com/kirill_egorov",
+               "about":  "Помогает командам с данными, API и аналитикой.",
+               "specialty":  "Backend / Data Science",
+               "job":  "Куратор данных",
+               "workplace":  "РИЦ"
+           },
+    "13":  {
+               "email":  "curator.mobile@mail.ru",
+               "telegram":  "@alina_sokolova",
+               "vk":  "vk.com/alina_sokolova",
+               "about":  "Курирует мобильные и полевые сервисы.",
+               "specialty":  "Mobile / QA",
+               "job":  "Куратор мобильной разработки",
+               "workplace":  "РИЦ"
+           },
+    "14":  {
+               "email":  "curator.city@mail.ru",
+               "telegram":  "@artem_lebedev",
+               "vk":  "vk.com/artem_lebedev",
+               "about":  "Сопровождает городские и геоаналитические проекты.",
+               "specialty":  "GIS / Smart City",
+               "job":  "Куратор smart city",
+               "workplace":  "РИЦ"
+           },
+    "101":  {
+                "email":  "student@mail.ru",
+                "telegram":  "@ivan_ivanov",
+                "vk":  "vk.com/ivan_ivanov",
+                "about":  "Разрабатывает клиентские интерфейсы и UI-компоненты.",
+                "university":  "УрФУ",
+                "course":  "2",
+                "specialty":  "Frontend"
+            },
+    "102":  {
+                "email":  "egor.petrov@student.local",
+                "telegram":  "@egor_petrov",
+                "vk":  "vk.com/egor_petrov",
+                "about":  "Интересуется проектированием API и серверной логикой.",
+                "university":  "УрФУ",
+                "course":  "3",
+                "specialty":  "Backend"
+            },
+    "103":  {
+                "email":  "olga.smirnova@student.local",
+                "telegram":  "@olga_smirnova",
+                "vk":  "vk.com/olga_smirnova",
+                "about":  "Проектирует интерфейсы и пользовательские сценарии.",
+                "university":  "РТУ МИРЭА",
+                "course":  "2",
+                "specialty":  "UX/UI"
+            },
+    "104":  {
+                "email":  "nikita.kozlov@student.local",
+                "telegram":  "@nikita_kozlov",
+                "vk":  "vk.com/nikita_kozlov",
+                "about":  "Работает с аналитикой, моделями и обработкой данных.",
+                "university":  "ИТМО",
+                "course":  "4",
+                "specialty":  "Data Science"
+            },
+    "105":  {
+                "email":  "elena.popova@student.local",
+                "telegram":  "@elena_popova",
+                "vk":  "vk.com/elena_popova",
+                "about":  "Отвечает за тестирование, сценарии и проверку качества.",
+                "university":  "СПбГУ",
+                "course":  "3",
+                "specialty":  "QA"
+            },
+    "106":  {
+                "email":  "roman.fedorov@student.local",
+                "telegram":  "@roman_fedorov",
+                "vk":  "vk.com/roman_fedorov",
+                "about":  "Разрабатывает мобильные интерфейсы и приложения.",
+                "university":  "УрФУ",
+                "course":  "1",
+                "specialty":  "Mobile"
+            },
+    "107":  {
+                "email":  "polina.lebedeva@student.local",
+                "telegram":  "@polina_lebedeva",
+                "vk":  "vk.com/polina_lebedeva",
+                "about":  "Занимается продуктовой логикой, гипотезами и roadmap.",
+                "university":  "ВШЭ",
+                "course":  "4",
+                "specialty":  "Product Management"
+            },
+    "108":  {
+                "email":  "dmitriy.volkov@student.local",
+                "telegram":  "@dmitriy_volkov",
+                "vk":  "vk.com/dmitriy_volkov",
+                "about":  "Работает с геоданными, картами и spatial-аналитикой.",
+                "university":  "СибГУТИ",
+                "course":  "3",
+                "specialty":  "GIS"
+            },
+    "109":  {
+                "email":  "sofia.morozova@student.local",
+                "telegram":  "@sofia_morozova",
+                "vk":  "vk.com/sofia_morozova",
+                "about":  "Настраивает окружение, CI/CD и инфраструктуру проекта.",
+                "university":  "КФУ",
+                "course":  "2",
+                "specialty":  "DevOps"
+            },
+    "110":  {
+                "email":  "ilya.novikov@student.local",
+                "telegram":  "@ilya_novikov",
+                "vk":  "vk.com/ilya_novikov",
+                "about":  "Интересуется встраиваемыми системами и технической аналитикой.",
+                "university":  "МАИ",
+                "course":  "4",
+                "specialty":  "Embedded / Analytics"
+            }
+}

@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState } from "react";
 import client from "../../api/client";
 import type { Request } from "../../types/request";
+import { REQUEST_STATUS } from "../../constants/requestProgress";
 import { AuthContext } from "../../context/AuthContext";
 import Modal from "../Modal/Modal";
 import { useToast } from "../Toast/ToastProvider";
@@ -110,7 +111,7 @@ export default function ApplyModal({
       directionId,
       specialization,
       about: about.trim(),
-      status: "Прислал заявку",
+      status: REQUEST_STATUS.SUBMITTED,
       createdAt: new Date().toISOString(),
       ownerId: user?.id,
     };

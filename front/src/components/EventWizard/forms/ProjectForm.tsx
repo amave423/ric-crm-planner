@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getDirectionsByEvent } from "../../../api/directions";
 import { getProjectsByDirection, saveProjectsForDirection } from "../../../api/projects";
 import { getAllUsers } from "../../../storage/storage";
@@ -10,29 +10,41 @@ import type { DirectionModel, ProjectModel } from "../types";
 
 type LocalProject = ProjectModel & { directionId?: string };
 
+function normalizeUser(u: User | Record<string, unknown>): User {
+  const obj = u as User & Record<string, unknown>;
+  return {
+    ...obj,
+    id: Number(obj.id),
+    email: String(obj.email ?? ""),
+    role: String(obj.role ?? ""),
+    name: obj.name ?? String(obj.firstName ?? obj.first_name ?? ""),
+    surname: obj.surname ?? String(obj.lastName ?? obj.last_name ?? ""),
+  };
+}
+
 export default function ProjectForm() {
-  const { eventId, savedDirections, directionId: ctxDirectionId } = useWizard();
+  const { mode, eventId, savedDirections, directionId: ctxDirectionId, projectId: ctxProjectId } = useWizard();
 
   const [directions, setDirections] = useState<DirectionModel[]>([]);
   const [directionId, setDirectionId] = useState<string>(ctxDirectionId ? String(ctxDirectionId) : "");
   const [projects, setProjects] = useState<LocalProject[]>([]);
+  const [editingProjectId, setEditingProjectId] = useState<number | null>(mode === "edit" && ctxProjectId ? Number(ctxProjectId) : null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [curatorId, setCuratorId] = useState("");
   const [teams, setTeams] = useState<number | "">("");
   const [usersList, setUsersList] = useState<User[]>([]);
-  const { showToast } = useToast();
-
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadingDirs, setLoadingDirs] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const { showToast } = useToast();
 
   const userNameById = useMemo(
-    () => new Map<number, string>(usersList.map((u) => [Number(u.id), `${u.surname ?? ""} ${u.name ?? ""}`.trim()])),
+    () => new Map<number, string>(usersList.map((user) => [Number(user.id), `${user.surname ?? ""} ${user.name ?? ""}`.trim()])),
     [usersList]
   );
   const userIdByName = useMemo(
-    () => new Map<string, number>(usersList.map((u) => [`${u.surname ?? ""} ${u.name ?? ""}`.trim(), Number(u.id)])),
+    () => new Map<string, number>(usersList.map((user) => [`${user.surname ?? ""} ${user.name ?? ""}`.trim(), Number(user.id)])),
     [usersList]
   );
 
@@ -40,8 +52,8 @@ export default function ProjectForm() {
     (value: unknown): number | undefined => {
       if (typeof value === "number" && !Number.isNaN(value)) return value;
       if (typeof value === "string") {
-        const n = Number(value);
-        if (!Number.isNaN(n)) return n;
+        const numericValue = Number(value);
+        if (!Number.isNaN(numericValue)) return numericValue;
         const byName = userIdByName.get(value.trim());
         if (typeof byName !== "undefined") return byName;
       }
@@ -50,36 +62,37 @@ export default function ProjectForm() {
     [userIdByName]
   );
 
-  const curatorLabel = (p: LocalProject) => {
-    const id = resolveCuratorId(p.curatorId ?? p.curator);
-    if (typeof id !== "undefined") return userNameById.get(id) ?? String(id);
-    return p.curator ?? "";
+  const curatorLabel = (project: LocalProject) => {
+    const resolvedCuratorId = resolveCuratorId(project.curatorId ?? project.curator);
+    if (typeof resolvedCuratorId !== "undefined") return userNameById.get(resolvedCuratorId) ?? String(resolvedCuratorId);
+    return project.curator ?? "";
   };
 
-  const normalizeUser = (u: User | Record<string, unknown>): User => {
-    const obj = u as User & Record<string, unknown>;
-    return {
-      ...obj,
-      id: Number(obj.id),
-      email: String(obj.email ?? ""),
-      role: String(obj.role ?? ""),
-      name: obj.name ?? String(obj.firstName ?? obj.first_name ?? ""),
-      surname: obj.surname ?? String(obj.lastName ?? obj.last_name ?? ""),
-    };
-  };
+  const fillForm = useCallback(
+    (project?: LocalProject) => {
+      if (!project) return;
+      setEditingProjectId(Number(project.id));
+      setDirectionId(String(project.directionId ?? ctxDirectionId ?? ""));
+      setTitle(project.title ?? "");
+      setDescription(project.description ?? "");
+      const nextCuratorId = resolveCuratorId(project.curatorId ?? project.curator);
+      setCuratorId(typeof nextCuratorId === "undefined" ? "" : String(nextCuratorId));
+      setTeams(typeof project.teams === "number" ? project.teams : project.teams ? Number(project.teams) : "");
+      setErrors({});
+    },
+    [ctxDirectionId, resolveCuratorId]
+  );
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const users = await getAllUsers();
-        const mapped = (users || []).map((u) => normalizeUser(u));
-        if (mounted) setUsersList(mapped);
+        if (mounted) setUsersList((users || []).map((user) => normalizeUser(user)));
       } catch {
         if (mounted) setUsersList([]);
       }
     })();
-
     return () => {
       mounted = false;
     };
@@ -91,18 +104,21 @@ export default function ProjectForm() {
       if (savedDirections && savedDirections.length > 0) {
         if (!mounted) return;
         setDirections(savedDirections);
-        if (!directionId && savedDirections.length > 0) setDirectionId(String(savedDirections[0].id));
+        if (!directionId && savedDirections.length > 0) setDirectionId(String(ctxDirectionId ?? savedDirections[0].id));
         return;
       }
 
       if (!eventId) return;
       setLoadingDirs(true);
       try {
-        const dirs = await getDirectionsByEvent(eventId ?? 0);
+        const loadedDirections = await getDirectionsByEvent(eventId ?? 0);
         if (!mounted) return;
-        setDirections(dirs || []);
-        if (!directionId && dirs && dirs.length > 0) setDirectionId(String(dirs[0].id));
+        setDirections(loadedDirections || []);
+        if (!directionId && loadedDirections && loadedDirections.length > 0) {
+          setDirectionId(String(ctxDirectionId ?? loadedDirections[0].id));
+        }
       } catch {
+        if (mounted) setDirections([]);
       } finally {
         if (mounted) setLoadingDirs(false);
       }
@@ -111,7 +127,7 @@ export default function ProjectForm() {
     return () => {
       mounted = false;
     };
-  }, [directionId, eventId, savedDirections]);
+  }, [ctxDirectionId, directionId, eventId, savedDirections]);
 
   useEffect(() => {
     let mounted = true;
@@ -121,16 +137,18 @@ export default function ProjectForm() {
         return;
       }
 
-      const dirFromSaved = (savedDirections || []).find((d: DirectionModel) => String(d.id) === String(directionId));
-      if (dirFromSaved && dirFromSaved.projects && dirFromSaved.projects.length > 0) {
+      const directionFromSaved = (savedDirections || []).find((direction) => String(direction.id) === String(directionId));
+      if (directionFromSaved?.projects?.length) {
         if (!mounted) return;
-        setProjects(
-          dirFromSaved.projects.map((p: ProjectModel) => ({
-            ...p,
-            directionId: String(directionId),
-            curatorId: resolveCuratorId(p.curatorId ?? p.curator),
-          }))
-        );
+        const mappedProjects = directionFromSaved.projects.map((project) => ({
+          ...project,
+          directionId: String(directionId),
+          curatorId: resolveCuratorId(project.curatorId ?? project.curator),
+        }));
+        setProjects(mappedProjects);
+        if (mode === "edit" && ctxProjectId) {
+          fillForm(mappedProjects.find((project) => Number(project.id) === Number(ctxProjectId)));
+        }
         return;
       }
 
@@ -138,18 +156,21 @@ export default function ProjectForm() {
       try {
         const apiProjects = await getProjectsByDirection(Number(directionId));
         if (!mounted) return;
-        setProjects(
-          (apiProjects || []).map((p: Project) => ({
-            id: p.id,
-            title: p.title ?? "",
-            description: p.description ?? "",
-            directionId: String(directionId),
-            curatorId: resolveCuratorId(p.curatorId ?? p.curator),
-            curator: p.curator ?? "",
-            teams: p.teams ?? 0,
-          }))
-        );
+        const mappedProjects = (apiProjects || []).map((project) => ({
+          id: Number(project.id),
+          title: project.title ?? "",
+          description: project.description ?? "",
+          directionId: String(directionId),
+          curatorId: resolveCuratorId(project.curatorId ?? project.curator),
+          curator: project.curator ?? "",
+          teams: project.teams ?? 0,
+        }));
+        setProjects(mappedProjects);
+        if (mode === "edit" && ctxProjectId) {
+          fillForm(mappedProjects.find((project) => Number(project.id) === Number(ctxProjectId)));
+        }
       } catch {
+        if (mounted) setProjects([]);
       } finally {
         if (mounted) setLoadingProjects(false);
       }
@@ -158,48 +179,45 @@ export default function ProjectForm() {
     return () => {
       mounted = false;
     };
-  }, [directionId, resolveCuratorId, savedDirections, usersList]);
+  }, [ctxProjectId, directionId, fillForm, mode, resolveCuratorId, savedDirections]);
 
   useEffect(() => {
     if (ctxDirectionId) setDirectionId(String(ctxDirectionId));
   }, [ctxDirectionId]);
 
-  useEffect(() => {
-    if (!directionId && directions.length > 0) setDirectionId(String(directions[0].id));
-  }, [directionId, directions]);
+  const validateDraft = () => {
+    const nextErrors: Record<string, string> = {};
+    if (!directionId) nextErrors.directionId = "Выберите направление";
+    if (!title.trim()) nextErrors.title = "Введите название проекта";
+    if (!curatorId) nextErrors.curator = "Выберите куратора";
+    if (teams === "" || Number(teams) < 0) nextErrors.teams = "Укажите количество команд";
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
 
-  const addProject = () => {
-    if (!directionId) {
-      setErrors((p) => ({ ...p, directionId: "Выберите направление" }));
-      return;
-    }
-    if (!title.trim()) {
-      setErrors((p) => ({ ...p, title: "Введите название проекта" }));
-      return;
-    }
-    if (!curatorId) {
-      setErrors((p) => ({ ...p, curator: "Выберите куратора" }));
-      return;
-    }
-    if (teams === "" || Number(teams) < 0) {
-      setErrors((p) => ({ ...p, teams: "Укажите количество команд (0 или больше)" }));
-      return;
-    }
+  const saveDraftToList = () => {
+    if (!validateDraft()) return;
 
     const curatorIdNum = Number(curatorId);
-    setProjects([
-      ...projects,
-      {
-        id: Date.now(),
-        title: title.trim(),
-        description: description.trim(),
-        directionId,
-        curatorId: Number.isNaN(curatorIdNum) ? undefined : curatorIdNum,
-        curator: userNameById.get(curatorIdNum) ?? "",
-        teams: typeof teams === "number" ? teams : Number(teams),
-      },
-    ]);
+    const nextProject: LocalProject = {
+      id: editingProjectId ?? Date.now(),
+      title: title.trim(),
+      description: description.trim(),
+      directionId,
+      curatorId: Number.isNaN(curatorIdNum) ? undefined : curatorIdNum,
+      curator: userNameById.get(curatorIdNum) ?? "",
+      teams: typeof teams === "number" ? teams : Number(teams),
+    };
 
+    if (editingProjectId != null) {
+      setProjects((prev) =>
+        prev.map((project) => (Number(project.id) === Number(editingProjectId) ? { ...project, ...nextProject } : project))
+      );
+      showToast("success", "Изменения проекта добавлены в черновик");
+      return;
+    }
+
+    setProjects((prev) => [...prev, nextProject]);
     setTitle("");
     setDescription("");
     setCuratorId("");
@@ -208,7 +226,14 @@ export default function ProjectForm() {
   };
 
   const removeProject = (id: number) => {
-    setProjects(projects.filter((p) => p.id !== id));
+    setProjects((prev) => prev.filter((project) => Number(project.id) !== Number(id)));
+    if (Number(editingProjectId) === Number(id)) {
+      setEditingProjectId(null);
+      setTitle("");
+      setDescription("");
+      setCuratorId("");
+      setTeams("");
+    }
   };
 
   const handleSave = async () => {
@@ -217,39 +242,58 @@ export default function ProjectForm() {
       return;
     }
 
-    for (const p of projects) {
-      if (!p.title || !p.title.trim()) {
+    const preparedProjects =
+      editingProjectId != null
+        ? projects.map((project) =>
+            Number(project.id) === Number(editingProjectId)
+              ? {
+                  ...project,
+                  title: title.trim(),
+                  description: description.trim(),
+                  directionId,
+                  curatorId: resolveCuratorId(curatorId),
+                  curator: userNameById.get(Number(curatorId)) ?? project.curator ?? "",
+                  teams: typeof teams === "number" ? teams : Number(teams),
+                }
+              : project
+          )
+        : projects;
+
+    for (const project of preparedProjects) {
+      if (!project.title?.trim()) {
         showToast("error", "У одного из проектов нет названия");
         return;
       }
-      if (!resolveCuratorId(p.curatorId ?? p.curator)) {
+      if (!resolveCuratorId(project.curatorId ?? project.curator)) {
         showToast("error", "У одного из проектов не выбран куратор");
         return;
       }
     }
 
     try {
-      const toSave: Project[] = projects.map((p) => ({
-        id: Number(p.id),
-        title: p.title ?? "",
-        description: p.description ?? "",
-        curatorId: resolveCuratorId(p.curatorId ?? p.curator),
-        curator: p.curator ?? "",
-        teams: p.teams,
+      const toSave: Project[] = preparedProjects.map((project) => ({
+        id: Number(project.id),
+        title: project.title ?? "",
+        description: project.description ?? "",
+        curatorId: resolveCuratorId(project.curatorId ?? project.curator),
+        curator: project.curator ?? "",
+        teams: project.teams,
         directionId: Number(directionId),
       }));
       const saved = await saveProjectsForDirection(Number(directionId), toSave);
-      setProjects(
-        (saved || []).map((p: Project) => ({
-          id: p.id,
-          title: p.title ?? "",
-          description: p.description ?? "",
-          directionId: String(directionId),
-          curatorId: resolveCuratorId(p.curatorId ?? p.curator),
-          curator: p.curator ?? "",
-          teams: p.teams ?? 0,
-        }))
-      );
+      const mappedProjects = (saved || []).map((project) => ({
+        id: Number(project.id),
+        title: project.title ?? "",
+        description: project.description ?? "",
+        directionId: String(directionId),
+        curatorId: resolveCuratorId(project.curatorId ?? project.curator),
+        curator: project.curator ?? "",
+        teams: project.teams ?? 0,
+      }));
+      setProjects(mappedProjects);
+      if (mode === "edit" && ctxProjectId) {
+        fillForm(mappedProjects.find((project) => Number(project.id) === Number(ctxProjectId)));
+      }
       showToast("success", "Проекты сохранены");
     } catch {
       showToast("error", "Ошибка при сохранении проектов");
@@ -258,19 +302,20 @@ export default function ProjectForm() {
 
   return (
     <div className="wizard-form">
-      <h2 className="h2">Добавление проектов</h2>
+      <h2 className="h2">{mode === "edit" ? "Редактирование проекта" : "Добавление проектов"}</h2>
 
       <div className={`field-wrap ${errors.directionId ? "error" : ""}`}>
         <label className="text-small">
           Выберите направление
           <select
             value={directionId ?? ""}
-            onChange={(e) => {
-              setDirectionId(String(e.target.value));
-              setErrors((p) => {
-                const np = { ...p };
-                delete np.directionId;
-                return np;
+            disabled={mode === "edit" && !!ctxDirectionId}
+            onChange={(event) => {
+              setDirectionId(String(event.target.value));
+              setErrors((prev) => {
+                const next = { ...prev };
+                delete next.directionId;
+                return next;
               });
             }}
           >
@@ -280,9 +325,9 @@ export default function ProjectForm() {
             {loadingDirs ? (
               <option>Загрузка...</option>
             ) : (
-              directions.map((d: DirectionModel) => (
-                <option key={d.id} value={d.id}>
-                  {d.title}
+              directions.map((direction) => (
+                <option key={direction.id} value={direction.id}>
+                  {direction.title}
                 </option>
               ))
             )}
@@ -297,15 +342,20 @@ export default function ProjectForm() {
           <input
             placeholder="Введите название проекта"
             value={title}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              setErrors((p) => {
-                const np = { ...p };
-                delete np.title;
-                return np;
+            onChange={(event) => {
+              setTitle(event.target.value);
+              setErrors((prev) => {
+                const next = { ...prev };
+                delete next.title;
+                return next;
               });
             }}
-            onKeyDown={(e) => e.key === "Enter" && addProject()}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                saveDraftToList();
+              }
+            }}
           />
         </label>
         {errors.title && <div className="field-error">{errors.title}</div>}
@@ -316,19 +366,19 @@ export default function ProjectForm() {
           Куратор
           <select
             value={curatorId}
-            onChange={(e) => {
-              setCuratorId(e.target.value);
-              setErrors((p) => {
-                const np = { ...p };
-                delete np.curator;
-                return np;
+            onChange={(event) => {
+              setCuratorId(event.target.value);
+              setErrors((prev) => {
+                const next = { ...prev };
+                delete next.curator;
+                return next;
               });
             }}
           >
-            <option value="">-- выбрать куратора --</option>
-            {usersList.map((u) => (
-              <option key={u.id} value={String(u.id)}>
-                {u.surname} {u.name} ({u.role})
+            <option value="">Выберите куратора</option>
+            {usersList.map((user) => (
+              <option key={user.id} value={String(user.id)}>
+                {user.surname} {user.name} ({user.role})
               </option>
             ))}
           </select>
@@ -343,12 +393,12 @@ export default function ProjectForm() {
             type="number"
             min={0}
             value={teams}
-            onChange={(e) => {
-              setTeams(e.target.value === "" ? "" : Number(e.target.value));
-              setErrors((p) => {
-                const np = { ...p };
-                delete np.teams;
-                return np;
+            onChange={(event) => {
+              setTeams(event.target.value === "" ? "" : Number(event.target.value));
+              setErrors((prev) => {
+                const next = { ...prev };
+                delete next.teams;
+                return next;
               });
             }}
           />
@@ -360,8 +410,8 @@ export default function ProjectForm() {
         Описание
         <textarea
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Краткое описание проекта (необязательно)"
+          onChange={(event) => setDescription(event.target.value)}
+          placeholder="Краткое описание проекта"
         />
       </label>
 
@@ -369,35 +419,31 @@ export default function ProjectForm() {
         {loadingProjects ? (
           <div>Загрузка...</div>
         ) : (
-          projects.map((p) => (
-            <div key={p.id} className="tag">
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-                <strong style={{ lineHeight: 1 }}>{p.title}</strong>
-                {p.description && (
-                  <span className="text-small" style={{ opacity: 0.8 }}>
-                    {p.description}
-                  </span>
-                )}
-                {curatorLabel(p) && (
-                  <span className="text-small" style={{ opacity: 0.8 }}>
-                    Куратор: {curatorLabel(p)}
-                  </span>
-                )}
-                {typeof p.teams !== "undefined" && (
-                  <span className="text-small" style={{ opacity: 0.8 }}>
-                    Команд: {p.teams}
-                  </span>
-                )}
-              </div>
-              <button onClick={() => removeProject(p.id)}>×</button>
+          projects.map((project) => (
+            <div
+              key={project.id}
+              className="tag"
+              style={Number(editingProjectId) === Number(project.id) ? { outline: "2px solid var(--wizard-accent)" } : undefined}
+            >
+              <button
+                type="button"
+                style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", display: "flex", flexDirection: "column", gap: 2 }}
+                onClick={() => fillForm(project)}
+              >
+                <strong style={{ lineHeight: 1 }}>{project.title}</strong>
+                {project.description && <span className="text-small" style={{ opacity: 0.8 }}>{project.description}</span>}
+                {curatorLabel(project) && <span className="text-small" style={{ opacity: 0.8 }}>Куратор: {curatorLabel(project)}</span>}
+                {typeof project.teams !== "undefined" && <span className="text-small" style={{ opacity: 0.8 }}>Команд: {project.teams}</span>}
+              </button>
+              <button type="button" onClick={() => removeProject(Number(project.id))}>x</button>
             </div>
           ))
         )}
       </div>
 
       <div className="wizard-actions">
-        <button className="primary" type="button" onClick={addProject} style={{ marginRight: 8 }}>
-          Добавить проект
+        <button className="primary" type="button" onClick={saveDraftToList} style={{ marginRight: 8 }}>
+          {editingProjectId != null ? "Обновить проект" : "Добавить проект"}
         </button>
 
         <button className="primary" type="button" onClick={handleSave}>

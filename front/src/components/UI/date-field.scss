@@ -1,0 +1,48 @@
+.ui-date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ui-date-input {
+  position: relative;
+}
+
+.ui-date-input input {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.ui-calendar-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ui-calendar-btn img {
+  width: 20px;
+  height: 20px;
+  opacity: 0.62;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.ui-calendar-btn:hover img {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+.ui-calendar-btn:disabled {
+  cursor: default;
+}
+
+.ui-calendar-btn:disabled img {
+  opacity: 0.35;
+}

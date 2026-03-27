@@ -111,6 +111,13 @@ function isStudent(user: User) {
 export function buildParticipantsFromRequests(users: User[], requests: Request[]): PlannerParticipant[] {
   const students = users.filter(isStudent);
   const userNameById = new Map<number, string>(students.map((u) => [Number(u.id), `${u.surname || ""} ${u.name || ""}`.trim() || u.email]));
+  const requestNameById = new Map<number, string>();
+  requests.forEach((request) => {
+    const ownerId = toNumber(request.ownerId);
+    const studentName = String(request.studentName || "").trim();
+    if (typeof ownerId === "undefined" || !studentName) return;
+    requestNameById.set(ownerId, studentName);
+  });
   const validStudentIds = new Set<number>(students.map((u) => Number(u.id)));
 
   const ids = new Set<number>();
@@ -123,7 +130,7 @@ export function buildParticipantsFromRequests(users: User[], requests: Request[]
 
   return Array.from(ids).map((id) => ({
     id,
-    fullName: userNameById.get(id) || `Участник #${id}`,
+    fullName: userNameById.get(id) || requestNameById.get(id) || `Участник #${id}`,
   }));
 }
 

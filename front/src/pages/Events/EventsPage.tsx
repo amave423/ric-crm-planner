@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getEvents } from "../../api/events";
 import { useState, useEffect } from "react";
@@ -19,19 +20,18 @@ export default function EventsPage() {
   const [search, setSearch] = useState("");
   const [allEvents, setAllEvents] = useState<Event[]>([]);
 
-  useEffect(() => {
-    let mounted = true;
-    getEvents()
-      .then((evs) => {
-        if (mounted) setAllEvents(evs || []);
-      })
-      .catch(() => {
-        if (mounted) setAllEvents([]);
-      });
-    return () => {
-      mounted = false;
-    };
+  const loadEvents = useCallback(async () => {
+    try {
+      const events = await getEvents();
+      setAllEvents(events || []);
+    } catch {
+      setAllEvents([]);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadEvents();
+  }, [loadEvents]);
 
   const events = !search.trim()
     ? allEvents
@@ -80,7 +80,16 @@ export default function EventsPage() {
         }}
       />
 
-      {wizardOpen && wizardContext && <EventWizardModal mode={mode} context={wizardContext} onClose={() => setWizardOpen(false)} />}
+      {wizardOpen && wizardContext && (
+        <EventWizardModal
+          mode={mode}
+          context={wizardContext}
+          onClose={() => {
+            setWizardOpen(false);
+            void loadEvents();
+          }}
+        />
+      )}
 
       <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} title={infoItem?.title} description={infoItem?.description} />
     </div>

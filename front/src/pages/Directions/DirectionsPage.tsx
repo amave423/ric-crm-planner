@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { getDirectionsByEvent } from "../../api/directions";
 import { getEventById } from "../../api/events";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Direction } from "../../types/direction";
 import type { Event } from "../../types/event";
 
@@ -22,17 +22,20 @@ export default function DirectionsPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [directions, setDirections] = useState<Direction[]>([]);
 
-  useEffect(() => {
-    let mounted = true;
-    Promise.all([getEventById(eventIdNum), getDirectionsByEvent(eventIdNum)]).then(([ev, dirs]) => {
-      if (!mounted) return;
+  const loadDirections = useCallback(async () => {
+    try {
+      const [ev, dirs] = await Promise.all([getEventById(eventIdNum), getDirectionsByEvent(eventIdNum)]);
       setEvent(ev || null);
       setDirections(dirs || []);
-    });
-    return () => {
-      mounted = false;
-    };
+    } catch {
+      setEvent(null);
+      setDirections([]);
+    }
   }, [eventIdNum]);
+
+  useEffect(() => {
+    void loadDirections();
+  }, [loadDirections]);
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardContext, setWizardContext] = useState<WizardLaunchContext | null>(null);
@@ -89,7 +92,16 @@ export default function DirectionsPage() {
         }}
       />
 
-      {wizardOpen && wizardContext && <EventWizardModal mode={mode} context={wizardContext} onClose={() => setWizardOpen(false)} />}
+      {wizardOpen && wizardContext && (
+        <EventWizardModal
+          mode={mode}
+          context={wizardContext}
+          onClose={() => {
+            setWizardOpen(false);
+            void loadDirections();
+          }}
+        />
+      )}
 
       <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} title={infoItem?.title} description={infoItem?.description} />
     </div>

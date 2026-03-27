@@ -1,9 +1,10 @@
-﻿import { useContext, useEffect, useState, useCallback } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import client from "../../api/client";
 import { getDirectionById } from "../../api/directions";
 import { getEventById } from "../../api/events";
 import { getProjectsByDirection } from "../../api/projects";
-import { getRequests as apiGetRequests, saveRequest } from "../../api/requests";
+import { getRequests as apiGetRequests, saveRequest, updateRequestStatus } from "../../api/requests";
 import EventWizardModal, { type WizardLaunchContext } from "../../components/EventWizard/EventWizardModal";
 import TableHeader from "../../components/Layout/TableHeader";
 import InfoModal from "../../components/Modal/InfoModal";
@@ -12,6 +13,7 @@ import ApplyModal from "../../components/Requests/ApplyModal";
 import Table from "../../components/Table/Table";
 import { useToast } from "../../components/Toast/ToastProvider";
 import BackButton from "../../components/UI/BackButton";
+import { buildMockRequestTransitionUrl, REQUEST_STATUS } from "../../constants/requestProgress";
 import { AuthContext } from "../../context/AuthContext";
 import { useNotifications } from "../../context/NotificationsContext";
 import type { Direction } from "../../types/direction";
@@ -46,8 +48,10 @@ export default function ProjectsPage() {
   const navigate = useNavigate();
   const eventIdNum = Number(eventId);
   const directionIdNum = Number(directionId);
-
   const { user } = useContext(AuthContext);
+  const { showToast } = useToast();
+  const { addNotification } = useNotifications();
+
   const isStudent = user?.role === "student";
 
   const [event, setEvent] = useState<Event | null>(null);
@@ -65,30 +69,27 @@ export default function ProjectsPage() {
 
   const [testingPromptOpen, setTestingPromptOpen] = useState(false);
   const [testingPromptStep, setTestingPromptStep] = useState<"ask" | "info">("ask");
-  const [testingLink, setTestingLink] = useState("");
+  const [pendingRequest, setPendingRequest] = useState<RequestType | null>(null);
 
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoItem, setInfoItem] = useState<{ title?: string; description?: string } | null>(null);
-
-  const { showToast } = useToast();
-  const { addNotification } = useNotifications();
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     const ownerId = user?.id;
     const role = user?.role;
 
-    const [ev, dir, projs, reqs] = await Promise.all([
+    const [loadedEvent, loadedDirection, loadedProjects, loadedRequests] = await Promise.all([
       getEventById(eventIdNum).catch(() => null),
       getDirectionById(directionIdNum).catch(() => null),
       getProjectsByDirection(directionIdNum).catch(() => []),
       apiGetRequests({ ownerId, role }).catch(() => []),
     ]);
 
-    setEvent(ev || null);
-    setDirection(dir || null);
-    setProjects(Array.isArray(projs) ? projs : []);
-    setRequests(Array.isArray(reqs) ? reqs : []);
+    setEvent(loadedEvent || null);
+    setDirection(loadedDirection || null);
+    setProjects(Array.isArray(loadedProjects) ? loadedProjects : []);
+    setRequests(Array.isArray(loadedRequests) ? loadedRequests : []);
     setLoading(false);
   }, [directionIdNum, eventIdNum, user?.id, user?.role]);
 
@@ -96,20 +97,84 @@ export default function ProjectsPage() {
     void loadAll();
   }, [loadAll]);
 
+  const refreshRequests = useCallback(async () => {
+    const rs = await apiGetRequests({ ownerId: user?.id, role: user?.role }).catch(() => []);
+    setRequests(Array.isArray(rs) ? rs : []);
+  }, [user?.id, user?.role]);
+
   const filteredProjects = !search.trim()
     ? projects
-    : projects.filter((p) => (p.title || "").toLowerCase().includes(search.toLowerCase()) || (p.curator || "").toLowerCase().includes(search.toLowerCase()));
+    : projects.filter(
+        (project) =>
+          (project.title || "").toLowerCase().includes(search.toLowerCase()) ||
+          (project.curator || "").toLowerCase().includes(search.toLowerCase())
+      );
 
   const closeTestingPrompt = () => {
     setTestingPromptOpen(false);
     setTestingPromptStep("ask");
+    setPendingRequest(null);
   };
 
-  const goToTesting = () => {
-    const url = testingLink.trim();
+  const openLink = (url: string) => {
+    const trimmed = url.trim();
     closeTestingPrompt();
-    if (!url) return;
-    window.location.assign(url);
+    if (!trimmed) return;
+    try {
+      const nextUrl = new URL(trimmed, window.location.origin);
+      if (nextUrl.origin === window.location.origin) {
+        navigate(`${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+        return;
+      }
+    } catch {
+    }
+    window.location.assign(trimmed);
+  };
+
+  const startTestingScenario = async () => {
+    if (!pendingRequest?.id) return;
+
+    try {
+      if (client.USE_MOCK) {
+        await updateRequestStatus(Number(pendingRequest.id), REQUEST_STATUS.TESTING);
+      }
+
+      const link = client.USE_MOCK
+        ? buildMockRequestTransitionUrl(Number(pendingRequest.id), REQUEST_STATUS.JOINED_CHAT, "testing")
+        : buildTestingUrl(pendingRequest);
+
+      addNotification({
+        userId: user?.id,
+        title: "Приглашение на тестирование",
+        message: client.USE_MOCK
+          ? "Откройте ссылку и подтвердите переход к следующему этапу."
+          : "Для продолжения откройте ссылку и пройдите тест.",
+        link,
+      });
+
+      await refreshRequests();
+      openLink(link);
+    } catch {
+      showToast("error", "Не удалось запустить сценарий тестирования");
+    }
+  };
+
+  const startDirectScenario = async () => {
+    if (!pendingRequest?.id) return;
+
+    const link = client.USE_MOCK
+      ? buildMockRequestTransitionUrl(Number(pendingRequest.id), REQUEST_STATUS.STARTED, "start")
+      : buildTestingUrl(pendingRequest);
+
+    addNotification({
+      userId: user?.id,
+      title: "Ссылка для перехода к ПШ",
+      message: "Откройте ссылку из центра уведомлений, чтобы продолжить работу с заявкой.",
+      link,
+    });
+
+    setTestingPromptStep("info");
+    await refreshRequests();
   };
 
   return (
@@ -161,7 +226,7 @@ export default function ProjectsPage() {
             className="apply-box"
             onClick={() => {
               const ownerId = user?.id;
-              const existing = requests.find((r) => Number(r.ownerId) === Number(ownerId) && Number(r.projectId) === Number(selectedProjectId));
+              const existing = requests.find((request) => Number(request.ownerId) === Number(ownerId) && Number(request.projectId) === Number(selectedProjectId));
               if (existing) {
                 showToast("error", "Вы уже отправляли заявку на этот проект");
                 return;
@@ -174,44 +239,42 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {wizardOpen && wizardContext && <EventWizardModal mode={mode} context={wizardContext} onClose={() => setWizardOpen(false)} />}
+      {wizardOpen && wizardContext && (
+        <EventWizardModal
+          mode={mode}
+          context={wizardContext}
+          onClose={() => {
+            setWizardOpen(false);
+            void loadAll();
+          }}
+        />
+      )}
 
       <ApplyModal
         isOpen={applyOpen}
         onClose={() => setApplyOpen(false)}
         projectId={selectedProjectId ?? undefined}
-        projectTitle={projects.find((p) => p.id === selectedProjectId)?.title}
+        projectTitle={projects.find((project) => project.id === selectedProjectId)?.title}
         eventId={eventIdNum}
         directionId={directionIdNum}
         specializations={event?.specializations || []}
-        onSubmit={async (req) => {
+        onSubmit={async (request) => {
           const ownerId = user?.id;
-          if (ownerId) req.ownerId = ownerId;
+          if (ownerId) request.ownerId = ownerId;
 
-          const existing = requests.find((r) => Number(r.ownerId) === Number(ownerId) && Number(r.projectId) === Number(req.projectId));
+          const existing = requests.find((item) => Number(item.ownerId) === Number(ownerId) && Number(item.projectId) === Number(request.projectId));
           if (existing) {
             showToast("error", "Вы уже отправляли заявку на этот проект");
             return false;
           }
 
           try {
-            const created = await saveRequest(req);
-            const testUrl = buildTestingUrl(created);
-
-            addNotification({
-              userId: ownerId,
-              title: "Приглашение на тестирование",
-              message: "Для продолжения откройте ссылку и пройдите тест.",
-              link: testUrl,
-            });
-
-            setTestingLink(testUrl);
+            const created = await saveRequest(request);
+            setPendingRequest(created);
             setTestingPromptStep("ask");
             setTestingPromptOpen(true);
-
             showToast("success", "Заявка отправлена");
-            const rs = await apiGetRequests({ ownerId, role: user?.role }).catch(() => []);
-            setRequests(Array.isArray(rs) ? rs : []);
+            await refreshRequests();
             return true;
           } catch {
             showToast("error", "Ошибка при отправке заявки");
@@ -222,22 +285,22 @@ export default function ProjectsPage() {
 
       <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} title={infoItem?.title} description={infoItem?.description} />
 
-      <Modal isOpen={testingPromptOpen} onClose={closeTestingPrompt} title="Тестирование">
+      <Modal isOpen={testingPromptOpen} onClose={closeTestingPrompt} title="Переход по заявке">
         {testingPromptStep === "ask" ? (
           <div className="confirm-body">
             <div className="confirm-text">Перейти к прохождению теста?</div>
             <div className="confirm-actions">
-              <button className="close-btn" onClick={() => setTestingPromptStep("info")}>
+              <button className="close-btn" onClick={startDirectScenario}>
                 Нет
               </button>
-              <button className="btn-send" onClick={goToTesting}>
+              <button className="btn-send" onClick={startTestingScenario}>
                 Да
               </button>
             </div>
           </div>
         ) : (
           <div className="confirm-body">
-            <div className="confirm-text">Ссылка для прохождения находится в центре уведомлений</div>
+            <div className="confirm-text">Ссылка для перехода находится в центре уведомлений</div>
             <div className="confirm-actions">
               <button className="close-btn" onClick={closeTestingPrompt}>
                 Понятно
@@ -251,4 +314,3 @@ export default function ProjectsPage() {
     </div>
   );
 }
-

@@ -1,25 +1,14 @@
-import { useContext, useEffect, useState, useCallback } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import client from "../../api/client";
 import { getRequests, removeRequest, updateRequestStatus } from "../../api/requests";
 import TableHeader from "../../components/Layout/TableHeader";
 import Modal from "../../components/Modal/Modal";
 import Table from "../../components/Table/Table";
+import { ORGANIZER_REQUEST_STATUSES, getRequestTransitionCopy } from "../../constants/requestProgress";
 import { AuthContext } from "../../context/AuthContext";
 import type { Request as RequestType } from "../../types/request";
 import "../../styles/page-colors.scss";
-
-const STATUSES = [
-  "Прислал заявку",
-  "Прохождение тестирования",
-  "Отправлена ссылка на орг. чат",
-  "Добавился в орг. чат",
-  "Приступил к ПШ",
-  "Не перешел к тестированию",
-  "Не прошел тестирование",
-  "Не добавился в орг. чат",
-  "Удален с ПШ",
-  "Отказался от ПШ",
-];
 
 type RequestRecord = RequestType & {
   eventName?: string;
@@ -37,21 +26,62 @@ type RequestTableRow = {
   raw: RequestRecord;
 };
 
+type PendingTransition = {
+  requestId: number;
+  targetStatus: string;
+  title: string;
+  message: string;
+};
+
+function eventTitleFromRecord(request: RequestRecord) {
+  return request.eventTitle || request.eventName || request.event || request.event_name || "—";
+}
+
 export default function RequestsPage() {
   const { user } = useContext(AuthContext);
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [requests, setRequests] = useState<RequestRecord[]>([]);
   const [search, setSearch] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [toRemoveId, setToRemoveId] = useState<number | null>(null);
+  const [transitionOpen, setTransitionOpen] = useState(false);
+  const [pendingTransition, setPendingTransition] = useState<PendingTransition | null>(null);
 
   const load = useCallback(async () => {
-    const rs = await getRequests({ ownerId: user?.id, role: user?.role }).catch(() => []);
-    setRequests(Array.isArray(rs) ? (rs as RequestRecord[]) : []);
+    const loadedRequests = await getRequests({ ownerId: user?.id, role: user?.role }).catch(() => []);
+    setRequests(Array.isArray(loadedRequests) ? (loadedRequests as RequestRecord[]) : []);
   }, [user?.id, user?.role]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (user?.role !== "student") return;
+
+    const params = new URLSearchParams(location.search);
+    if (params.get("requestAction") !== "progress") return;
+
+    const requestId = Number(params.get("requestId"));
+    const targetStatus = String(params.get("targetStatus") || "").trim();
+    const source = params.get("source") === "testing" ? "testing" : "start";
+
+    if (!requestId || !targetStatus) {
+      navigate("/requests", { replace: true });
+      return;
+    }
+
+    const copy = getRequestTransitionCopy(source, targetStatus);
+    setPendingTransition({
+      requestId,
+      targetStatus,
+      title: copy.title,
+      message: copy.message,
+    });
+    setTransitionOpen(true);
+  }, [location.search, navigate, user?.role]);
 
   const handleStatusChange = async (id: number, status: string) => {
     try {
@@ -68,38 +98,58 @@ export default function RequestsPage() {
   };
 
   const confirmWithdraw = async () => {
-    if (toRemoveId != null) {
-      try {
-        await removeRequest(toRemoveId);
-      } finally {
-        setConfirmOpen(false);
-        setToRemoveId(null);
-        await load();
-      }
+    if (toRemoveId == null) return;
+    try {
+      await removeRequest(toRemoveId);
+    } finally {
+      setConfirmOpen(false);
+      setToRemoveId(null);
+      await load();
     }
   };
 
-  const eventTitleFromRecord = (r: RequestRecord) => r.eventTitle || r.eventName || r.event || r.event_name || "—";
+  const closeTransitionModal = () => {
+    setTransitionOpen(false);
+    setPendingTransition(null);
+    navigate("/requests", { replace: true });
+  };
+
+  const confirmTransition = async () => {
+    if (!pendingTransition) {
+      closeTransitionModal();
+      return;
+    }
+
+    try {
+      await updateRequestStatus(pendingTransition.requestId, pendingTransition.targetStatus);
+      await load();
+    } finally {
+      closeTransitionModal();
+    }
+  };
 
   const filteredAll = !search.trim()
     ? requests
     : requests.filter(
-        (r) =>
-          (r.studentName || "").toLowerCase().includes(search.toLowerCase()) ||
-          (r.projectTitle || "").toLowerCase().includes(search.toLowerCase()) ||
-          String(eventTitleFromRecord(r)).toLowerCase().includes(search.toLowerCase())
+        (request) =>
+          (request.studentName || "").toLowerCase().includes(search.toLowerCase()) ||
+          (request.projectTitle || "").toLowerCase().includes(search.toLowerCase()) ||
+          String(eventTitleFromRecord(request)).toLowerCase().includes(search.toLowerCase())
       );
 
-  const filtered = user?.role === "student" ? filteredAll.filter((r) => Number(r.ownerId) === Number(user.id)) : filteredAll;
+  const filtered =
+    user?.role === "student"
+      ? filteredAll.filter((request) => Number(request.ownerId) === Number(user.id))
+      : filteredAll;
 
-  const mapped: RequestTableRow[] = filtered.map((r) => ({
-    id: r.id,
-    studentName: r.studentName || "—",
-    event: eventTitleFromRecord(r),
-    project: r.projectTitle || "—",
-    specialization: r.specialization || "—",
-    status: r.status || "—",
-    raw: r,
+  const mapped: RequestTableRow[] = filtered.map((request) => ({
+    id: request.id,
+    studentName: request.studentName || "—",
+    event: eventTitleFromRecord(request),
+    project: request.projectTitle || "—",
+    specialization: request.specialization || "—",
+    status: request.status || "—",
+    raw: request,
   }));
 
   return (
@@ -112,7 +162,7 @@ export default function RequestsPage() {
           { key: "event", title: "Мероприятие", width: "370px" },
           { key: "project", title: "Проект", width: "450px" },
           { key: "specialization", title: "Специализация", width: "380px" },
-          { key: "status", title: user?.role === "student" ? "Действие" : "Статус" },
+          { key: "status", title: user?.role === "student" ? "Статус" : "Статус" },
         ]}
         data={mapped}
         renderCell={(row: RequestTableRow, colKey: string) => {
@@ -120,11 +170,11 @@ export default function RequestsPage() {
 
           if (user?.role === "organizer") {
             return (
-              <select className="status-select" value={row.status || ""} onChange={(e) => handleStatusChange(row.id, e.target.value)}>
+              <select className="status-select" value={row.status || ""} onChange={(event) => handleStatusChange(row.id, event.target.value)}>
                 <option value="">—</option>
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
+                {ORGANIZER_REQUEST_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
                   </option>
                 ))}
               </select>
@@ -133,7 +183,8 @@ export default function RequestsPage() {
 
           if (user?.role === "student" && client.USE_MOCK) {
             return (
-              <div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+                <div>{row.status || "—"}</div>
                 <button className="danger-outline" onClick={() => handleWithdraw(row.id)}>
                   Отозвать заявку
                 </button>
@@ -154,6 +205,20 @@ export default function RequestsPage() {
             </button>
             <button className="danger-outline" onClick={confirmWithdraw}>
               Отозвать
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={transitionOpen} onClose={closeTransitionModal} title={pendingTransition?.title || "Подтверждение"}>
+        <div className="confirm-body">
+          <div className="confirm-text">{pendingTransition?.message || "Подтвердите действие."}</div>
+          <div className="confirm-actions">
+            <button className="close-btn" onClick={closeTransitionModal}>
+              Отмена
+            </button>
+            <button className="btn-send" onClick={confirmTransition}>
+              Подтвердить
             </button>
           </div>
         </div>

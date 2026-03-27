@@ -60,6 +60,15 @@ export default function Header() {
   const openNotificationLink = (id: string, link?: string) => {
     markAsRead(id);
     if (!link) return;
+    try {
+      const url = new URL(link, window.location.origin);
+      if (url.origin === window.location.origin) {
+        setNotificationsOpen(false);
+        navigate(`${url.pathname}${url.search}${url.hash}`);
+        return;
+      }
+    } catch {
+    }
     window.open(link, "_blank", "noopener,noreferrer");
   };
 

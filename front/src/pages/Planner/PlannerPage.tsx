@@ -11,6 +11,7 @@ import type { PlannerState, PlannerSubtask, PlannerTeam } from "../../types/plan
 import type { Request } from "../../types/request";
 import type { User } from "../../types/user";
 import Modal from "../../components/Modal/Modal";
+import DateField from "../../components/UI/DateField";
 import infoIcon from "../../assets/icons/info.svg";
 import "./planner.scss";
 
@@ -68,7 +69,7 @@ export default function PlannerPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isPlannerLoaded, setIsPlannerLoaded] = useState(false);
-  const [teamFilter, setTeamFilter] = useState("all");
+  const [teamFilter, setTeamFilter] = useState("");
   const [state, setState] = useState<PlannerState>({
     enrollmentClosed: false,
     participants: [],
@@ -87,7 +88,6 @@ export default function PlannerPage() {
   const [directionTitleById, setDirectionTitleById] = useState<Record<number, string>>({});
   const [projectTitleById, setProjectTitleById] = useState<Record<number, string>>({});
 
-  const [parentTeamId, setParentTeamId] = useState("");
   const [parentTitle, setParentTitle] = useState("");
   const [parentStart, setParentStart] = useState("");
   const [parentEnd, setParentEnd] = useState("");
@@ -294,6 +294,16 @@ export default function PlannerPage() {
   }, [requests]);
 
   const userNameById = useMemo(() => new Map(users.map((u) => [Number(u.id), fullName(u) || u.email])), [users]);
+  const requestStudentNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    requests.forEach((request) => {
+      const ownerId = Number(request.ownerId);
+      const name = String(request.studentName || "").trim();
+      if (!Number.isFinite(ownerId) || !name) return;
+      map.set(ownerId, name);
+    });
+    return map;
+  }, [requests]);
   const participantNameById = useMemo(
     () => new Map(state.participants.map((p) => [Number(p.id), String(p.fullName || "").trim()])),
     [state.participants]
@@ -314,15 +324,37 @@ export default function PlannerPage() {
   const canEditTeam = (teamId: number) => isOrganizer || (isCurator && curatorTeamIds.includes(teamId)) || (isStudent && memberTeamIdsAll.includes(teamId));
 
   const visibleTeams = state.teams.filter((t) => canViewTeam(t.id));
+  const activeTeamId = teamFilter ? Number(teamFilter) : null;
+  const activeTeam = activeTeamId != null ? visibleTeams.find((team) => Number(team.id) === Number(activeTeamId)) ?? null : null;
+  useEffect(() => {
+    if (visibleTeams.length === 0) {
+      if (teamFilter) setTeamFilter("");
+      return;
+    }
+    const hasSelectedTeam = visibleTeams.some((team) => String(team.id) === teamFilter);
+    if (!hasSelectedTeam) {
+      setTeamFilter(String(visibleTeams[0].id));
+    }
+  }, [teamFilter, visibleTeams]);
   const filteredParents = state.parentTasks.filter(
-    (p) => canViewTeam(p.teamId) && (teamFilter === "all" || Number(teamFilter) === Number(p.teamId))
+    (p) => canViewTeam(p.teamId) && activeTeamId != null && Number(activeTeamId) === Number(p.teamId)
   );
   const selectedParent = filteredParents.find((p) => Number(p.id) === Number(selectedParentId));
   const filteredSubtasks = state.subtasks.filter(
-    (s) => canViewTeam(s.teamId) && (teamFilter === "all" || Number(teamFilter) === Number(s.teamId))
+    (s) => canViewTeam(s.teamId) && activeTeamId != null && Number(activeTeamId) === Number(s.teamId)
   );
-  const displayNameForUserId = (id: number) =>
-    participantNameById.get(id) || userNameById.get(id) || `Участник #${id}`;
+  const displayNameForUserId = (id: number) => {
+    const userName = userNameById.get(id);
+    if (userName) return userName;
+
+    const requestName = requestStudentNameById.get(id);
+    if (requestName) return requestName;
+
+    const participantName = participantNameById.get(id);
+    if (participantName && !/^Участник #\d+$/.test(participantName)) return participantName;
+
+    return `Участник #${id}`;
+  };
   const displayAssigneeLabel = (id: number) => {
     const base = displayNameForUserId(id);
     const spec = specializationByOwnerId.get(id);
@@ -565,7 +597,11 @@ export default function PlannerPage() {
     setState((prev) => {
       const participantsById = new Map(prev.participants.map((p) => [Number(p.id), p]));
       memberIds.forEach((id) => {
-        const fullName = group.applicants.find((a) => a.ownerId === id)?.name || userNameById.get(id) || `Участник #${id}`;
+        const fullName =
+          group.applicants.find((a) => a.ownerId === id)?.name ||
+          userNameById.get(id) ||
+          requestStudentNameById.get(id) ||
+          `Участник #${id}`;
         participantsById.set(id, { id, fullName });
       });
       return {
@@ -581,7 +617,7 @@ export default function PlannerPage() {
   };
 
   const addParentTask = () => {
-    const teamId = Number(parentTeamId);
+    const teamId = Number(activeTeamId);
     if (!teamId || !canEditTeam(teamId)) return setError("Нет прав или команда не выбрана");
     if (!parentTitle.trim() || !parentStart || !parentEnd || parentStart > parentEnd) return setError("Проверьте поля большой задачи");
     setState((prev) => ({
@@ -862,9 +898,29 @@ export default function PlannerPage() {
     : 0;
   const teamEditTeam = teamEditId != null ? state.teams.find((t) => Number(t.id) === Number(teamEditId)) : null;
   const teamEditCandidateIds = (() => {
-    const ids = new Set<number>(state.participants.map((p) => Number(p.id)));
+    const ids = new Set<number>();
+    if (teamEditTeam?.projectId) {
+      requests.forEach((request) => {
+        const ownerId = Number(request.ownerId);
+        if (!Number.isFinite(ownerId)) return;
+        if (Number(request.projectId) === Number(teamEditTeam.projectId)) {
+          ids.add(ownerId);
+        }
+      });
+    } else if (teamEditTeam?.sourceRequestIds?.length) {
+      const sourceIds = new Set(teamEditTeam.sourceRequestIds.map((id) => Number(id)));
+      requests.forEach((request) => {
+        const ownerId = Number(request.ownerId);
+        if (!Number.isFinite(ownerId)) return;
+        if (sourceIds.has(Number(request.id))) {
+          ids.add(ownerId);
+        }
+      });
+    }
     (teamEditTeam?.memberIds || []).forEach((id) => ids.add(Number(id)));
-    return Array.from(ids).sort((a, b) => displayNameForUserId(a).localeCompare(displayNameForUserId(b)));
+    return Array.from(ids)
+      .filter((id) => Number.isFinite(id))
+      .sort((a, b) => displayNameForUserId(a).localeCompare(displayNameForUserId(b), "ru"));
   })();
 
   if (!user) return <div className="page planner-page"><div className="planner-empty">Войдите для доступа к планировщику.</div></div>;
@@ -877,8 +933,8 @@ export default function PlannerPage() {
         <h1 className="h1">Планировщик</h1>
         <label className="planner-label">
           Команда
-          <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
-            {(isOrganizer || isCurator) && <option value="all">Все команды</option>}
+          <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)} disabled={visibleTeams.length === 0}>
+            {visibleTeams.length === 0 && <option value="">Нет команд</option>}
             {visibleTeams.map((t) => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
           </select>
         </label>
@@ -896,8 +952,11 @@ export default function PlannerPage() {
         {isOrganizer && <div className="planner-row planner-row--right">
           {!state.enrollmentClosed
             ? <button className="primary" onClick={() => setConfirmCloseEnrollmentOpen(true)}>Завершить набор</button>
-            : <button className="primary" onClick={() => setState((p) => ({ ...p, participants: snapshotParticipants() }))}>Обновить пул</button>}
+            : <button className="primary" onClick={() => setState((p) => ({ ...p, participants: snapshotParticipants() }))}>Синхронизировать участников</button>}
         </div>}
+        {isOrganizer && state.enrollmentClosed && (
+          <div className="planner-note">Список участников обновляется по заявкам со статусом «Приступил к ПШ».</div>
+        )}
         {isOrganizer && <div className="planner-source-tree">
           {applicantsTree.length === 0
             ? <div className="planner-empty-inline">Нет заявок для формирования команд.</div>
@@ -985,11 +1044,13 @@ export default function PlannerPage() {
 
       {tab === "backlog" && <div className="planner-stack">
         <div className="planner-card">
+          <div className="planner-current-team">
+            Команда: <strong>{activeTeam?.name || "Не выбрана"}</strong>
+          </div>
           <div className="planner-grid planner-grid--parent-create">
-            <select value={parentTeamId} onChange={(e) => setParentTeamId(e.target.value)}><option value="">Команда</option>{visibleTeams.map((t) => <option key={t.id} value={String(t.id)}>{t.name}</option>)}</select>
             <input value={parentTitle} onChange={(e) => setParentTitle(e.target.value)} placeholder="Большая задача" />
-            <input type="date" value={parentStart} onChange={(e) => setParentStart(e.target.value)} />
-            <input type="date" value={parentEnd} onChange={(e) => setParentEnd(e.target.value)} />
+            <DateField value={parentStart} onChange={setParentStart} />
+            <DateField value={parentEnd} onChange={setParentEnd} />
             <button className="primary" onClick={addParentTask}>Добавить большую задачу</button>
           </div>
           <div className="backlog-list">{filteredParents.map((p) => <div key={p.id} className={`backlog-parent ${selectedParentId === p.id ? "active" : ""}`}>
@@ -1002,18 +1063,18 @@ export default function PlannerPage() {
                       onChange={(e) => setEditingParentDraft((prev) => prev ? { ...prev, title: e.target.value } : prev)}
                     />
                     <div className="planner-inline-edit-row">
-                      <input
-                        type="date"
-                        value={editingParentDraft.startDate}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => setEditingParentDraft((prev) => prev ? { ...prev, startDate: e.target.value } : prev)}
-                      />
-                      <input
-                        type="date"
-                        value={editingParentDraft.endDate}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => setEditingParentDraft((prev) => prev ? { ...prev, endDate: e.target.value } : prev)}
-                      />
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <DateField
+                          value={editingParentDraft.startDate}
+                          onChange={(date) => setEditingParentDraft((prev) => prev ? { ...prev, startDate: date } : prev)}
+                        />
+                      </div>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <DateField
+                          value={editingParentDraft.endDate}
+                          onChange={(date) => setEditingParentDraft((prev) => prev ? { ...prev, endDate: date } : prev)}
+                        />
+                      </div>
                     </div>
                   </div>
                 : <>
@@ -1050,10 +1111,10 @@ export default function PlannerPage() {
               ))}
             </select>
             <input value={subTitle} onChange={(e) => setSubTitle(e.target.value)} placeholder="Подзадача" />
-            <input type="date" value={subStart} onChange={(e) => setSubStart(e.target.value)} />
-            <input type="date" value={subEnd} onChange={(e) => setSubEnd(e.target.value)} />
-            <select value={subStatus} onChange={(e) => setSubStatus(e.target.value)}>{state.columns.map((c) => <option key={c}>{c}</option>)}</select>
+            <DateField value={subStart} onChange={setSubStart} />
+            <DateField value={subEnd} onChange={setSubEnd} />
             <label className="planner-check planner-check--inline"><input type="checkbox" checked={subInSprint} onChange={(e) => setSubInSprint(e.target.checked)} /><span>В спринт</span></label>
+            {subInSprint && <select value={subStatus} onChange={(e) => setSubStatus(e.target.value)}>{state.columns.map((c) => <option key={c}>{c}</option>)}</select>}
             <button className="primary" onClick={addSubtask}>Добавить подзадачу</button>
           </div>}
           <div className="subtask-list">{filteredSubtasks.filter((s) => Number(s.parentTaskId) === Number(selectedParentId)).map((s) => <div key={s.id} className="subtask-item">
@@ -1073,11 +1134,13 @@ export default function PlannerPage() {
                       <input value={editingSubtaskDraft.title} onChange={(e) => setEditingSubtaskDraft((prev) => prev ? { ...prev, title: e.target.value } : prev)} placeholder="Подзадача" />
                     </div>
                     <div className="planner-inline-edit-row">
-                      <input type="date" value={editingSubtaskDraft.startDate} onChange={(e) => setEditingSubtaskDraft((prev) => prev ? { ...prev, startDate: e.target.value } : prev)} />
-                      <input type="date" value={editingSubtaskDraft.endDate} onChange={(e) => setEditingSubtaskDraft((prev) => prev ? { ...prev, endDate: e.target.value } : prev)} />
-                      <select value={editingSubtaskDraft.status} onChange={(e) => setEditingSubtaskDraft((prev) => prev ? { ...prev, status: e.target.value } : prev)}>
-                        {state.columns.map((c) => <option key={c}>{c}</option>)}
-                      </select>
+                      <DateField value={editingSubtaskDraft.startDate} onChange={(date) => setEditingSubtaskDraft((prev) => prev ? { ...prev, startDate: date } : prev)} />
+                      <DateField value={editingSubtaskDraft.endDate} onChange={(date) => setEditingSubtaskDraft((prev) => prev ? { ...prev, endDate: date } : prev)} />
+                      {editingSubtaskDraft.inSprint && (
+                        <select value={editingSubtaskDraft.status} onChange={(e) => setEditingSubtaskDraft((prev) => prev ? { ...prev, status: e.target.value } : prev)}>
+                          {state.columns.map((c) => <option key={c}>{c}</option>)}
+                        </select>
+                      )}
                     </div>
                     <label className="planner-check">
                       <input type="checkbox" checked={editingSubtaskDraft.inSprint} onChange={(e) => setEditingSubtaskDraft((prev) => prev ? { ...prev, inSprint: e.target.checked } : prev)} />
@@ -1187,7 +1250,7 @@ export default function PlannerPage() {
 
       <Modal isOpen={confirmCloseEnrollmentOpen} onClose={() => setConfirmCloseEnrollmentOpen(false)} title="Подтверждение">
         <div className="confirm-body">
-          <div className="confirm-text">Завершить набор участников и зафиксировать текущий пул?</div>
+          <div className="confirm-text">Завершить набор участников и сформировать список тех, кто уже перешёл в статус «Приступил к ПШ»?</div>
           <div className="confirm-actions">
             <button className="link-btn" onClick={() => setConfirmCloseEnrollmentOpen(false)}>
               Отмена
