@@ -19,21 +19,26 @@ from django.urls import path, include, re_path
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
+from planner.views import PlannerStateCompatView
 
+
+API_INFO = openapi.Info(
+    title="CRM Planner Backend API",
+    default_version="v1",
+    description="Полная документация API backend-сервиса: аутентификация, пользователи, события, направления, проекты, заявки и планировщик.",
+)
 
 schema_view = get_schema_view(
-    openapi.Info(
-        title="Backend Auth API",
-        default_version="v1",
-        description="Документация API для сервиса аутентификации и управления пользователями.",
-    ),
+    API_INFO,
     public=True,
     permission_classes=(permissions.AllowAny,),
 )
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path("api/users/planner/", PlannerStateCompatView.as_view(), name="planner-state"),
     path('api/users/', include("users.urls")),
+    path("api/planner/", include("planner.urls")),
     re_path(r"^swagger(?P<format>\.json|\.yaml)$", schema_view.without_ui(cache_timeout=0), name="schema-json"),
     path("swagger/", schema_view.with_ui("swagger", cache_timeout=0), name="schema-swagger-ui"),
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),

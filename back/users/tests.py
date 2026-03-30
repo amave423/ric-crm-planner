@@ -374,7 +374,6 @@ class ViewTests(TestCase):
         )
         self.assertEqual(deadline_response.status_code, status.HTTP_400_BAD_REQUEST)
 
-
 class RoleDecoratorTests(TestCase):
     def setUp(self):
         self.user_model = get_user_model()

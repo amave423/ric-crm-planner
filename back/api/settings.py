@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'users.apps.UsersConfig',
+    'planner.apps.PlannerConfig',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -89,18 +90,18 @@ DATABASES = {
         "USER": os.getenv("DB_USER", "crm_user"),
         "PASSWORD": os.getenv("DB_PASSWORD", "strong_password_here"),
         "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "5432"),
+        "PORT": os.getenv("DB_PORT", "5433"),
     }
 }
 
-if os.getenv("USE_SQLITE_FOR_TESTS") == "1":
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
-    MIGRATION_MODULES = {"users": None}
+# if os.getenv("USE_SQLITE_FOR_TESTS") == "1":
+#     DATABASES = {
+#         "default": {
+#             "ENGINE": "django.db.backends.sqlite3",
+#             "NAME": BASE_DIR / "db.sqlite3",
+#         }
+#     }
+#     MIGRATION_MODULES = {"users": None}
 
 
 
@@ -157,6 +158,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+}
+
+SWAGGER_SETTINGS = {
+    "DEFAULT_INFO": "api.urls.API_INFO",
 }
 
 SIMPLE_JWT = {

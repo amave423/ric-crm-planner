@@ -10,7 +10,15 @@ from rest_framework import serializers
 from .models import CRMRole, ROLE_PROJECTANT, ROLE_CURATOR, ROLE_ADMIN
 from rest_framework.serializers import ModelSerializer, Serializer
 
-from .models import Application, Direction, Event, Profile, Project, Specialization, Status
+from .models import (
+    Application,
+    Direction,
+    Event,
+    Profile,
+    Project,
+    Specialization,
+    Status,
+)
 
 
 class UserSerializer(ModelSerializer):
@@ -290,8 +298,9 @@ class ApplicationCreateSerializer(ModelSerializer):
         read_only_fields = ("id", "date_sub", "date_end", "direction", "event")
 
     def create(self, validated_data):
-        event = validated_data.get("event") or self.context.get("event")
-        direction = validated_data.get("direction") or self.context.get("direction")
+        payload = dict(validated_data)
+        event = payload.get("event") or self.context.get("event")
+        direction = payload.get("direction") or self.context.get("direction")
         if not event or not direction:
             raise serializers.ValidationError({"direction": "Направление или мероприятие не найдено"})
         if direction.event_id != event.id:
@@ -308,9 +317,14 @@ class ApplicationCreateSerializer(ModelSerializer):
                 {"direction": "Заявка на это направление уже создана"}
             )
 
+        # Avoid passing duplicated kwargs when event/direction are provided by both
+        # request body and endpoint context.
+        payload.pop("event", None)
+        payload.pop("direction", None)
+
         try:
             return Application.objects.create(
-                **validated_data,
+                **payload,
                 user=self.context["request"].user,
                 event=event,
                 direction=direction,
