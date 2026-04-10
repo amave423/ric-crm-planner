@@ -1,4 +1,4 @@
-﻿import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { buildParticipantsFromRequests, getPlannerState, savePlannerState, syncParticipants } from "../../api/planner";
 import { getRequests } from "../../api/requests";
 import { getEventById } from "../../api/events";
@@ -10,58 +10,27 @@ import { getAllUsers } from "../../storage/storage";
 import type { PlannerState, PlannerSubtask, PlannerTeam } from "../../types/planner";
 import type { Request } from "../../types/request";
 import type { User } from "../../types/user";
-import Modal from "../../components/Modal/Modal";
-import DateField from "../../components/UI/DateField";
-import infoIcon from "../../assets/icons/info.svg";
+import PlannerHeader from "./components/PlannerHeader";
+import PlannerTabs from "./components/PlannerTabs";
+import TeamsTab from "./components/tabs/TeamsTab";
+import BacklogTab from "./components/tabs/BacklogTab";
+import KanbanTab from "./components/tabs/KanbanTab";
+import GanttTab from "./components/tabs/GanttTab";
+import ConfirmCloseEnrollmentModal from "./components/modals/ConfirmCloseEnrollmentModal";
+import TeamInfoModal from "./components/modals/TeamInfoModal";
+import TeamEditModal from "./components/modals/TeamEditModal";
+import TaskCardModal from "./components/modals/TaskCardModal";
+import { usePlannerDrag } from "./hooks/usePlannerDrag";
+import type { ApplicantsTreeNode, GanttRow, ParentEditDraft, PlannerTab, ProjectApplicantsGroup, SubtaskEditDraft, TaskCardState } from "./planner.types";
+import { buildGanttTicks, fullName, isFallbackParticipantName, roleFlags } from "./planner.utils";
 import "./planner.scss";
-
-type Tab = "teams" | "backlog" | "kanban" | "gantt";
-type ParentEditDraft = { title: string; startDate: string; endDate: string };
-type SubtaskEditDraft = { title: string; assigneeId?: number; startDate: string; endDate: string; status: string; inSprint: boolean };
-type ProjectApplicantsGroup = {
-  key: string;
-  eventId?: number;
-  directionId?: number;
-  projectId?: number;
-  eventTitle: string;
-  directionTitle: string;
-  projectTitle: string;
-  applicants: Array<{ ownerId: number; name: string; status?: string; requestIds: number[] }>;
-};
-
-function buildGanttTicks(minDate: string, maxDate: string, span: number) {
-  if (!minDate || !maxDate) return [];
-  const start = new Date(minDate);
-  const end = new Date(maxDate);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
-  const days = Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86400000));
-  const step = days > 90 ? 14 : days > 45 ? 7 : days > 21 ? 3 : 1;
-  const ticks: Array<{ offset: number; label: string }> = [];
-  for (let d = 0; d <= days; d += step) {
-    const date = new Date(start.getTime() + d * 86400000);
-    const label = date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
-    ticks.push({ offset: (d / span) * 100, label });
-  }
-  return ticks;
-}
-
-const fullName = (u: User) => `${u.surname || ""} ${u.name || ""}`.trim();
-
-function roleFlags(roleRaw?: string) {
-  const role = String(roleRaw || "").toLowerCase();
-  return {
-    isOrganizer: role === "organizer" || role.includes("admin"),
-    isCurator: role.includes("curator"),
-    isStudent: role === "student" || role.includes("project"),
-  };
-}
 
 export default function PlannerPage() {
   const { user } = useContext(AuthContext);
   const { isOrganizer, isCurator, isStudent } = roleFlags(user?.role);
   const userId = Number(user?.id || 0);
 
-  const [tab, setTab] = useState<Tab>(() => {
+  const [tab, setTab] = useState<PlannerTab>(() => {
     const raw = localStorage.getItem("planner_tab_v1");
     if (raw === "teams" || raw === "backlog" || raw === "kanban" || raw === "gantt") return raw;
     return "teams";
@@ -107,21 +76,11 @@ export default function PlannerPage() {
   const [teamEditId, setTeamEditId] = useState<number | null>(null);
   const [teamEditMembers, setTeamEditMembers] = useState<number[]>([]);
   const [taskCardOpen, setTaskCardOpen] = useState(false);
-  const [taskCard, setTaskCard] = useState<{ type: "parent" | "subtask"; id: number } | null>(null);
-  const [draggingSubtaskId, setDraggingSubtaskId] = useState<number | null>(null);
-  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
-  const [dragStartX, setDragStartX] = useState<number | null>(null);
-  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
-  const [dragPreview, setDragPreview] = useState<{ subtask: PlannerSubtask; x: number; y: number; width: number; tilt: number } | null>(null);
-  const dragTargetRef = useRef<{ x: number; y: number; tilt: number } | null>(null);
-  const dragPreviewRef = useRef<{ subtask: PlannerSubtask; x: number; y: number; width: number; tilt: number } | null>(null);
-  const dragAnimRef = useRef<number | null>(null);
-  const dragPreviewElRef = useRef<HTMLDivElement | null>(null);
+  const [taskCard, setTaskCard] = useState<TaskCardState>(null);
   const [editingParentId, setEditingParentId] = useState<number | null>(null);
   const [editingParentDraft, setEditingParentDraft] = useState<ParentEditDraft | null>(null);
   const [editingSubtaskId, setEditingSubtaskId] = useState<number | null>(null);
   const [editingSubtaskDraft, setEditingSubtaskDraft] = useState<SubtaskEditDraft | null>(null);
-  const dragImageRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!isPlannerLoaded) return;
@@ -131,50 +90,6 @@ export default function PlannerPage() {
   useEffect(() => {
     localStorage.setItem("planner_tab_v1", tab);
   }, [tab]);
-
-  useEffect(() => {
-    if (!dragOffset || dragStartX == null || !draggingSubtaskId) return;
-    const handleGlobalDragOver = (e: DragEvent) => {
-      if (!e.clientX && !e.clientY) return;
-      const deltaX = e.clientX - dragStartX;
-      const tilt = Math.abs(deltaX) >= 12 ? (deltaX > 0 ? 6 : -6) : 0;
-      dragTargetRef.current = {
-        x: e.clientX - dragOffset.x,
-        y: e.clientY - dragOffset.y,
-        tilt,
-      };
-    };
-    window.addEventListener("dragover", handleGlobalDragOver);
-    return () => window.removeEventListener("dragover", handleGlobalDragOver);
-  }, [dragOffset, dragStartX, draggingSubtaskId]);
-
-  useEffect(() => {
-    if (!draggingSubtaskId) return;
-    const step = () => {
-      const target = dragTargetRef.current;
-      const current = dragPreviewRef.current;
-      if (target && current) {
-        const lerp = (a: number, b: number) => a + (b - a) * 0.18;
-        const next = {
-          ...current,
-          x: lerp(current.x, target.x),
-          y: lerp(current.y, target.y),
-          tilt: lerp(current.tilt, target.tilt),
-        };
-        dragPreviewRef.current = next;
-        const el = dragPreviewElRef.current;
-        if (el) {
-          el.style.transform = `translate3d(${next.x}px, ${next.y}px, 0) rotate(${next.tilt}deg)`;
-        }
-      }
-      dragAnimRef.current = requestAnimationFrame(step);
-    };
-    dragAnimRef.current = requestAnimationFrame(step);
-    return () => {
-      if (dragAnimRef.current) cancelAnimationFrame(dragAnimRef.current);
-      dragAnimRef.current = null;
-    };
-  }, [draggingSubtaskId]);
 
   useEffect(() => {
     let mounted = true;
@@ -351,7 +266,7 @@ export default function PlannerPage() {
     if (requestName) return requestName;
 
     const participantName = participantNameById.get(id);
-    if (participantName && !/^Участник #\d+$/.test(participantName)) return participantName;
+    if (participantName && !isFallbackParticipantName(participantName)) return participantName;
 
     return `Участник #${id}`;
   };
@@ -512,7 +427,7 @@ export default function PlannerPage() {
       );
   }, [directionTitleById, eventTitleById, projectTitleById, requests, userNameById]);
 
-  const applicantsTree = useMemo(() => {
+  const applicantsTree = useMemo<ApplicantsTreeNode[]>(() => {
     const eventsMap = new Map<
       string,
       {
@@ -756,7 +671,7 @@ export default function PlannerPage() {
     setError("");
   };
 
-  const ganttRows: Array<{ key: string; label: string; start: string; end: string; type: "parent" | "sub" }> = filteredParents.flatMap(
+  const ganttRows: GanttRow[] = filteredParents.flatMap(
     (p) => [
       { key: `p_${p.id}`, label: p.title, start: p.startDate, end: p.endDate, type: "parent" as const },
       ...filteredSubtasks
@@ -798,105 +713,46 @@ export default function PlannerPage() {
     setError("");
   };
 
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, subtask: PlannerSubtask, teamId: number) => {
-    if (!canEditTeam(teamId)) return;
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", String(subtask.id));
-    if (dragImageRef.current) e.dataTransfer.setDragImage(dragImageRef.current, 0, 0);
-    const rect = e.currentTarget.getBoundingClientRect();
-    const offsetX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-    const offsetY = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
-    setDragOffset({ x: offsetX, y: offsetY });
-    setDragStartX(e.clientX || null);
-    const preview = {
-      subtask,
-      x: e.clientX - offsetX,
-      y: e.clientY - offsetY,
-      width: rect.width,
-      tilt: 0,
-    };
-    dragPreviewRef.current = preview;
-    dragTargetRef.current = { x: preview.x, y: preview.y, tilt: 0 };
-    setDragPreview(preview);
-    setDraggingSubtaskId(subtask.id);
-  };
-
-  const handleDragMove = (e: React.DragEvent<HTMLDivElement>) => {
-    if (dragStartX == null || !dragOffset) return;
-    if (!e.clientX && !e.clientY) return;
-    const deltaX = e.clientX - dragStartX;
-    const tilt = Math.abs(deltaX) >= 12 ? (deltaX > 0 ? 6 : -6) : 0;
-    dragTargetRef.current = {
-      x: e.clientX - dragOffset.x,
-      y: e.clientY - dragOffset.y,
-      tilt,
-    };
-  };
-
-  const handleDragEnd = () => {
-    setDraggingSubtaskId(null);
-    setDragOverColumn(null);
-    setDragStartX(null);
-    setDragOffset(null);
-    setDragPreview(null);
-    dragTargetRef.current = null;
-    dragPreviewRef.current = null;
-    if (dragAnimRef.current) cancelAnimationFrame(dragAnimRef.current);
-    dragAnimRef.current = null;
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, column: string) => {
-    e.preventDefault();
-    if (dragOverColumn !== column) setDragOverColumn(column);
-    e.dataTransfer.dropEffect = "move";
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>, column: string) => {
-    if (dragOverColumn !== column) return;
-    const related = e.relatedTarget as Node | null;
-    if (related && e.currentTarget.contains(related)) return;
-    setDragOverColumn(null);
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, column: string) => {
-    e.preventDefault();
-    const raw = e.dataTransfer.getData("text/plain");
-    const subtaskId = Number(raw);
-    if (!subtaskId) return;
-    setState((prev) => ({
-      ...prev,
-      subtasks: prev.subtasks.map((s) =>
-        Number(s.id) === Number(subtaskId)
-          ? { ...s, status: column, inSprint: true }
-          : s
-      ),
-    }));
-    setDraggingSubtaskId(null);
-    setDragOverColumn(null);
-    setDragStartX(null);
-    setDragOffset(null);
-    setDragPreview(null);
-    dragTargetRef.current = null;
-    dragPreviewRef.current = null;
-    if (dragAnimRef.current) cancelAnimationFrame(dragAnimRef.current);
-    dragAnimRef.current = null;
-  };
+  const {
+    draggingSubtaskId,
+    dragOverColumn,
+    dragPreview,
+    dragPreviewElRef,
+    dragImageRef,
+    handleDragStart,
+    handleDragMove,
+    handleDragEnd,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+  } = usePlannerDrag({
+    canEditTeam,
+    onDropSubtask: (subtaskId, column) => {
+      setState((prev) => ({
+        ...prev,
+        subtasks: prev.subtasks.map((subtask) =>
+          Number(subtask.id) === Number(subtaskId) ? { ...subtask, status: column, inSprint: true } : subtask
+        ),
+      }));
+    },
+  });
 
   const taskCardParent = taskCard?.type === "parent"
-    ? state.parentTasks.find((p) => Number(p.id) === Number(taskCard.id))
+    ? state.parentTasks.find((p) => Number(p.id) === Number(taskCard.id)) ?? null
     : null;
   const taskCardSubtask = taskCard?.type === "subtask"
-    ? state.subtasks.find((s) => Number(s.id) === Number(taskCard.id))
+    ? state.subtasks.find((s) => Number(s.id) === Number(taskCard.id)) ?? null
     : null;
   const taskCardTeamId = taskCardSubtask?.teamId ?? taskCardParent?.teamId;
-  const taskCardTeam = taskCardTeamId ? state.teams.find((t) => Number(t.id) === Number(taskCardTeamId)) : null;
+  const taskCardTeam = taskCardTeamId ? state.teams.find((t) => Number(t.id) === Number(taskCardTeamId)) ?? null : null;
   const taskCardParentForSubtask = taskCardSubtask
-    ? state.parentTasks.find((p) => Number(p.id) === Number(taskCardSubtask.parentTaskId))
+    ? state.parentTasks.find((p) => Number(p.id) === Number(taskCardSubtask.parentTaskId)) ?? null
     : null;
   const taskCardSubtasksCount = taskCardParent
     ? state.subtasks.filter((s) => Number(s.parentTaskId) === Number(taskCardParent.id)).length
     : 0;
-  const teamEditTeam = teamEditId != null ? state.teams.find((t) => Number(t.id) === Number(teamEditId)) : null;
+  const teamInfoTeam = teamInfoId != null ? state.teams.find((t) => Number(t.id) === Number(teamInfoId)) ?? null : null;
+  const teamEditTeam = teamEditId != null ? state.teams.find((t) => Number(t.id) === Number(teamEditId)) ?? null : null;
   const teamEditCandidateIds = (() => {
     const ids = new Set<number>();
     if (teamEditTeam?.projectId) {
@@ -929,465 +785,174 @@ export default function PlannerPage() {
 
   return (
     <div className="page planner-page">
-      <div className="planner-head">
-        <h1 className="h1">Планировщик</h1>
-        <label className="planner-label">
-          Команда
-          <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)} disabled={visibleTeams.length === 0}>
-            {visibleTeams.length === 0 && <option value="">Нет команд</option>}
-            {visibleTeams.map((t) => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
-          </select>
-        </label>
-      </div>
-
-      <div className="planner-tabs">
-        <button className={tab === "teams" ? "active" : ""} onClick={() => setTab("teams")}>Команды</button>
-        <button className={tab === "backlog" ? "active" : ""} onClick={() => setTab("backlog")}>Бэклог</button>
-        <button className={tab === "kanban" ? "active" : ""} onClick={() => setTab("kanban")}>Канбан</button>
-        <button className={tab === "gantt" ? "active" : ""} onClick={() => setTab("gantt")}>Гант</button>
-      </div>
+      <PlannerHeader visibleTeams={visibleTeams} teamFilter={teamFilter} onTeamFilterChange={setTeamFilter} />
+      <PlannerTabs tab={tab} onChange={setTab} />
       {error && <div className="planner-error">{error}</div>}
 
-      {tab === "teams" && <div className="planner-card">
-        {isOrganizer && <div className="planner-row planner-row--right">
-          {!state.enrollmentClosed
-            ? <button className="primary" onClick={() => setConfirmCloseEnrollmentOpen(true)}>Завершить набор</button>
-            : <button className="primary" onClick={() => setState((p) => ({ ...p, participants: snapshotParticipants() }))}>Синхронизировать участников</button>}
-        </div>}
-        {isOrganizer && state.enrollmentClosed && (
-          <div className="planner-note">Список участников обновляется по заявкам со статусом «Приступил к ПШ».</div>
-        )}
-        {isOrganizer && <div className="planner-source-tree">
-          {applicantsTree.length === 0
-            ? <div className="planner-empty-inline">Нет заявок для формирования команд.</div>
-            : applicantsTree.map((eventNode) => <details key={eventNode.key} className="planner-source-node planner-source-node--event" open>
-                <summary className="planner-source-summary">
-                  <span>Мероприятие: {eventNode.title}</span>
-                </summary>
-                <div className="planner-source-content">
-                  {eventNode.directions.map((directionNode) => <details key={directionNode.key} className="planner-source-node planner-source-node--direction">
-                    <summary className="planner-source-summary">
-                      <span>Направление: {directionNode.title}</span>
-                    </summary>
-                    <div className="planner-source-content">
-                      {directionNode.projects.map((group) => <details key={group.key} className="planner-source-node planner-source-node--project">
-                        <summary className="planner-source-summary">
-                          <span>Проект: {group.projectTitle}</span>
-                          <span className="planner-source-meta">{group.applicants.length} заявок</span>
-                        </summary>
-                        <div className="planner-source-content">
-                          <div className="planner-members-grid">
-                            {group.applicants.map((a) => <label key={`${group.key}:${a.ownerId}`} className="planner-check planner-applicant-row">
-                              <input
-                                type="checkbox"
-                                checked={(selectedApplicantsByGroup[group.key] || []).includes(a.ownerId)}
-                                onChange={() => toggleApplicantForGroup(group.key, a.ownerId)}
-                              />
-                              <span>{a.name}{a.status ? ` (${a.status})` : ""}</span>
-                            </label>)}
-                          </div>
-                          <div className="planner-grid planner-grid--team-from-project">
-                            <input
-                              value={teamNameByGroup[group.key] || ""}
-                              onChange={(e) => setTeamNameByGroup((prev) => ({ ...prev, [group.key]: e.target.value }))}
-                              placeholder="Название команды (обязательно)"
-                            />
-                            <select
-                              value={teamCuratorByGroup[group.key] || ""}
-                              onChange={(e) => setTeamCuratorByGroup((prev) => ({ ...prev, [group.key]: e.target.value }))}
-                            >
-                              <option value="" disabled>Куратор (из заявок проекта)</option>
-                              {!group.applicants.some((a) => Number(a.ownerId) === Number(user.id)) && (
-                                <option value={String(user.id)}>
-                                  Организатор: {fullName(user) || user.email || `ID ${user.id}`}
-                                </option>
-                              )}
-                              {group.applicants.map((a) => <option key={`${group.key}:curator:${a.ownerId}`} value={String(a.ownerId)}>{a.name}</option>)}
-                            </select>
-                            <button className="primary" onClick={() => createTeamFromGroup(group)}>Сформировать команду</button>
-                          </div>
-                        </div>
-                      </details>)}
-                    </div>
-                  </details>)}
-                </div>
-              </details>)}
-        </div>}
-        <div className="teams-list">
-          {state.teams.filter((t) => canViewTeam(t.id)).map((t) => <div key={t.id} className="team-item">
-            <div className="team-top">
-              {isOrganizer ? <input value={t.name} onChange={(e) => setState((p) => ({ ...p, teams: p.teams.map((x) => x.id === t.id ? { ...x, name: e.target.value } : x) }))} /> : <div className="team-title">{t.name}</div>}
-              {isOrganizer ? (
-                <div className={`team-badge ${t.confirmed ? "ok" : "draft"}`}>{t.confirmed ? "Подтверждена" : "Черновик"}</div>
-              ) : (
-                <div className="team-badge-stack">
-                  <div className={`team-badge ${t.confirmed ? "ok" : "draft"}`}>{t.confirmed ? "Подтверждена" : "Черновик"}</div>
-                  <button className="info-icon-btn" onClick={() => openTeamInfo(t.id)} aria-label="Информация о команде">
-                    <img src={infoIcon} alt="info" />
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="team-value">Куратор: {t.curatorId ? userNameById.get(t.curatorId) || `ID ${t.curatorId}` : "—"}</div>
-            <div className="team-value">Участники: {t.memberIds.length}</div>
-            {sourceLabelForTeam(t) && <div className="team-value">Источник: {sourceLabelForTeam(t)}</div>}
-            {isOrganizer && (
-              <div className="team-actions">
-                <button className="primary" onClick={() => setState((p) => ({ ...p, teams: p.teams.map((x) => x.id === t.id ? { ...x, confirmed: !x.confirmed } : x) }))}>{t.confirmed ? "Снять подтверждение" : "Подтвердить"}</button>
-                <button className="link-btn" onClick={() => openTeamEdit(t.id)}>Состав</button>
-                <button className="danger-outline" onClick={() => setState((p) => removeTeamCascade(p, t.id))}>Удалить</button>
-              </div>
-            )}
-          </div>)}
-        </div>
-      </div>}
+      {tab === "teams" && (
+        <TeamsTab
+          isOrganizer={isOrganizer}
+          state={state}
+          applicantsTree={applicantsTree}
+          selectedApplicantsByGroup={selectedApplicantsByGroup}
+          teamNameByGroup={teamNameByGroup}
+          teamCuratorByGroup={teamCuratorByGroup}
+          currentUser={user}
+          visibleTeams={visibleTeams}
+          userNameById={userNameById}
+          onOpenConfirmCloseEnrollment={() => setConfirmCloseEnrollmentOpen(true)}
+          onSyncParticipants={() => setState((prev) => ({ ...prev, participants: snapshotParticipants() }))}
+          onToggleApplicantForGroup={toggleApplicantForGroup}
+          onTeamNameChange={(groupKey, value) => setTeamNameByGroup((prev) => ({ ...prev, [groupKey]: value }))}
+          onTeamCuratorChange={(groupKey, value) => setTeamCuratorByGroup((prev) => ({ ...prev, [groupKey]: value }))}
+          onCreateTeamFromGroup={createTeamFromGroup}
+          onRenameTeam={(teamId, value) =>
+            setState((prev) => ({ ...prev, teams: prev.teams.map((team) => (team.id === teamId ? { ...team, name: value } : team)) }))
+          }
+          onToggleTeamConfirmed={(teamId) =>
+            setState((prev) => ({
+              ...prev,
+              teams: prev.teams.map((team) => (team.id === teamId ? { ...team, confirmed: !team.confirmed } : team)),
+            }))
+          }
+          onOpenTeamInfo={openTeamInfo}
+          onOpenTeamEdit={openTeamEdit}
+          onDeleteTeam={(teamId) => setState((prev) => removeTeamCascade(prev, teamId))}
+          sourceLabelForTeam={sourceLabelForTeam}
+        />
+      )}
 
-      {tab === "backlog" && <div className="planner-stack">
-        <div className="planner-card">
-          <div className="planner-current-team">
-            Команда: <strong>{activeTeam?.name || "Не выбрана"}</strong>
-          </div>
-          <div className="planner-grid planner-grid--parent-create">
-            <input value={parentTitle} onChange={(e) => setParentTitle(e.target.value)} placeholder="Большая задача" />
-            <DateField value={parentStart} onChange={setParentStart} />
-            <DateField value={parentEnd} onChange={setParentEnd} />
-            <button className="primary" onClick={addParentTask}>Добавить большую задачу</button>
-          </div>
-          <div className="backlog-list">{filteredParents.map((p) => <div key={p.id} className={`backlog-parent ${selectedParentId === p.id ? "active" : ""}`}>
-            <div className="backlog-parent-main" onClick={() => (editingParentId !== p.id ? setSelectedParentId(p.id) : undefined)}>
-              {editingParentId === p.id && editingParentDraft
-                ? <div className="planner-inline-edit">
-                    <input
-                      value={editingParentDraft.title}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => setEditingParentDraft((prev) => prev ? { ...prev, title: e.target.value } : prev)}
-                    />
-                    <div className="planner-inline-edit-row">
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <DateField
-                          value={editingParentDraft.startDate}
-                          onChange={(date) => setEditingParentDraft((prev) => prev ? { ...prev, startDate: date } : prev)}
-                        />
-                      </div>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <DateField
-                          value={editingParentDraft.endDate}
-                          onChange={(date) => setEditingParentDraft((prev) => prev ? { ...prev, endDate: date } : prev)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                : <>
-                    <div className="title">{p.title}</div><div className="meta"><span>{p.startDate}</span><span>{p.endDate}</span></div>
-                  </>}
-            </div>
-            <div className="planner-item-actions">
-              <button className="link-btn" onClick={() => openTaskCard("parent", p.id)}>Карточка</button>
-              {canEditTeam(p.teamId) && (
-                <>
-                  {editingParentId === p.id
-                    ? <>
-                        <button className="link-btn" onClick={saveEditedParent}>Сохранить</button>
-                        <button className="link-btn" onClick={cancelEditParent}>Отмена</button>
-                      </>
-                    : <button className="link-btn" onClick={() => startEditParent(p.id)}>Редактировать</button>}
-                  <button className="link-btn danger" onClick={() => setState((prev) => ({ ...prev, parentTasks: prev.parentTasks.filter((x) => x.id !== p.id), subtasks: prev.subtasks.filter((x) => x.parentTaskId !== p.id) }))}>Удалить</button>
-                </>
-              )}
-            </div>
-          </div>)}</div>
-        </div>
-        <div className="planner-card">
-          <h3 className="h3">Подзадачи</h3>
-          {selectedParent && <div className="planner-grid planner-grid--4">
-            <select
-              value={subAssigneeId}
-              onChange={(e) => setSubAssigneeId(e.target.value)}
-              disabled={selectedTeamMembers.length === 0}
-            >
-              <option value="" disabled>Ответственный</option>
-              {selectedTeamMembers.map((id) => (
-                <option key={`assignee-${id}`} value={String(id)}>{displayAssigneeLabel(Number(id))}</option>
-              ))}
-            </select>
-            <input value={subTitle} onChange={(e) => setSubTitle(e.target.value)} placeholder="Подзадача" />
-            <DateField value={subStart} onChange={setSubStart} />
-            <DateField value={subEnd} onChange={setSubEnd} />
-            <label className="planner-check planner-check--inline"><input type="checkbox" checked={subInSprint} onChange={(e) => setSubInSprint(e.target.checked)} /><span>В спринт</span></label>
-            {subInSprint && <select value={subStatus} onChange={(e) => setSubStatus(e.target.value)}>{state.columns.map((c) => <option key={c}>{c}</option>)}</select>}
-            <button className="primary" onClick={addSubtask}>Добавить подзадачу</button>
-          </div>}
-          <div className="subtask-list">{filteredSubtasks.filter((s) => Number(s.parentTaskId) === Number(selectedParentId)).map((s) => <div key={s.id} className="subtask-item">
-            <div className="subtask-main">
-              {editingSubtaskId === s.id && editingSubtaskDraft
-                  ? <div className="planner-inline-edit">
-                    <div className="planner-inline-edit-row">
-                      <select
-                        value={editingSubtaskDraft.assigneeId ?? ""}
-                        onChange={(e) => setEditingSubtaskDraft((prev) => prev ? { ...prev, assigneeId: Number(e.target.value) } : prev)}
-                      >
-                        <option value="" disabled>Ответственный</option>
-                        {getTeamMemberIds(s.teamId).map((id) => (
-                          <option key={`edit-assignee-${s.id}-${id}`} value={String(id)}>{displayAssigneeLabel(Number(id))}</option>
-                        ))}
-                      </select>
-                      <input value={editingSubtaskDraft.title} onChange={(e) => setEditingSubtaskDraft((prev) => prev ? { ...prev, title: e.target.value } : prev)} placeholder="Подзадача" />
-                    </div>
-                    <div className="planner-inline-edit-row">
-                      <DateField value={editingSubtaskDraft.startDate} onChange={(date) => setEditingSubtaskDraft((prev) => prev ? { ...prev, startDate: date } : prev)} />
-                      <DateField value={editingSubtaskDraft.endDate} onChange={(date) => setEditingSubtaskDraft((prev) => prev ? { ...prev, endDate: date } : prev)} />
-                      {editingSubtaskDraft.inSprint && (
-                        <select value={editingSubtaskDraft.status} onChange={(e) => setEditingSubtaskDraft((prev) => prev ? { ...prev, status: e.target.value } : prev)}>
-                          {state.columns.map((c) => <option key={c}>{c}</option>)}
-                        </select>
-                      )}
-                    </div>
-                    <label className="planner-check">
-                      <input type="checkbox" checked={editingSubtaskDraft.inSprint} onChange={(e) => setEditingSubtaskDraft((prev) => prev ? { ...prev, inSprint: e.target.checked } : prev)} />
-                      <span>В спринт</span>
-                    </label>
-                  </div>
-                  : <>
-                    <div className="title">{s.title}</div><div className="meta"><span>{s.assigneeId ? displayAssigneeLabel(s.assigneeId) : s.role}</span><span>{s.startDate} — {s.endDate}</span><span>{s.status}</span></div>
-                  </>}
-            </div>
-            <div className="planner-item-actions">
-              <button className="link-btn" onClick={() => openTaskCard("subtask", s.id)}>Карточка</button>
-              {canEditTeam(s.teamId) && (
-                <>
-                  {editingSubtaskId === s.id
-                    ? <>
-                        <button className="link-btn" onClick={saveEditedSubtask}>Сохранить</button>
-                        <button className="link-btn" onClick={cancelEditSubtask}>Отмена</button>
-                      </>
-                    : <button className="link-btn" onClick={() => startEditSubtask(s.id)}>Редактировать</button>}
-                  <button className="link-btn danger" onClick={() => setState((p) => ({ ...p, subtasks: p.subtasks.filter((x) => x.id !== s.id) }))}>Удалить</button>
-                </>
-              )}
-            </div>
-          </div>)}</div>
-        </div>
-      </div>}
+      {tab === "backlog" && (
+        <BacklogTab
+          activeTeamName={activeTeam?.name || ""}
+          parentTitle={parentTitle}
+          parentStart={parentStart}
+          parentEnd={parentEnd}
+          onParentTitleChange={setParentTitle}
+          onParentStartChange={setParentStart}
+          onParentEndChange={setParentEnd}
+          onAddParentTask={addParentTask}
+          filteredParents={filteredParents}
+          selectedParentId={selectedParentId}
+          onSelectParent={setSelectedParentId}
+          editingParentId={editingParentId}
+          editingParentDraft={editingParentDraft}
+          setEditingParentDraft={setEditingParentDraft}
+          onOpenTaskCard={openTaskCard}
+          onStartEditParent={startEditParent}
+          onSaveEditedParent={saveEditedParent}
+          onCancelEditParent={cancelEditParent}
+          onDeleteParent={(parentId) =>
+            setState((prev) => ({
+              ...prev,
+              parentTasks: prev.parentTasks.filter((parentTask) => parentTask.id !== parentId),
+              subtasks: prev.subtasks.filter((subtask) => subtask.parentTaskId !== parentId),
+            }))
+          }
+          canEditTeam={canEditTeam}
+          selectedParent={selectedParent}
+          selectedTeamMembers={selectedTeamMembers}
+          subAssigneeId={subAssigneeId}
+          subTitle={subTitle}
+          subStart={subStart}
+          subEnd={subEnd}
+          subInSprint={subInSprint}
+          subStatus={subStatus}
+          columns={state.columns}
+          onSubAssigneeChange={setSubAssigneeId}
+          onSubTitleChange={setSubTitle}
+          onSubStartChange={setSubStart}
+          onSubEndChange={setSubEnd}
+          onSubInSprintChange={setSubInSprint}
+          onSubStatusChange={setSubStatus}
+          onAddSubtask={addSubtask}
+          filteredSubtasks={filteredSubtasks}
+          editingSubtaskId={editingSubtaskId}
+          editingSubtaskDraft={editingSubtaskDraft}
+          setEditingSubtaskDraft={setEditingSubtaskDraft}
+          getTeamMemberIds={getTeamMemberIds}
+          displayAssigneeLabel={displayAssigneeLabel}
+          onStartEditSubtask={startEditSubtask}
+          onSaveEditedSubtask={saveEditedSubtask}
+          onCancelEditSubtask={cancelEditSubtask}
+          onDeleteSubtask={(subtaskId) =>
+            setState((prev) => ({ ...prev, subtasks: prev.subtasks.filter((subtask) => subtask.id !== subtaskId) }))
+          }
+        />
+      )}
 
-      {tab === "kanban" && <div className="planner-stack">
-        <div className="planner-card">
-          <div className="planner-inline-form">
-            <input value={newColumn} onChange={(e) => setNewColumn(e.target.value)} placeholder="Кастомный статус" />
-            <button className="primary" onClick={() => {
-              const title = newColumn.trim();
-              if (!title) return;
-              if (state.columns.some((c) => c.toLowerCase() === title.toLowerCase())) return;
-              setState((p) => ({ ...p, columns: [...p.columns, title] }));
-              setNewColumn("");
-            }}>Добавить</button>
-          </div>
-        </div>
-        <div className="kanban-board">{state.columns.map((col) => <div key={col} className={`kanban-column${dragOverColumn === col ? " drag-over" : ""}`}>
-          <div className="kanban-column-title"><span>{col}</span><button className="kanban-column-remove" onClick={() => removeKanbanColumn(col)} title="Удалить колонку" aria-label="Удалить колонку">{"\u00d7"}</button></div>
-          <div
-            className="kanban-column-body"
-            onDragOver={(e) => handleDragOver(e, col)}
-            onDragLeave={(e) => handleDragLeave(e, col)}
-            onDrop={(e) => handleDrop(e, col)}
-          >
-            {filteredSubtasks.filter((s) => s.inSprint && s.status === col).map((s) => (
-              <div
-                key={s.id}
-                className={`kanban-card${draggingSubtaskId === s.id ? " dragging" : ""}`}
-                draggable={canEditTeam(s.teamId)}
-                onDragStart={(e) => handleDragStart(e, s, s.teamId)}
-                onDrag={handleDragMove}
-                onDragEnd={handleDragEnd}
-                onClick={() => {
-                  if (draggingSubtaskId != null) return;
-                  openTaskCard("subtask", s.id);
-                }}
-              >
-            <div className="kanban-card-title">{s.title}</div><div className="kanban-card-meta">{s.startDate} — {s.endDate}</div>
-              </div>
-            ))}
-          </div>
-        </div>)}</div>
-        {dragPreview && (
-          <div
-            className="kanban-card drag-preview"
-            ref={dragPreviewElRef}
-            style={{
-              width: dragPreview.width,
-              transform: `translate3d(${dragPreview.x}px, ${dragPreview.y}px, 0) rotate(${dragPreview.tilt}deg)`,
-            } as React.CSSProperties}
-          >
-            <div className="kanban-card-title">{dragPreview.subtask.title}</div>
-            <div className="kanban-card-meta">{dragPreview.subtask.startDate} — {dragPreview.subtask.endDate}</div>
-          </div>
-        )}
-        <div ref={dragImageRef} className="kanban-drag-image" />
-      </div>}
+      {tab === "kanban" && (
+        <KanbanTab
+          newColumn={newColumn}
+          columns={state.columns}
+          filteredSubtasks={filteredSubtasks}
+          draggingSubtaskId={draggingSubtaskId}
+          dragOverColumn={dragOverColumn}
+          dragPreview={dragPreview}
+          dragPreviewElRef={dragPreviewElRef}
+          dragImageRef={dragImageRef}
+          canEditTeam={canEditTeam}
+          onNewColumnChange={setNewColumn}
+          onAddColumn={() => {
+            const title = newColumn.trim();
+            if (!title) return;
+            if (state.columns.some((column) => column.toLowerCase() === title.toLowerCase())) return;
+            setState((prev) => ({ ...prev, columns: [...prev.columns, title] }));
+            setNewColumn("");
+          }}
+          onRemoveColumn={removeKanbanColumn}
+          onOpenTaskCard={openTaskCard}
+          onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        />
+      )}
 
-      {tab === "gantt" && <div className="planner-card">
-        <h3 className="h3">Диаграмма Ганта</h3>
-        {ganttRows.length === 0 ? <div className="planner-empty-inline">Нет задач для отображения.</div> : <>
-          <div className="gantt-range"><span>{minDate}</span><span>{maxDate}</span></div>
-          <div className="gantt-axis">
-            <div className="gantt-axis-spacer" />
-            <div className="gantt-axis-track">
-              {ganttTicks.map((t) => (
-                <div key={`${t.offset}-${t.label}`} className="gantt-axis-tick" style={{ left: `${t.offset}%` }}>
-                  <span>{t.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="gantt-rows">{ganttRows.map((r) => {
-            const startOffset = Math.floor((Date.parse(r.start) - Date.parse(minDate)) / 86400000);
-            const endOffset = Math.floor((Date.parse(r.end) - Date.parse(minDate)) / 86400000);
-            const left = `${Math.max(0, (startOffset / span) * 100)}%`;
-            const width = `${Math.max(1.5, ((endOffset - startOffset + 1) / span) * 100)}%`;
-            return <div key={r.key} className={`gantt-row ${r.type}`}><div className="gantt-label">{r.label}</div><div className="gantt-track"><div className="gantt-bar" style={{ left, width }} /></div></div>;
-          })}</div>
-        </>}
-      </div>}
+      {tab === "gantt" && <GanttTab rows={ganttRows} ticks={ganttTicks} minDate={minDate} maxDate={maxDate} span={span} />}
 
-      <Modal isOpen={confirmCloseEnrollmentOpen} onClose={() => setConfirmCloseEnrollmentOpen(false)} title="Подтверждение">
-        <div className="confirm-body">
-          <div className="confirm-text">Завершить набор участников и сформировать список тех, кто уже перешёл в статус «Приступил к ПШ»?</div>
-          <div className="confirm-actions">
-            <button className="link-btn" onClick={() => setConfirmCloseEnrollmentOpen(false)}>
-              Отмена
-            </button>
-            <button className="primary" onClick={confirmCloseEnrollment}>
-              Подтвердить
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal isOpen={teamInfoOpen} onClose={closeTeamInfo} title="Состав команды">
-        <div className="confirm-body">
-          {teamInfoId == null ? (
-            <div className="confirm-text">Команда не выбрана.</div>
-          ) : (
-            <>
-              <div className="confirm-text">
-                {state.teams.find((t) => t.id === teamInfoId)?.name || "Команда"}
-              </div>
-              <div className="planner-team-info-list">
-                {(state.teams.find((t) => t.id === teamInfoId)?.memberIds || []).map((id) => (
-                  <div key={`team-info-${teamInfoId}-${id}`} className="planner-team-info-row">
-                    <div className="planner-team-info-name">{displayNameForUserId(id)}</div>
-                    <div className="planner-team-info-role">{specializationByOwnerId.get(id) || "—"}</div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </Modal>
-
-      <Modal isOpen={teamEditOpen} onClose={closeTeamEdit} title="Редактирование команды">
-        <div className="confirm-body">
-          {teamEditTeam == null ? (
-            <div className="confirm-text">Команда не выбрана.</div>
-          ) : (
-            <>
-              <div className="confirm-text">{teamEditTeam.name || "Команда"}</div>
-              <div className="planner-team-edit-meta">Участники: {teamEditMembers.length}</div>
-              {teamEditCandidateIds.length === 0 ? (
-                <div className="planner-empty-inline">Нет участников для выбора.</div>
-              ) : (
-                <div className="planner-team-edit-list">
-                  {teamEditCandidateIds.map((id) => (
-                    <label key={`team-edit-${teamEditTeam.id}-${id}`} className="planner-check planner-applicant-row">
-                      <input
-                        type="checkbox"
-                        checked={teamEditMembers.includes(id)}
-                        onChange={() => toggleTeamEditMember(id)}
-                      />
-                      <span>{displayAssigneeLabel(id)}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-              <div className="planner-team-edit-actions">
-                <button className="link-btn" onClick={closeTeamEdit}>Отмена</button>
-                <button className="primary" onClick={saveTeamEdit}>Сохранить</button>
-              </div>
-            </>
-          )}
-        </div>
-      </Modal>
-
-      <Modal isOpen={taskCardOpen} onClose={closeTaskCard} title="Карточка задачи">
-        <div className="confirm-body">
-          {!taskCardParent && !taskCardSubtask ? (
-            <div className="confirm-text">Задача не найдена.</div>
-          ) : (
-            <div className="planner-task-card">
-              <div className="planner-task-row">
-                <div className="planner-task-label">Тип</div>
-                <div className="planner-task-value">{taskCardSubtask ? "Подзадача" : "Большая задача"}</div>
-              </div>
-              <div className="planner-task-row">
-                <div className="planner-task-label">Название</div>
-                <div className="planner-task-value">{taskCardSubtask?.title || taskCardParent?.title}</div>
-              </div>
-              <div className="planner-task-row">
-                <div className="planner-task-label">Команда</div>
-                <div className="planner-task-value">{taskCardTeam?.name || "—"}</div>
-              </div>
-              {taskCardTeam && sourceLabelForTeam(taskCardTeam) && (
-                <div className="planner-task-row">
-                  <div className="planner-task-label">Источник</div>
-                  <div className="planner-task-value">{sourceLabelForTeam(taskCardTeam)}</div>
-                </div>
-              )}
-              <div className="planner-task-row">
-                <div className="planner-task-label">Сроки</div>
-                <div className="planner-task-value">
-                  {taskCardSubtask ? `${taskCardSubtask.startDate} — ${taskCardSubtask.endDate}` : `${taskCardParent?.startDate} — ${taskCardParent?.endDate}`}
-                </div>
-              </div>
-              {taskCardParent?.description && (
-                <div className="planner-task-row">
-                  <div className="planner-task-label">Описание</div>
-                  <div className="planner-task-value">{taskCardParent.description}</div>
-                </div>
-              )}
-              {taskCardParent && (
-                <div className="planner-task-row">
-                  <div className="planner-task-label">Подзадач</div>
-                  <div className="planner-task-value">{taskCardSubtasksCount}</div>
-                </div>
-              )}
-              {taskCardSubtask && (
-                <>
-                  <div className="planner-task-row">
-                    <div className="planner-task-label">Ответственный</div>
-                    <div className="planner-task-value">
-                      {taskCardSubtask.assigneeId ? displayAssigneeLabel(taskCardSubtask.assigneeId) : "—"}
-                    </div>
-                  </div>
-                  <div className="planner-task-row">
-                    <div className="planner-task-label">Статус</div>
-                    <div className="planner-task-value">{taskCardSubtask.status || "—"}</div>
-                  </div>
-                  <div className="planner-task-row">
-                    <div className="planner-task-label">В спринт</div>
-                    <div className="planner-task-value">{taskCardSubtask.inSprint ? "Да" : "Нет"}</div>
-                  </div>
-                  <div className="planner-task-row">
-                    <div className="planner-task-label">Большая задача</div>
-                    <div className="planner-task-value">{taskCardParentForSubtask?.title || "—"}</div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </Modal>
+      <ConfirmCloseEnrollmentModal
+        isOpen={confirmCloseEnrollmentOpen}
+        onClose={() => setConfirmCloseEnrollmentOpen(false)}
+        onConfirm={confirmCloseEnrollment}
+      />
+      <TeamInfoModal
+        isOpen={teamInfoOpen}
+        team={teamInfoTeam}
+        specializationByOwnerId={specializationByOwnerId}
+        displayNameForUserId={displayNameForUserId}
+        onClose={closeTeamInfo}
+      />
+      <TeamEditModal
+        isOpen={teamEditOpen}
+        team={teamEditTeam}
+        teamEditMembers={teamEditMembers}
+        candidateIds={teamEditCandidateIds}
+        displayAssigneeLabel={displayAssigneeLabel}
+        onToggleMember={toggleTeamEditMember}
+        onClose={closeTeamEdit}
+        onSave={saveTeamEdit}
+      />
+      <TaskCardModal
+        isOpen={taskCardOpen}
+        taskCardParent={taskCardParent}
+        taskCardSubtask={taskCardSubtask}
+        taskCardTeam={taskCardTeam}
+        taskCardParentForSubtask={taskCardParentForSubtask}
+        taskCardSubtasksCount={taskCardSubtasksCount}
+        displayAssigneeLabel={displayAssigneeLabel}
+        sourceLabelForTeam={sourceLabelForTeam}
+        onClose={closeTaskCard}
+      />
     </div>
   );
 }
+
+
+
+
 
 
 
