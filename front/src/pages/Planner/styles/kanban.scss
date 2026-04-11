@@ -177,6 +177,31 @@
   transform: none;
 }
 
+.kanban-card.is-done {
+  --kanban-card-accent: #94a3b8;
+  --kanban-card-soft: #f1f5f9;
+  background: #f8fafc;
+  color: #64748b;
+  filter: grayscale(0.35);
+  opacity: 0.76;
+}
+
+.kanban-card.is-done:hover {
+  opacity: 0.9;
+  border-color: #cbd5e1;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.09);
+}
+
+.kanban-card.is-done .kanban-card-code,
+.kanban-card.is-done .kanban-card-title {
+  color: #64748b;
+}
+
+.kanban-card.is-done .kanban-card-tags span {
+  background: #e2e8f0;
+  color: #64748b;
+}
+
 .kanban-card.drag-preview {
   min-width: 310px;
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.2);

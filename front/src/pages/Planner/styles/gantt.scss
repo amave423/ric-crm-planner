@@ -85,6 +85,14 @@
   opacity: 0;
 }
 
+.planner-gantt-done-line {
+  pointer-events: none;
+  stroke: #ef4444;
+  stroke-linecap: round;
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
 .planner-gantt-surface ._2RbVy {
   opacity: 1;
 }

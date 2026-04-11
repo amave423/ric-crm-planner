@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FC } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FC } from "react";
 import { Gantt, ViewMode, type Task } from "gantt-task-react";
 import type { PlannerParentTask, PlannerSubtask } from "../../../../types/planner";
+import { isDoneKanbanStatus } from "../../planner.utils";
 import "gantt-task-react/dist/index.css";
 
 type PlannerGanttTask = Task & {
@@ -9,6 +10,7 @@ type PlannerGanttTask = Task & {
   assigneeLabel?: string;
   statusLabel?: string;
   childrenCount?: number;
+  isDone?: boolean;
 };
 
 type GanttTabProps = {
@@ -157,6 +159,19 @@ const PARENT_BLUE = {
   progressSelectedColor: "#315de0",
 } as const;
 
+const DONE_GRAY = {
+  backgroundColor: "#94a3b8",
+  backgroundSelectedColor: "#64748b",
+  progressColor: "#94a3b8",
+  progressSelectedColor: "#64748b",
+} as const;
+
+const DONE_GANTT_FILLS = new Set(["#94a3b8", "#64748b", "rgb(148, 163, 184)", "rgb(100, 116, 139)"]);
+
+function isDoneGanttFill(value?: string) {
+  return DONE_GANTT_FILLS.has(String(value || "").trim().toLowerCase());
+}
+
 const TooltipContent: FC<{ task: Task; fontSize: string; fontFamily: string }> = ({ task, fontFamily, fontSize }) => {
   const plannerTask = task as PlannerGanttTask;
   return (
@@ -213,6 +228,7 @@ export default function GanttTab({ activeTeamName, parents, subtasks, displayAss
           parsePlannerDate(subtask.startDate),
           parsePlannerDate(subtask.endDate)
         );
+        const isDone = isDoneKanbanStatus(subtask.status);
         return {
           id: `subtask-${subtask.id}`,
           type: "task",
@@ -227,7 +243,8 @@ export default function GanttTab({ activeTeamName, parents, subtasks, displayAss
           plannerId: subtask.id,
           assigneeLabel: subtask.assigneeId ? displayAssigneeLabel(subtask.assigneeId) : "Не назначен",
           statusLabel: subtask.status,
-          styles: { ...SUBTASK_EMERALD },
+          isDone,
+          styles: isDone ? { ...DONE_GRAY } : { ...SUBTASK_EMERALD },
         };
       });
 
@@ -257,22 +274,66 @@ export default function GanttTab({ activeTeamName, parents, subtasks, displayAss
     });
   }, [viewMode]);
 
-  useEffect(() => {
+  const renderDoneLines = useCallback(() => {
+    const svg = surfaceRef.current?.querySelector<SVGSVGElement>("svg");
+    if (!svg) return;
+
+    svg.querySelectorAll(".planner-gantt-done-line").forEach((node) => node.remove());
+
+    const usedRects = new Set<string>();
+    svg.querySelectorAll<SVGRectElement>("rect").forEach((rect) => {
+      const fill = rect.getAttribute("fill") || rect.style.fill || window.getComputedStyle(rect).fill;
+      if (!isDoneGanttFill(fill)) return;
+
+      const x = Number(rect.getAttribute("x"));
+      const y = Number(rect.getAttribute("y"));
+      const width = Number(rect.getAttribute("width"));
+      const height = Number(rect.getAttribute("height"));
+      if (![x, y, width, height].every(Number.isFinite) || width <= 8 || height <= 4) return;
+
+      const key = `${x}:${y}:${width}:${height}`;
+      if (usedRects.has(key)) return;
+      usedRects.add(key);
+
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("class", "planner-gantt-done-line");
+      line.setAttribute("x1", String(x - 8));
+      line.setAttribute("x2", String(x + width + 8));
+      line.setAttribute("y1", String(y + height / 2));
+      line.setAttribute("y2", String(y + height / 2));
+      svg.appendChild(line);
+    });
+  }, []);
+
+  useLayoutEffect(() => {
     const element = surfaceRef.current;
     if (!element) return;
 
-    const updateWidth = () => setSurfaceWidth(element.clientWidth);
-    updateWidth();
+    let frameId = 0;
+    const updateWidth = () => {
+      const nextWidth = Math.floor(element.getBoundingClientRect().width || element.clientWidth || 0);
+      if (nextWidth > 0) {
+        setSurfaceWidth((prev) => (prev === nextWidth ? prev : nextWidth));
+      }
+    };
+    const scheduleUpdate = () => {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(updateWidth);
+    };
 
-    const resizeObserver = new ResizeObserver(updateWidth);
+    updateWidth();
+    scheduleUpdate();
+
+    const resizeObserver = new ResizeObserver(scheduleUpdate);
     resizeObserver.observe(element);
-    window.addEventListener("resize", updateWidth);
+    window.addEventListener("resize", scheduleUpdate);
 
     return () => {
+      window.cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
-      window.removeEventListener("resize", updateWidth);
+      window.removeEventListener("resize", scheduleUpdate);
     };
-  }, []);
+  }, [tasks.length]);
 
   useEffect(() => {
     const element = surfaceRef.current;
@@ -288,6 +349,20 @@ export default function GanttTab({ activeTeamName, parents, subtasks, displayAss
       observer.disconnect();
     };
   }, [columnWidth, ganttTasks, replaceWeekLabels, viewMode]);
+
+  useEffect(() => {
+    const element = surfaceRef.current;
+    if (!element) return;
+
+    renderDoneLines();
+    const frame = window.requestAnimationFrame(renderDoneLines);
+    const timer = window.setTimeout(renderDoneLines, 80);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [columnWidth, ganttTasks, renderDoneLines, viewMode]);
 
   const handleGanttExpanderClick = useCallback((task: Task) => {
     const taskId = String(task.id);
@@ -406,7 +481,7 @@ export default function GanttTab({ activeTeamName, parents, subtasks, displayAss
       ) : (
         <div className="planner-gantt-surface" ref={surfaceRef}>
           <Gantt
-            key={viewMode}
+            key={`${viewMode}-${columnWidth}`}
             tasks={ganttTasks}
             viewMode={viewMode}
             locale="ru"

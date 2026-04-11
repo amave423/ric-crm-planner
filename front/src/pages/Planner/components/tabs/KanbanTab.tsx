@@ -1,6 +1,7 @@
 import { useMemo, useState, type CSSProperties, type ComponentProps, type DragEvent } from "react";
 import { Kanban, type BoardData, type BoardItem } from "react-kanban-kit";
 import type { PlannerSubtask } from "../../../../types/planner";
+import { isDoneKanbanStatus } from "../../planner.utils";
 
 const ROOT_ID = "root";
 const COLUMN_PREFIX = "column:";
@@ -82,7 +83,10 @@ function renderSubtaskCard(
   extraClass = ""
 ) {
   const subtask = getCardSubtask(card);
-  const className = ["kanban-card", !isDraggable ? "is-locked" : "", extraClass].filter(Boolean).join(" ");
+  const isDone = isDoneKanbanStatus(subtask?.status);
+  const className = ["kanban-card", isDone ? "is-done" : "", !isDraggable ? "is-locked" : "", extraClass]
+    .filter(Boolean)
+    .join(" ");
 
   if (!subtask) {
     return (

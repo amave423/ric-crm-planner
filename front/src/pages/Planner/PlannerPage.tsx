@@ -21,7 +21,7 @@ import TeamInfoModal from "./components/modals/TeamInfoModal";
 import TeamEditModal from "./components/modals/TeamEditModal";
 import TaskCardModal from "./components/modals/TaskCardModal";
 import type { ApplicantsTreeNode, ParentEditDraft, PlannerTab, ProjectApplicantsGroup, SubtaskEditDraft, TaskCardState } from "./planner.types";
-import { fullName, isFallbackParticipantName, roleFlags } from "./planner.utils";
+import { fullName, isFallbackParticipantName, PLANNED_KANBAN_STATUS, roleFlags } from "./planner.utils";
 import "./planner.scss";
 
 export default function PlannerPage() {
@@ -65,7 +65,6 @@ export default function PlannerPage() {
   const [subAssigneeId, setSubAssigneeId] = useState("");
   const [subStart, setSubStart] = useState("");
   const [subEnd, setSubEnd] = useState("");
-  const [subStatus, setSubStatus] = useState("");
   const [subInSprint, setSubInSprint] = useState(false);
   const [newColumn, setNewColumn] = useState("");
   const [confirmCloseEnrollmentOpen, setConfirmCloseEnrollmentOpen] = useState(false);
@@ -279,6 +278,7 @@ export default function PlannerPage() {
   const selectedTeamMembers = selectedParent
     ? state.teams.find((t) => Number(t.id) === Number(selectedParent.teamId))?.memberIds || []
     : [];
+  const plannedColumn = state.columns.find((column) => column === PLANNED_KANBAN_STATUS) || state.columns[0] || PLANNED_KANBAN_STATUS;
   const sourceLabelForTeam = (team: PlannerTeam) => {
     const eventLabel = team.eventId ? eventTitleById[team.eventId] || `Мероприятие #${team.eventId}` : "";
     const directionLabel = team.directionId ? directionTitleById[team.directionId] || `Направление #${team.directionId}` : "";
@@ -330,10 +330,6 @@ export default function PlannerPage() {
     setTaskCardOpen(false);
     setTaskCard(null);
   };
-
-  useEffect(() => {
-    if (!subStatus && state.columns[0]) setSubStatus(state.columns[0]);
-  }, [state.columns, subStatus]);
 
   const snapshotParticipants = () => buildParticipantsFromRequests(users, requests);
 
@@ -558,7 +554,7 @@ export default function PlannerPage() {
       assigneeId: Number(subAssigneeId),
       startDate: subStart,
       endDate: subEnd,
-      status: subStatus || state.columns[0],
+      status: plannedColumn,
       inSprint: subInSprint,
     };
     setState((prev) => ({ ...prev, subtasks: [...prev.subtasks, created] }));
@@ -649,7 +645,14 @@ export default function PlannerPage() {
       setError("Сроки подзадачи вне диапазона большой задачи");
       return;
     }
-    const safeStatus = state.columns.includes(editingSubtaskDraft.status) ? editingSubtaskDraft.status : state.columns[0] || current.status;
+    const safeStatus =
+      editingSubtaskDraft.inSprint && !current.inSprint
+        ? plannedColumn
+        : state.columns.includes(editingSubtaskDraft.status)
+          ? editingSubtaskDraft.status
+          : state.columns.includes(current.status)
+            ? current.status
+            : plannedColumn;
     setState((prev) => ({
       ...prev,
       subtasks: prev.subtasks.map((s) =>
@@ -689,7 +692,6 @@ export default function PlannerPage() {
       subtasks: prev.subtasks.map((s) => (s.status === title ? { ...s, status: fallbackStatus } : s)),
     }));
 
-    if (subStatus === title) setSubStatus(fallbackStatus);
     setError("");
   };
 
@@ -872,14 +874,11 @@ export default function PlannerPage() {
           subStart={subStart}
           subEnd={subEnd}
           subInSprint={subInSprint}
-          subStatus={subStatus}
-          columns={state.columns}
           onSubAssigneeChange={setSubAssigneeId}
           onSubTitleChange={setSubTitle}
           onSubStartChange={setSubStart}
           onSubEndChange={setSubEnd}
           onSubInSprintChange={setSubInSprint}
-          onSubStatusChange={setSubStatus}
           onAddSubtask={addSubtask}
           filteredSubtasks={filteredSubtasks}
           editingSubtaskId={editingSubtaskId}
