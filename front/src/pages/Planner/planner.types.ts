@@ -38,19 +38,6 @@ export type ApplicantsTreeNode = {
   }>;
 };
 
-export type GanttTick = {
-  offset: number;
-  label: string;
-};
-
-export type GanttRow = {
-  key: string;
-  label: string;
-  start: string;
-  end: string;
-  type: "parent" | "sub";
-};
-
 export type TaskCardState = { type: "parent" | "subtask"; id: number } | null;
 
 export type PlannerDragPreview = {

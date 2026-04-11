@@ -21,8 +21,8 @@ import TeamInfoModal from "./components/modals/TeamInfoModal";
 import TeamEditModal from "./components/modals/TeamEditModal";
 import TaskCardModal from "./components/modals/TaskCardModal";
 import { usePlannerDrag } from "./hooks/usePlannerDrag";
-import type { ApplicantsTreeNode, GanttRow, ParentEditDraft, PlannerTab, ProjectApplicantsGroup, SubtaskEditDraft, TaskCardState } from "./planner.types";
-import { buildGanttTicks, fullName, isFallbackParticipantName, roleFlags } from "./planner.utils";
+import type { ApplicantsTreeNode, ParentEditDraft, PlannerTab, ProjectApplicantsGroup, SubtaskEditDraft, TaskCardState } from "./planner.types";
+import { fullName, isFallbackParticipantName, roleFlags } from "./planner.utils";
 import "./planner.scss";
 
 export default function PlannerPage() {
@@ -671,19 +671,6 @@ export default function PlannerPage() {
     setError("");
   };
 
-  const ganttRows: GanttRow[] = filteredParents.flatMap(
-    (p) => [
-      { key: `p_${p.id}`, label: p.title, start: p.startDate, end: p.endDate, type: "parent" as const },
-      ...filteredSubtasks
-        .filter((s) => Number(s.parentTaskId) === Number(p.id))
-        .map((s) => ({ key: `s_${s.id}`, label: `L ${s.title}`, start: s.startDate, end: s.endDate, type: "sub" as const })),
-    ]
-  );
-  const minDate = ganttRows.reduce((acc, r) => (!acc || r.start < acc ? r.start : acc), "");
-  const maxDate = ganttRows.reduce((acc, r) => (!acc || r.end > acc ? r.end : acc), "");
-  const span = minDate && maxDate ? Math.max(1, Math.floor((Date.parse(maxDate) - Date.parse(minDate)) / 86400000) + 1) : 1;
-  const ganttTicks = buildGanttTicks(minDate, maxDate, span);
-
   const removeKanbanColumn = (title: string) => {
     if (DEFAULT_KANBAN_COLUMNS.includes(title)) {
       setError("Базовые колонки удалить нельзя");
@@ -911,7 +898,15 @@ export default function PlannerPage() {
         />
       )}
 
-      {tab === "gantt" && <GanttTab rows={ganttRows} ticks={ganttTicks} minDate={minDate} maxDate={maxDate} span={span} />}
+      {tab === "gantt" && (
+        <GanttTab
+          activeTeamName={activeTeam?.name || ""}
+          parents={filteredParents}
+          subtasks={filteredSubtasks}
+          displayAssigneeLabel={displayAssigneeLabel}
+          onOpenTaskCard={openTaskCard}
+        />
+      )}
 
       <ConfirmCloseEnrollmentModal
         isOpen={confirmCloseEnrollmentOpen}

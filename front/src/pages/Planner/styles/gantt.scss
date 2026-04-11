@@ -1,106 +1,234 @@
-.gantt-range {
-  display: flex;
-  justify-content: space-between;
-  color: #6b7280;
-  font-size: 12px;
-  margin-bottom: 8px;
+.planner-gantt-card {
+  gap: 16px;
 }
 
-.gantt-rows {
+.planner-gantt-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.planner-gantt-head__copy {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.gantt-axis {
-  display: grid;
-  grid-template-columns: minmax(180px, 260px) 1fr;
+.planner-gantt-head__copy .h3 {
+  margin: 0;
+}
+
+.planner-gantt-head__controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: 260px;
+}
+
+.planner-gantt-switcher {
+  display: inline-flex;
+  flex-wrap: wrap;
   gap: 8px;
-  align-items: center;
-  margin-bottom: 6px;
 }
 
-.gantt-axis-track {
-  position: relative;
-  height: 22px;
-}
-
-.gantt-axis-tick {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-  font-size: 11px;
-  color: #64748b;
-  white-space: nowrap;
-}
-
-.gantt-axis-tick::after {
-  content: "";
-  position: absolute;
-  top: 16px;
-  left: 50%;
-  width: 1px;
-  height: 6px;
-  background: #cbd5f5;
-  transform: translateX(-50%);
-}
-
-.gantt-row {
-  display: grid;
-  grid-template-columns: minmax(180px, 260px) 1fr;
-  gap: 8px;
-  align-items: center;
-}
-
-.gantt-label {
-  font-size: 13px;
+.planner-gantt-switcher button {
+  border: 1px solid #d1d5db;
+  background: #fff;
   color: #374151;
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.planner-gantt-switcher button:hover {
+  transform: translateY(-1px);
+  border-color: #94a3b8;
+}
+
+.planner-gantt-switcher button.is-active {
+  border-color: #2563eb;
+  background: #eef4ff;
+  color: #1d4ed8;
+}
+
+.planner-gantt-meta {
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.planner-gantt-surface {
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #fbfdff, #fff);
+}
+
+.planner-gantt-surface .gantt-horizontal-container,
+.planner-gantt-surface .gantt-vertical-container,
+.planner-gantt-surface .task-list-wrapper,
+.planner-gantt-surface .timeline-container {
+  border-color: #eef2f7;
+}
+
+.planner-gantt-surface .task-list-header,
+.planner-gantt-surface .timeline-header {
+  background: #f8fafc;
+}
+
+/* Подписи названий на SVG-полосах (gantt-task-react) */
+.planner-gantt-surface svg g.bar text {
+  opacity: 0;
+}
+
+/* В 0.3.9 у .projectBackground задано opacity: 0.6 — полоса «проекта» выглядит двухслойной */
+.planner-gantt-surface ._2RbVy {
+  opacity: 1;
+}
+
+.planner-gantt-list-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.planner-gantt-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.planner-gantt-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 0 16px;
+  border: 0;
+  border-bottom: 1px solid #eef2f7;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.planner-gantt-list-row:hover {
+  background: #f8fbff;
+}
+
+.planner-gantt-list-row.is-selected {
+  background: #eef4ff;
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+.planner-gantt-list-row.is-child {
+  background: linear-gradient(90deg, rgba(248, 250, 252, 0.9), #fff);
+}
+
+.planner-gantt-list-row__title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.planner-gantt-list-row__main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planner-gantt-list-row__name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 600;
+  color: #111827;
 }
 
-.gantt-row.sub .gantt-label {
-  padding-left: 12px;
+.planner-gantt-list-row.is-child .planner-gantt-list-row__name {
+  padding-left: 14px;
+}
+
+.planner-gantt-list-row__meta {
   color: #6b7280;
+  font-size: 12px;
 }
 
-.gantt-track {
-  position: relative;
-  height: 24px;
-  border-radius: 999px;
-  background:
-    linear-gradient(90deg, rgba(148, 163, 184, 0.18) 1px, transparent 1px) 0 0 / 36px 100%,
-    #f8fafc;
-  border: 1px solid #e2e8f0;
+.planner-gantt-expander {
+  width: 18px;
+  min-width: 18px;
+  color: #2563eb;
+  font-size: 14px;
+  line-height: 1;
+  user-select: none;
 }
 
-.gantt-bar {
-  position: absolute;
-  top: 3px;
-  height: 18px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #3b82f6, #60a5fa);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-  border: 1px solid rgba(37, 99, 235, 0.55);
+.planner-gantt-expander.is-hidden {
+  color: transparent;
 }
 
-.gantt-row.sub .gantt-bar {
-  background: linear-gradient(90deg, #10b981, #34d399);
-  border-color: rgba(5, 150, 105, 0.55);
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.28);
+.planner-gantt-expander.is-visible:hover {
+  color: #1d4ed8;
+}
+
+.planner-gantt-tooltip {
+  min-width: 220px;
+}
+
+.planner-gantt-tooltip__title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.planner-gantt-tooltip__row {
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.planner-gantt-tooltip__hint {
+  margin-top: 8px;
+  color: #1d4ed8;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 @media (max-width: 900px) {
-  .gantt-axis {
-    grid-template-columns: 1fr;
+  .planner-gantt-head {
+    flex-direction: column;
   }
 
-  .gantt-axis-spacer {
-    display: none;
+  .planner-gantt-head__controls {
+    width: 100%;
+    min-width: 0;
+    align-items: flex-start;
   }
 
-  .gantt-row {
-    grid-template-columns: 1fr;
+  .planner-gantt-meta {
+    text-align: left;
+  }
+
+  .planner-gantt-surface {
+    overflow-x: auto;
+  }
+
+  .planner-gantt-list-header,
+  .planner-gantt-list-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
