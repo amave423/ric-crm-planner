@@ -1,5 +1,3 @@
-import type { PlannerSubtask } from "../../types/planner";
-
 export type PlannerTab = "teams" | "backlog" | "kanban" | "gantt";
 
 export type ParentEditDraft = {
@@ -39,11 +37,3 @@ export type ApplicantsTreeNode = {
 };
 
 export type TaskCardState = { type: "parent" | "subtask"; id: number } | null;
-
-export type PlannerDragPreview = {
-  subtask: PlannerSubtask;
-  x: number;
-  y: number;
-  width: number;
-  tilt: number;
-};

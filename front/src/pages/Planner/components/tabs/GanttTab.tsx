@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type FC } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FC } from "react";
 import { Gantt, ViewMode, type Task } from "gantt-task-react";
 import type { PlannerParentTask, PlannerSubtask } from "../../../../types/planner";
 import "gantt-task-react/dist/index.css";
@@ -25,7 +25,9 @@ const viewModes = [
   { id: ViewMode.Month, label: "Месяц" },
 ] as const;
 
-/** Accepts YYYY-MM-DD or full ISO; invalid input must not reach gantt-task-react (taskXCoordinate breaks on bad dates). */
+const LIST_CELL_WIDTH = 240;
+const PRE_STEPS_COUNT = 1;
+
 function parsePlannerDate(value: string): Date {
   if (!value || typeof value !== "string") {
     return new Date(NaN);
@@ -45,7 +47,6 @@ function parsePlannerDate(value: string): Date {
   return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
 }
 
-/** gantt-task-react mutates Date instances (e.g. getMonday); never pass stored planner dates directly. */
 function normalizeGanttRange(start: Date, end: Date): { start: Date; end: Date } {
   let s = new Date(start.getFullYear(), start.getMonth(), start.getDate());
   let e = new Date(end.getFullYear(), end.getMonth(), end.getDate());
@@ -82,6 +83,66 @@ function getColumnWidth(mode: ViewMode): number {
   }
 }
 
+function addToDate(date: Date, quantity: number, scale: "day" | "month" | "year"): Date {
+  return new Date(
+    date.getFullYear() + (scale === "year" ? quantity : 0),
+    date.getMonth() + (scale === "month" ? quantity : 0),
+    date.getDate() + (scale === "day" ? quantity : 0)
+  );
+}
+
+function startOfDate(date: Date, scale: "day" | "month" | "year"): Date {
+  if (scale === "year") return new Date(date.getFullYear(), 0, 1);
+  if (scale === "month") return new Date(date.getFullYear(), date.getMonth(), 1);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function getMonday(date: Date): Date {
+  const result = new Date(date.getTime());
+  const day = result.getDay();
+  const diff = result.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(result.setDate(diff));
+}
+
+function getGanttDateCount(tasks: PlannerGanttTask[], mode: ViewMode, preStepsCount: number): number {
+  if (tasks.length === 0) return 1;
+
+  let start = tasks[0].start;
+  let end = tasks[0].start;
+  tasks.forEach((task) => {
+    if (task.start < start) start = task.start;
+    if (task.end > end) end = task.end;
+  });
+
+  switch (mode) {
+    case ViewMode.Month:
+      start = startOfDate(addToDate(start, -1 * preStepsCount, "month"), "month");
+      end = startOfDate(addToDate(end, 1, "year"), "year");
+      break;
+    case ViewMode.Week:
+      start = addToDate(getMonday(startOfDate(start, "day")), -7 * preStepsCount, "day");
+      end = startOfDate(addToDate(end, 1.5, "month"), "day");
+      break;
+    case ViewMode.Day:
+      start = addToDate(startOfDate(start, "day"), -1 * preStepsCount, "day");
+      end = addToDate(startOfDate(end, "day"), 19, "day");
+      break;
+    default:
+      return 1;
+  }
+
+  let current = new Date(start.getTime());
+  let count = 1;
+  while (current < end && count < 1000) {
+    if (mode === ViewMode.Month) current = addToDate(current, 1, "month");
+    else if (mode === ViewMode.Week) current = addToDate(current, 7, "day");
+    else current = addToDate(current, 1, "day");
+    count += 1;
+  }
+
+  return count;
+}
+
 const SUBTASK_EMERALD = {
   backgroundColor: "#10b981",
   backgroundSelectedColor: "#059669",
@@ -112,9 +173,11 @@ const TooltipContent: FC<{ task: Task; fontSize: string; fontFamily: string }> =
 };
 
 export default function GanttTab({ activeTeamName, parents, subtasks, displayAssigneeLabel, onOpenTaskCard }: GanttTabProps) {
+  const surfaceRef = useRef<HTMLDivElement | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week);
   const [selectedLabel, setSelectedLabel] = useState("Нажми на строку или полосу задачи, чтобы открыть карточку.");
   const [collapsedParents, setCollapsedParents] = useState<string[]>([]);
+  const [surfaceWidth, setSurfaceWidth] = useState(0);
 
   const tasks = useMemo<PlannerGanttTask[]>(() => {
     const sortedParents = [...parents].sort((a, b) => a.startDate.localeCompare(b.startDate) || a.title.localeCompare(b.title, "ru"));
@@ -172,7 +235,59 @@ export default function GanttTab({ activeTeamName, parents, subtasks, displayAss
     });
   }, [collapsedParents, displayAssigneeLabel, parents, subtasks]);
 
-  const ganttTasks = useMemo(() => cloneTasksForGanttView(tasks), [tasks, viewMode]);
+  const ganttTasks = useMemo(() => cloneTasksForGanttView(tasks), [tasks]);
+
+  const columnWidth = useMemo(() => {
+    const baseWidth = getColumnWidth(viewMode);
+    if (!surfaceWidth || ganttTasks.length === 0) return baseWidth;
+
+    const timelineWidth = Math.max(surfaceWidth - LIST_CELL_WIDTH, 0);
+    if (!timelineWidth) return baseWidth;
+
+    const dateCount = getGanttDateCount(ganttTasks, viewMode, PRE_STEPS_COUNT);
+    return Math.max(baseWidth, Math.floor(timelineWidth / dateCount));
+  }, [ganttTasks, surfaceWidth, viewMode]);
+
+  const replaceWeekLabels = useCallback(() => {
+    if (viewMode !== ViewMode.Week) return;
+    surfaceRef.current?.querySelectorAll("text").forEach((node) => {
+      const value = node.textContent?.trim() || "";
+      const match = value.match(/^W(\d+)$/);
+      if (match) node.textContent = `Нед. ${match[1]}`;
+    });
+  }, [viewMode]);
+
+  useEffect(() => {
+    const element = surfaceRef.current;
+    if (!element) return;
+
+    const updateWidth = () => setSurfaceWidth(element.clientWidth);
+    updateWidth();
+
+    const resizeObserver = new ResizeObserver(updateWidth);
+    resizeObserver.observe(element);
+    window.addEventListener("resize", updateWidth);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateWidth);
+    };
+  }, []);
+
+  useEffect(() => {
+    const element = surfaceRef.current;
+    if (!element || viewMode !== ViewMode.Week) return;
+
+    replaceWeekLabels();
+    const frame = window.requestAnimationFrame(replaceWeekLabels);
+    const observer = new MutationObserver(replaceWeekLabels);
+    observer.observe(element, { childList: true, subtree: true, characterData: true });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [columnWidth, ganttTasks, replaceWeekLabels, viewMode]);
 
   const handleGanttExpanderClick = useCallback((task: Task) => {
     const taskId = String(task.id);
@@ -289,18 +404,18 @@ export default function GanttTab({ activeTeamName, parents, subtasks, displayAss
       {tasks.length === 0 ? (
         <div className="planner-empty-inline">Нет задач для отображения.</div>
       ) : (
-        <div className="planner-gantt-surface">
+        <div className="planner-gantt-surface" ref={surfaceRef}>
           <Gantt
             key={viewMode}
             tasks={ganttTasks}
             viewMode={viewMode}
             locale="ru"
-            listCellWidth="240px"
-            columnWidth={getColumnWidth(viewMode)}
+            listCellWidth={`${LIST_CELL_WIDTH}px`}
+            columnWidth={columnWidth}
             rowHeight={44}
             ganttHeight={420}
             barFill={72}
-            preStepsCount={1}
+            preStepsCount={PRE_STEPS_COUNT}
             fontFamily="Inter, sans-serif"
             todayColor="rgba(79, 124, 255, 0.10)"
             TooltipContent={TooltipContent}

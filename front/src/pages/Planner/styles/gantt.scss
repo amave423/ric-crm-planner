@@ -81,12 +81,10 @@
   background: #f8fafc;
 }
 
-/* Подписи названий на SVG-полосах (gantt-task-react) */
 .planner-gantt-surface svg g.bar text {
   opacity: 0;
 }
 
-/* В 0.3.9 у .projectBackground задано opacity: 0.6 — полоса «проекта» выглядит двухслойной */
 .planner-gantt-surface ._2RbVy {
   opacity: 1;
 }
@@ -145,6 +143,10 @@
   gap: 4px;
 }
 
+.planner-gantt-list-row.is-child .planner-gantt-list-row__title {
+  padding-left: 28px;
+}
+
 .planner-gantt-list-row__main {
   min-width: 0;
   display: flex;
@@ -159,10 +161,6 @@
   white-space: nowrap;
   font-weight: 600;
   color: #111827;
-}
-
-.planner-gantt-list-row.is-child .planner-gantt-list-row__name {
-  padding-left: 14px;
 }
 
 .planner-gantt-list-row__meta {
@@ -183,12 +181,19 @@
   color: transparent;
 }
 
+.planner-gantt-list-row.is-child .planner-gantt-expander.is-hidden {
+  display: none;
+}
+
 .planner-gantt-expander.is-visible:hover {
   color: #1d4ed8;
 }
 
 .planner-gantt-tooltip {
   min-width: 220px;
+  background-color: #dddddd;
+  border-radius: 10px;
+  padding: 10px
 }
 
 .planner-gantt-tooltip__title {

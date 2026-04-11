@@ -20,7 +20,6 @@ import ConfirmCloseEnrollmentModal from "./components/modals/ConfirmCloseEnrollm
 import TeamInfoModal from "./components/modals/TeamInfoModal";
 import TeamEditModal from "./components/modals/TeamEditModal";
 import TaskCardModal from "./components/modals/TaskCardModal";
-import { usePlannerDrag } from "./hooks/usePlannerDrag";
 import type { ApplicantsTreeNode, ParentEditDraft, PlannerTab, ProjectApplicantsGroup, SubtaskEditDraft, TaskCardState } from "./planner.types";
 import { fullName, isFallbackParticipantName, roleFlags } from "./planner.utils";
 import "./planner.scss";
@@ -700,29 +699,58 @@ export default function PlannerPage() {
     setError("");
   };
 
-  const {
-    draggingSubtaskId,
-    dragOverColumn,
-    dragPreview,
-    dragPreviewElRef,
-    dragImageRef,
-    handleDragStart,
-    handleDragMove,
-    handleDragEnd,
-    handleDragOver,
-    handleDragLeave,
-    handleDrop,
-  } = usePlannerDrag({
-    canEditTeam,
-    onDropSubtask: (subtaskId, column) => {
-      setState((prev) => ({
-        ...prev,
-        subtasks: prev.subtasks.map((subtask) =>
-          Number(subtask.id) === Number(subtaskId) ? { ...subtask, status: column, inSprint: true } : subtask
-        ),
-      }));
-    },
-  });
+  const moveKanbanSubtask = (subtaskId: number, column: string, position: number) => {
+    setState((prev) => {
+      const moved = prev.subtasks.find((subtask) => Number(subtask.id) === Number(subtaskId));
+      if (!moved || !canEditTeam(moved.teamId)) return prev;
+
+      const movedNext: PlannerSubtask = { ...moved, status: column, inSprint: true };
+      const targetSubtasks = prev.subtasks.filter(
+        (subtask) =>
+          Number(subtask.id) !== Number(subtaskId) &&
+          Number(subtask.teamId) === Number(moved.teamId) &&
+          subtask.inSprint &&
+          subtask.status === column
+      );
+      const safePosition = Math.max(0, Math.min(position, targetSubtasks.length));
+
+      let targetIndex = 0;
+      let inserted = false;
+      const subtasks: PlannerSubtask[] = [];
+
+      prev.subtasks.forEach((subtask) => {
+        if (Number(subtask.id) === Number(subtaskId)) return;
+
+        const isTargetColumn =
+          Number(subtask.teamId) === Number(moved.teamId) && subtask.inSprint && subtask.status === column;
+        if (isTargetColumn && !inserted && targetIndex === safePosition) {
+          subtasks.push(movedNext);
+          inserted = true;
+        }
+
+        subtasks.push(subtask);
+        if (isTargetColumn) targetIndex += 1;
+      });
+
+      if (!inserted) subtasks.push(movedNext);
+
+      return { ...prev, subtasks };
+    });
+  };
+
+  const moveKanbanColumn = (sourceTitle: string, targetTitle: string) => {
+    setState((prev) => {
+      const fromIndex = prev.columns.indexOf(sourceTitle);
+      const toIndex = prev.columns.indexOf(targetTitle);
+      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return prev;
+
+      const columns = [...prev.columns];
+      const [moved] = columns.splice(fromIndex, 1);
+      columns.splice(toIndex, 0, moved);
+
+      return { ...prev, columns };
+    });
+  };
 
   const taskCardParent = taskCard?.type === "parent"
     ? state.parentTasks.find((p) => Number(p.id) === Number(taskCard.id)) ?? null
@@ -873,12 +901,9 @@ export default function PlannerPage() {
           newColumn={newColumn}
           columns={state.columns}
           filteredSubtasks={filteredSubtasks}
-          draggingSubtaskId={draggingSubtaskId}
-          dragOverColumn={dragOverColumn}
-          dragPreview={dragPreview}
-          dragPreviewElRef={dragPreviewElRef}
-          dragImageRef={dragImageRef}
           canEditTeam={canEditTeam}
+          displayAssigneeLabel={displayAssigneeLabel}
+          currentUserId={userId}
           onNewColumnChange={setNewColumn}
           onAddColumn={() => {
             const title = newColumn.trim();
@@ -889,12 +914,8 @@ export default function PlannerPage() {
           }}
           onRemoveColumn={removeKanbanColumn}
           onOpenTaskCard={openTaskCard}
-          onDragStart={handleDragStart}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
+          onMoveSubtask={moveKanbanSubtask}
+          onMoveColumn={moveKanbanColumn}
         />
       )}
 
