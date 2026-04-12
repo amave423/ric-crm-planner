@@ -1,4 +1,4 @@
-import Modal from "../../../../components/Modal/Modal";
+﻿import Modal from "../../../../components/Modal/Modal";
 import type { PlannerTeam } from "../../../../types/planner";
 
 type TeamInfoModalProps = {
@@ -22,7 +22,7 @@ export default function TeamInfoModal({ isOpen, team, specializationByOwnerId, d
               {team.memberIds.map((id) => (
                 <div key={`team-info-${team.id}-${id}`} className="planner-team-info-row">
                   <div className="planner-team-info-name">{displayNameForUserId(id)}</div>
-                  <div className="planner-team-info-role">{specializationByOwnerId.get(id) || "—"}</div>
+                  <div className="planner-team-info-role">{specializationByOwnerId.get(id) || "-"}</div>
                 </div>
               ))}
             </div>

@@ -77,7 +77,6 @@
 
   input, textarea, select {
     width: 100%;
-    margin-bottom: 12px;
     padding: 10px;
     border-radius: 10px;
     border: 1px solid #ddd;
@@ -86,6 +85,16 @@
   }
 
   .row { display: flex; gap: 10px; }
+}
+
+.wizard-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wizard-form > .text-small {
+  display: block;
 }
 
 .wizard-actions {
@@ -218,12 +227,54 @@ select:focus {
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 20px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.wizard-inline-add-row {
+  display: grid;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.wizard-inline-add-row--specializations {
+  grid-template-columns: minmax(0, 1fr) 112px;
+}
+
+.wizard-inline-add-row--entity {
+  grid-template-columns: minmax(0, 1fr) 132px;
+}
+
+.wizard-inline-add-button {
+  min-height: 46px;
+  padding: 0 18px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.wizard-inline-add-button--secondary {
+  background: #3557b7 !important;
+}
+
+.wizard-inline-add-button--secondary:hover {
+  background: #2d499b !important;
+}
+
+.event-apply-placeholder {
+  display: block;
+  min-height: 40px;
 }
 
 .field-wrap.error input,
 .field-wrap.error textarea,
 .field-wrap.error select {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239,68,68,0.06);
+}
+
+.field-wrap.error .ui-date-input input {
   border-color: #ef4444;
   box-shadow: 0 0 0 4px rgba(239,68,68,0.06);
 }
@@ -248,4 +299,11 @@ select:focus {
 
 .danger-outline:hover {
   background: #ffebee;
+}
+
+@media (max-width: 960px) {
+  .wizard-inline-add-row--specializations,
+  .wizard-inline-add-row--entity {
+    grid-template-columns: 1fr;
+  }
 }

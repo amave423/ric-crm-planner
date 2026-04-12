@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+﻿import React, { useContext } from "react";
 import editIcon from "../../assets/icons/edit.svg";
 import infoIcon from "../../assets/icons/info.svg";
 import { AuthContext } from "../../context/AuthContext";
@@ -19,10 +19,10 @@ interface Props<T> {
   renderCell?: (row: T, colKey: string) => React.ReactNode | undefined;
 }
 
-function buildGridTemplate(columns: Column[], gridColumns?: string) {
+function buildGridTemplate(columns: Column[], hasActionColumn: boolean, gridColumns?: string) {
   if (gridColumns && gridColumns.trim()) return gridColumns;
-  const cols = columns.map((c) => (c.width ? `minmax(${c.width}, ${c.width})` : "minmax(150px, 1fr)"));
-  cols.push("60px");
+  const cols = columns.map((column) => (column.width ? `minmax(${column.width}, ${column.width})` : "minmax(150px, 1fr)"));
+  if (hasActionColumn) cols.push("60px");
   return cols.join(" ");
 }
 
@@ -34,8 +34,8 @@ function getRowId(row: unknown): number | string | undefined {
 }
 
 function toDisplay(value: unknown): string {
-  if (value == null) return "—";
-  if (Array.isArray(value)) return value.map((x) => String(x)).join(", ");
+  if (value == null) return "-";
+  if (Array.isArray(value)) return value.map((item) => String(item)).join(", ");
   return String(value);
 }
 
@@ -52,25 +52,26 @@ export default function Table<T>({
 }: Props<T>) {
   const { user } = useContext(AuthContext);
   const isOrganizer = user?.role === "organizer";
-  const columnKeys = columns.map((c) => c.key);
-  const isEventMobileLayout = ["title", "startDate", "endDate", "organizer", "status"].every((k) => columnKeys.includes(k));
-  const isDirectionMobileLayout = ["title", "organizer"].every((k) => columnKeys.includes(k)) && !isEventMobileLayout;
-  const isProjectMobileLayout = ["title", "curator", "teams"].every((k) => columnKeys.includes(k)) && !isEventMobileLayout;
-  const isRequestMobileLayout = ["studentName", "event", "project", "specialization", "status"].every((k) => columnKeys.includes(k));
+  const hasActionColumn = Boolean((isOrganizer && onEdit) || (!isOrganizer && onInfoClick));
+  const columnKeys = columns.map((column) => column.key);
+  const isEventMobileLayout = ["title", "startDate", "endDate", "organizer", "status"].every((key) => columnKeys.includes(key));
+  const isDirectionMobileLayout = ["title", "organizer"].every((key) => columnKeys.includes(key)) && !isEventMobileLayout;
+  const isProjectMobileLayout = ["title", "curator"].every((key) => columnKeys.includes(key)) && !isEventMobileLayout;
+  const isRequestMobileLayout = ["studentName", "event", "specialization", "status"].every((key) => columnKeys.includes(key));
 
-  const template = buildGridTemplate(columns, gridColumns);
+  const template = buildGridTemplate(columns, hasActionColumn, gridColumns);
   const gridStyle = { "--table-grid": template } as React.CSSProperties;
 
   return (
     <div className="custom-table-container">
       <div className="custom-table">
         <div className="table-grid table-grid-head" style={gridStyle}>
-          {columns.map((c) => (
-            <div key={c.key} className="head-cell text-small">
-              {c.title}
+          {columns.map((column) => (
+            <div key={column.key} className="head-cell text-small">
+              {column.title}
             </div>
           ))}
-          <div className="head-cell head-cell-actions" />
+          {hasActionColumn && <div className="head-cell head-cell-actions" />}
         </div>
 
         {data.length === 0 ? (
@@ -80,15 +81,18 @@ export default function Table<T>({
             const rowRecord = row as Record<string, unknown>;
             const statusRaw = rowRecord.status;
             const statusText = toDisplay(statusRaw);
-            const isActiveStatus = String(statusRaw ?? "").toLowerCase() === "активно";
+            const normalizedStatus = String(statusRaw ?? "").trim().toLowerCase();
+            const isActiveStatus = normalizedStatus === "активно";
+            const isClosedEnrollmentStatus = normalizedStatus === "набор завершен";
             const statusCustom = renderCell?.(row, "status");
+            const eventApplyCustom = renderCell?.(row, "apply");
 
             const actionButton =
               isOrganizer && onEdit ? (
                 <button
                   className="edit-btn-icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={(event) => {
+                    event.stopPropagation();
                     onEdit(row);
                   }}
                 >
@@ -97,8 +101,8 @@ export default function Table<T>({
               ) : !isOrganizer && onInfoClick ? (
                 <button
                   className="info-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={(event) => {
+                    event.stopPropagation();
                     onInfoClick(row);
                   }}
                   aria-label="Информация"
@@ -118,40 +122,44 @@ export default function Table<T>({
                 style={gridStyle}
                 onClick={() => onRowClick?.(row)}
               >
-                {columns.map((col) => {
+                {columns.map((column) => {
                   if (renderCell) {
-                    const custom = renderCell(row, col.key);
+                    const custom = renderCell(row, column.key);
                     if (custom !== undefined) {
                       return (
-                        <div key={col.key} className="cell" data-label={col.title}>
+                        <div key={column.key} className="cell" data-label={column.title}>
                           {custom}
                         </div>
                       );
                     }
                   }
 
-                  if (col.key === "status") {
+                  if (column.key === "status") {
                     return (
-                      <div key={col.key} className="cell status-cell" data-label={col.title}>
-                        <span className={`cell-badge status-${isActiveStatus ? "active" : "inactive"}`}>{statusText}</span>
+                      <div key={column.key} className="cell status-cell" data-label={column.title}>
+                        <span className={`cell-badge ${isClosedEnrollmentStatus ? "status-closed" : `status-${isActiveStatus ? "active" : "inactive"}`}`}>
+                          {statusText}
+                        </span>
                       </div>
                     );
                   }
 
-                  const raw = rowRecord[col.key];
-                  const isBadge = badgeKeys.includes(col.key);
+                  const raw = rowRecord[column.key];
+                  const isBadge = badgeKeys.includes(column.key);
                   const display = toDisplay(raw);
 
                   return (
-                    <div key={col.key} className="cell" data-label={col.title}>
+                    <div key={column.key} className="cell" data-label={column.title}>
                       {isBadge ? <span className="cell-badge">{display}</span> : <div className="title-text">{display}</div>}
                     </div>
                   );
                 })}
 
-                <div className="cell cell-actions cell-actions-desktop" data-label="Действие">
-                  {actionButton}
-                </div>
+                {hasActionColumn && (
+                  <div className="cell cell-actions cell-actions-desktop" data-label="Действие">
+                    {actionButton}
+                  </div>
+                )}
 
                 {isEventMobileLayout && (
                   <div className="event-card-mobile">
@@ -176,15 +184,17 @@ export default function Table<T>({
                         </div>
                         <div className="event-card-mobile__pair">
                           <span className="event-card-mobile__label">Статус</span>
-                          <span className={`cell-badge status-${isActiveStatus ? "active" : "inactive"}`}>{statusText}</span>
+                          <span className={`cell-badge ${isClosedEnrollmentStatus ? "status-closed" : `status-${isActiveStatus ? "active" : "inactive"}`}`}>{statusText}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="event-card-mobile__action">
-                      <div className="event-card-mobile__divider" />
-                      {actionButton}
-                    </div>
+                    {(eventApplyCustom !== undefined || actionButton) && (
+                      <div className="event-card-mobile__action">
+                        <div className="event-card-mobile__divider" />
+                        {eventApplyCustom !== undefined ? eventApplyCustom : actionButton}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -200,10 +210,12 @@ export default function Table<T>({
                       </div>
                     </div>
 
-                    <div className="event-card-mobile__action">
-                      <div className="event-card-mobile__divider" />
-                      {actionButton}
-                    </div>
+                    {actionButton && (
+                      <div className="event-card-mobile__action">
+                        <div className="event-card-mobile__divider" />
+                        {actionButton}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -211,22 +223,20 @@ export default function Table<T>({
                   <div className="event-card-mobile">
                     <div className="event-card-mobile__main">
                       <div className="event-card-mobile__title">{toDisplay(rowRecord.title)}</div>
-                      <div className="event-card-mobile__row event-card-mobile__row--meta">
+                      <div className="event-card-mobile__row event-card-mobile__row--single">
                         <div className="event-card-mobile__pair">
                           <span className="event-card-mobile__label">Куратор</span>
                           <span className="event-card-mobile__value">{toDisplay(rowRecord.curator)}</span>
                         </div>
-                        <div className="event-card-mobile__pair">
-                          <span className="event-card-mobile__label">Команды</span>
-                          <span className="event-card-mobile__value">{toDisplay(rowRecord.teams)}</span>
-                        </div>
                       </div>
                     </div>
 
-                    <div className="event-card-mobile__action">
-                      <div className="event-card-mobile__divider" />
-                      {actionButton}
-                    </div>
+                    {actionButton && (
+                      <div className="event-card-mobile__action">
+                        <div className="event-card-mobile__divider" />
+                        {actionButton}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -234,14 +244,10 @@ export default function Table<T>({
                   <div className="request-card-mobile">
                     <div className="request-card-mobile__title">{toDisplay(rowRecord.studentName)}</div>
 
-                    <div className="request-card-mobile__row">
+                    <div className="request-card-mobile__row request-card-mobile__row--single">
                       <div className="request-card-mobile__pair">
                         <span className="request-card-mobile__label">Мероприятие</span>
                         <span className="request-card-mobile__value">{toDisplay(rowRecord.event)}</span>
-                      </div>
-                      <div className="request-card-mobile__pair">
-                        <span className="request-card-mobile__label">Проект</span>
-                        <span className="request-card-mobile__value">{toDisplay(rowRecord.project)}</span>
                       </div>
                     </div>
 

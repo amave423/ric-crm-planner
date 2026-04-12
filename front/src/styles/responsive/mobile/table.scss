@@ -276,6 +276,11 @@
     width: 100%;
     max-width: none;
   }
+
+  body .event-apply-pill {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 @media (max-width: 480px) {

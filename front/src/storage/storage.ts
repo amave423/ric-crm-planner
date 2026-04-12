@@ -18,6 +18,8 @@ const LS_DIRECTIONS = "ric_mock_directions";
 const LS_PROJECTS = "ric_mock_projects";
 const LS_PROFILES = "ric_mock_profiles";
 const LS_USERS = "users";
+const LS_SEED_VERSION = "ric_mock_seed_version";
+const CURRENT_SEED_VERSION = "v3";
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
@@ -43,6 +45,16 @@ function nextId(items: Array<{ id?: number }>): number {
 }
 
 function ensureMockSeeded() {
+  const storedVersion = localStorage.getItem(LS_SEED_VERSION);
+  if (storedVersion !== CURRENT_SEED_VERSION) {
+    writeLS(LS_EVENTS, seedEvents);
+    writeLS(LS_DIRECTIONS, seedDirections);
+    writeLS(LS_PROJECTS, seedProjects);
+    writeLS(LS_PROFILES, seedProfile || {});
+    localStorage.setItem(LS_SEED_VERSION, CURRENT_SEED_VERSION);
+    return;
+  }
+
   if (!localStorage.getItem(LS_EVENTS)) writeLS(LS_EVENTS, seedEvents);
   if (!localStorage.getItem(LS_DIRECTIONS)) writeLS(LS_DIRECTIONS, seedDirections);
   if (!localStorage.getItem(LS_PROJECTS)) writeLS(LS_PROJECTS, seedProjects);

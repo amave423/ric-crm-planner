@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+﻿import type { Dispatch, SetStateAction } from "react";
 import DateField from "../../../../components/UI/DateField";
 import type { PlannerParentTask, PlannerSubtask } from "../../../../types/planner";
 import type { ParentEditDraft, SubtaskEditDraft } from "../../planner.types";
@@ -50,7 +50,7 @@ type BacklogTabProps = {
 };
 
 const getInitials = (label: string) => {
-  const name = label.split("—")[0]?.trim() || label.trim();
+  const name = label.split(/[—-]/)[0]?.trim() || label.trim();
   const parts = name.split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
   return parts
@@ -307,7 +307,7 @@ export default function BacklogTab({
             </div>
           </div>
         ) : (
-          <div className="planner-empty-inline">Сначала выбери большую задачу в верхнем списке.</div>
+          <div className="planner-empty-inline">Сначала выбери большую задачу в левом списке.</div>
         )}
 
         <div className="subtask-list">
@@ -385,7 +385,7 @@ export default function BacklogTab({
                         </span>
                         <span>
                           <small>Срок</small>
-                          {subtask.startDate} — {subtask.endDate}
+                          {subtask.startDate} - {subtask.endDate}
                         </span>
                       </div>
                     </>

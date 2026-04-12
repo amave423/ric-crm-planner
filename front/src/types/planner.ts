@@ -1,4 +1,4 @@
-export interface PlannerParticipant {
+﻿export interface PlannerParticipant {
   id: number;
   fullName: string;
 }
@@ -39,6 +39,7 @@ export interface PlannerSubtask {
 
 export interface PlannerState {
   enrollmentClosed: boolean;
+  closedEventIds: number[];
   participants: PlannerParticipant[];
   teams: PlannerTeam[];
   parentTasks: PlannerParentTask[];

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import "./calendar.scss";
 
 interface Props {
@@ -39,7 +39,7 @@ export default function Calendar({ value, onSelect }: Props) {
   const month = current.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDay = new Date(year, month, 1).getDay() || 7;
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const days = Array.from({ length: daysInMonth }, (_, index) => index + 1);
 
   const selectDate = (day: number) => {
     const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -63,8 +63,8 @@ export default function Calendar({ value, onSelect }: Props) {
           <span key={dayName} className="calendar-day-name">{dayName}</span>
         ))}
 
-        {Array(firstDay - 1).fill(null).map((_, i) => (
-          <span key={`empty-${year}-${month}-${i}`} />
+        {Array(firstDay - 1).fill(null).map((_, index) => (
+          <span key={`empty-${year}-${month}-${index}`} />
         ))}
 
         {days.map((day) => {

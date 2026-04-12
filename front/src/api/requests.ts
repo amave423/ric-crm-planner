@@ -1,4 +1,5 @@
-import client from "../api/client";
+﻿import client from "../api/client";
+import { REQUEST_STATUS } from "../constants/requestProgress";
 import type { Request as ReqType } from "../types/request";
 import {
   cacheBackendRequest,
@@ -23,6 +24,13 @@ type BackendStatus = {
   name: string;
 };
 
+const LEGACY_STATUS_MAP: Record<string, string> = {
+  "Прислал заявку": REQUEST_STATUS.SUBMITTED,
+  "Прохождение тестирования": REQUEST_STATUS.TESTING,
+  "Добавился в орг чат": REQUEST_STATUS.JOINED_CHAT,
+  "Присутствует на ПШ": REQUEST_STATUS.STARTED,
+};
+
 let statusCache: BackendStatus[] | null = null;
 
 type BackendRequest = {
@@ -44,7 +52,8 @@ type BackendRequest = {
   event_name?: string;
   directionId?: number | string;
   direction?: number | string;
-  specialization?: string | { name?: string };
+  specialization?: string | { id?: number | string; name?: string; title?: string };
+  specializationId?: number | string;
   about?: string;
   message?: string;
   status?: string | number;
@@ -65,6 +74,16 @@ function toNumber(value: unknown): number | undefined {
     if (!Number.isNaN(n)) return n;
   }
   return undefined;
+}
+
+function normalizeLegacyStatus(status?: string): string | undefined {
+  if (!status) return status;
+  return LEGACY_STATUS_MAP[status] ?? status;
+}
+
+function normalizeRequest(item: ReqType): ReqType {
+  const nextStatus = normalizeLegacyStatus(item.status);
+  return nextStatus !== item.status ? { ...item, status: nextStatus } : item;
 }
 
 function isForbidden(err: unknown): boolean {
@@ -91,8 +110,9 @@ function resolveStatusName(statusValue: unknown, statuses: BackendStatus[]): { s
   if (statusValue == null) return {};
 
   if (typeof statusValue === "string") {
-    const byName = statuses.find((s) => s.name === statusValue);
-    return { status: statusValue, statusId: byName?.id };
+    const normalizedStatus = normalizeLegacyStatus(statusValue);
+    const byName = statuses.find((s) => s.name === normalizedStatus);
+    return { status: normalizedStatus, statusId: byName?.id };
   }
 
   const id = toNumber(statusValue);
@@ -106,9 +126,10 @@ function mapBackendRequest(item: BackendRequest, statuses: BackendStatus[]): Req
   const eventId = toNumber(item.eventId ?? item.event);
   const directionId = toNumber(item.directionId ?? item.direction);
   const projectId = toNumber(item.projectId ?? item.project);
+  const specializationObject = typeof item.specialization === "object" ? item.specialization : undefined;
   const mappedStatus = resolveStatusName(item.status, statuses);
 
-  return {
+  return normalizeRequest({
     id: Number(item.id),
     studentName: item.studentName || item.userName || item.userEmail || item.user_email || `User #${ownerId ?? "?"}`,
     projectId,
@@ -116,10 +137,10 @@ function mapBackendRequest(item: BackendRequest, statuses: BackendStatus[]): Req
     eventId,
     eventTitle: item.eventTitle || item.eventName || item.event_name,
     directionId,
-    specialization:
-      typeof item.specialization === "object"
-        ? item.specialization?.name
-        : item.specialization
+    specializationId: toNumber(item.specializationId ?? specializationObject?.id),
+    specialization: specializationObject
+      ? specializationObject.name ?? specializationObject.title
+      : item.specialization
         ? String(item.specialization)
         : undefined,
     about: item.about ?? item.message ?? "",
@@ -127,7 +148,7 @@ function mapBackendRequest(item: BackendRequest, statuses: BackendStatus[]): Req
     statusId: mappedStatus.statusId,
     ownerId,
     createdAt: item.createdAt ?? item.dateSub ?? item.date_sub,
-  };
+  });
 }
 
 async function enrichMockRequests(items: ReqType[]): Promise<ReqType[]> {
@@ -140,7 +161,7 @@ async function enrichMockRequests(items: ReqType[]): Promise<ReqType[]> {
     )
   );
 
-  if (ids.length === 0) return items;
+  if (ids.length === 0) return items.map((item) => normalizeRequest(item));
 
   const pairs = await Promise.all(
     ids.map(async (id) => {
@@ -153,10 +174,11 @@ async function enrichMockRequests(items: ReqType[]): Promise<ReqType[]> {
     if (title) titleByEventId.set(id, title);
   });
 
-  return items.map((r) => {
-    if (r.eventTitle || typeof r.eventId === "undefined") return r;
-    const title = titleByEventId.get(Number(r.eventId));
-    return title ? { ...r, eventTitle: title } : r;
+  return items.map((request) => {
+    const next = normalizeRequest(request);
+    if (next.eventTitle || typeof next.eventId === "undefined") return next;
+    const title = titleByEventId.get(Number(next.eventId));
+    return title ? { ...next, eventTitle: title } : next;
   });
 }
 
@@ -181,7 +203,7 @@ export async function getRequests(options: GetRequestsOptions = {}): Promise<Req
     return filtered;
   } catch (err) {
     if (options.role === "student" || typeof options.ownerId !== "undefined") {
-      return getBackendRequestCache(options.ownerId);
+      return getBackendRequestCache(options.ownerId).map((item) => normalizeRequest(item));
     }
     if (isForbidden(err)) return [];
     return [];
@@ -190,17 +212,18 @@ export async function getRequests(options: GetRequestsOptions = {}): Promise<Req
 
 export async function saveRequest(req: ReqType): Promise<ReqType> {
   if (USE_MOCK) {
-    if (req.eventTitle || typeof req.eventId === "undefined") return _saveRequest(req);
+    if (req.eventTitle || typeof req.eventId === "undefined") return _saveRequest(normalizeRequest(req));
     const ev = await _getMockEventById(Number(req.eventId)).catch(() => undefined);
-    return _saveRequest({ ...req, eventTitle: ev?.title ?? req.eventTitle });
+    return _saveRequest(normalizeRequest({ ...req, eventTitle: ev?.title ?? req.eventTitle }));
   }
 
   const statuses = await loadStatuses();
   const eventId = toNumber(req.eventId);
   const directionId = toNumber(req.directionId);
+  const projectId = toNumber(req.projectId);
 
-  if (!eventId || !directionId) {
-    throw new Error("Нельзя отправить заявку без eventId и directionId.");
+  if (!eventId) {
+    throw new Error("Нельзя отправить заявку без eventId.");
   }
 
   const payload: Record<string, unknown> = {
@@ -208,34 +231,46 @@ export async function saveRequest(req: ReqType): Promise<ReqType> {
     is_link: false,
     comment: "",
     event_id: eventId,
-    direction_id: directionId,
-    project_ref: toNumber(req.projectId) ?? null,
   };
+
+  if (typeof directionId !== "undefined") payload.direction_id = directionId;
+  if (typeof projectId !== "undefined") payload.project_ref = projectId;
+  if (typeof req.specializationId !== "undefined") payload.specialization = req.specializationId;
+  else if (req.specialization) payload.specialization = req.specialization;
 
   if (req.id && req.id > 0) {
     const updated = await client.put<BackendRequest>(`/api/users/applications/${req.id}/`, payload);
-    const mapped = { ...req, ...mapBackendRequest(updated, statuses) };
+    const mapped = normalizeRequest({ ...req, ...mapBackendRequest(updated, statuses), eventId, directionId, projectId });
     cacheBackendRequest(mapped);
     return mapped;
   }
 
-  const created = await client.post<BackendRequest>(`/api/users/events/${eventId}/directions/${directionId}/applications/`, payload);
-  const mapped = {
+  let created: BackendRequest;
+  try {
+    created = await client.post<BackendRequest>("/api/users/applications/", payload);
+  } catch (error) {
+    if (typeof directionId === "undefined") throw error;
+    created = await client.post<BackendRequest>(`/api/users/events/${eventId}/directions/${directionId}/applications/`, payload);
+  }
+
+  const mapped = normalizeRequest({
     ...req,
     ...mapBackendRequest(created, statuses),
     eventId,
     directionId,
-  };
+    projectId,
+  });
   cacheBackendRequest(mapped);
   return mapped;
 }
 
 export async function updateRequestStatus(id: number, status: string) {
-  if (USE_MOCK) return _updateRequestStatus(id, status);
+  if (USE_MOCK) return _updateRequestStatus(id, normalizeLegacyStatus(status) ?? status);
 
   const statuses = await loadStatuses();
-  const found = statuses.find((s) => s.name === status);
-  const payload = found ? { status: found.id } : { status };
+  const normalizedStatus = normalizeLegacyStatus(status) ?? status;
+  const found = statuses.find((s) => s.name === normalizedStatus);
+  const payload = found ? { status: found.id } : { status: normalizedStatus };
 
   const updated = await client.patch<BackendRequest>(`/api/users/applications/${id}/`, payload);
   const mapped = mapBackendRequest(updated, statuses);
@@ -249,3 +284,4 @@ export async function removeRequest(id: number) {
   removeBackendRequestFromCache(id);
   return result;
 }
+

@@ -1,32 +1,35 @@
-import { useParams, useNavigate } from "react-router-dom";
+﻿import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { getDirectionsByEvent } from "../../api/directions";
 import { getEventById } from "../../api/events";
-import { useCallback, useEffect, useState } from "react";
+import EventWizardModal, { type WizardLaunchContext } from "../../components/EventWizard/EventWizardModal";
+import TableHeader from "../../components/Layout/TableHeader";
+import InfoModal from "../../components/Modal/InfoModal";
+import Table from "../../components/Table/Table";
+import BackButton from "../../components/UI/BackButton";
 import type { Direction } from "../../types/direction";
 import type { Event } from "../../types/event";
-
-import Table from "../../components/Table/Table";
-import TableHeader from "../../components/Layout/TableHeader";
-import BackButton from "../../components/UI/BackButton";
-import EventWizardModal, { type WizardLaunchContext } from "../../components/EventWizard/EventWizardModal";
-import InfoModal from "../../components/Modal/InfoModal";
-
 import "../../styles/page-colors.scss";
 
 export default function DirectionsPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const eventIdNum = Number(eventId);
-  const [search, setSearch] = useState("");
 
+  const [search, setSearch] = useState("");
   const [event, setEvent] = useState<Event | null>(null);
   const [directions, setDirections] = useState<Direction[]>([]);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardContext, setWizardContext] = useState<WizardLaunchContext | null>(null);
+  const [mode, setMode] = useState<"create" | "edit">("create");
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [infoItem, setInfoItem] = useState<{ title?: string; description?: string } | null>(null);
 
   const loadDirections = useCallback(async () => {
     try {
-      const [ev, dirs] = await Promise.all([getEventById(eventIdNum), getDirectionsByEvent(eventIdNum)]);
-      setEvent(ev || null);
-      setDirections(dirs || []);
+      const [loadedEvent, loadedDirections] = await Promise.all([getEventById(eventIdNum), getDirectionsByEvent(eventIdNum)]);
+      setEvent(loadedEvent || null);
+      setDirections(loadedDirections || []);
     } catch {
       setEvent(null);
       setDirections([]);
@@ -37,19 +40,12 @@ export default function DirectionsPage() {
     void loadDirections();
   }, [loadDirections]);
 
-  const [wizardOpen, setWizardOpen] = useState(false);
-  const [wizardContext, setWizardContext] = useState<WizardLaunchContext | null>(null);
-  const [mode, setMode] = useState<"create" | "edit">("create");
-
-  const [infoOpen, setInfoOpen] = useState(false);
-  const [infoItem, setInfoItem] = useState<{ title?: string; description?: string } | null>(null);
-
   const filteredDirections = !search.trim()
     ? directions
     : directions.filter(
-        (d) =>
-          (d.title || "").toLowerCase().includes(search.toLowerCase()) ||
-          (d.organizer || "").toLowerCase().includes(search.toLowerCase())
+        (direction) =>
+          (direction.title || "").toLowerCase().includes(search.toLowerCase()) ||
+          (direction.organizer || "").toLowerCase().includes(search.toLowerCase())
       );
 
   return (
@@ -58,7 +54,7 @@ export default function DirectionsPage() {
         title={
           <>
             <BackButton onClick={() => navigate("/events")} />
-            {`${event?.title || "Мероприятие"} — Направления`}
+            {`${event?.title || "Мероприятие"} - Направления`}
           </>
         }
         search={search}
@@ -87,7 +83,7 @@ export default function DirectionsPage() {
           setWizardOpen(true);
         }}
         onInfoClick={(row) => {
-          setInfoItem({ title: row.title || "—", description: row.description || "Нет описания" });
+          setInfoItem({ title: row.title || "-", description: row.description || "Нет описания" });
           setInfoOpen(true);
         }}
       />
@@ -107,3 +103,4 @@ export default function DirectionsPage() {
     </div>
   );
 }
+

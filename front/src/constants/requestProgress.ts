@@ -1,4 +1,4 @@
-export const REQUEST_STATUS = {
+﻿export const REQUEST_STATUS = {
   SUBMITTED: "Прислал заявку",
   TESTING: "Прохождение тестирования",
   JOINED_CHAT: "Добавился в орг чат",
@@ -37,6 +37,7 @@ export function getRequestTransitionCopy(source: RequestTransitionSource, target
 
   return {
     title: "Подтверждение перехода",
-    message: `Подтвердить переход заявки в статус "${targetStatus}"?`,
+    message: `Подтвердить перевод заявки в статус "${targetStatus}"?`,
   };
 }
+

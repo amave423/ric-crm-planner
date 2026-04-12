@@ -1,16 +1,22 @@
-import Modal from "../../../../components/Modal/Modal";
+﻿import Modal from "../../../../components/Modal/Modal";
 
 type ConfirmCloseEnrollmentModalProps = {
   isOpen: boolean;
+  eventTitle?: string;
   onClose: () => void;
   onConfirm: () => void;
 };
 
-export default function ConfirmCloseEnrollmentModal({ isOpen, onClose, onConfirm }: ConfirmCloseEnrollmentModalProps) {
+export default function ConfirmCloseEnrollmentModal({ isOpen, eventTitle, onClose, onConfirm }: ConfirmCloseEnrollmentModalProps) {
+  const resolvedTitle = eventTitle?.trim() || "это мероприятие";
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Подтверждение">
       <div className="confirm-body">
-        <div className="confirm-text">Завершить набор участников и сформировать список тех, кто уже перешёл в статус «Приступил к ПШ»?</div>
+        <div className="confirm-text">
+          Завершить набор по мероприятию «{resolvedTitle}» и оставить в планировщике только участников со статусом
+          «Приступил к ПШ»?
+        </div>
         <div className="confirm-actions">
           <button className="link-btn" onClick={onClose}>
             Отмена

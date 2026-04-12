@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useState } from "react";
+﻿import { useCallback, useContext, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import client from "../../api/client";
 import { getRequests, removeRequest, updateRequestStatus } from "../../api/requests";
@@ -20,7 +20,6 @@ type RequestTableRow = {
   id: number;
   studentName: string;
   event: string;
-  project: string;
   specialization: string;
   status: string;
   raw: RequestRecord;
@@ -34,7 +33,7 @@ type PendingTransition = {
 };
 
 function eventTitleFromRecord(request: RequestRecord) {
-  return request.eventTitle || request.eventName || request.event || request.event_name || "—";
+  return request.eventTitle || request.eventName || request.event || request.event_name || "-";
 }
 
 export default function RequestsPage() {
@@ -133,7 +132,6 @@ export default function RequestsPage() {
     : requests.filter(
         (request) =>
           (request.studentName || "").toLowerCase().includes(search.toLowerCase()) ||
-          (request.projectTitle || "").toLowerCase().includes(search.toLowerCase()) ||
           String(eventTitleFromRecord(request)).toLowerCase().includes(search.toLowerCase())
       );
 
@@ -144,11 +142,10 @@ export default function RequestsPage() {
 
   const mapped: RequestTableRow[] = filtered.map((request) => ({
     id: request.id,
-    studentName: request.studentName || "—",
+    studentName: request.studentName || "-",
     event: eventTitleFromRecord(request),
-    project: request.projectTitle || "—",
-    specialization: request.specialization || "—",
-    status: request.status || "—",
+    specialization: request.specialization || "-",
+    status: request.status || "-",
     raw: request,
   }));
 
@@ -160,18 +157,18 @@ export default function RequestsPage() {
         columns={[
           { key: "studentName", title: "ФИО студента", width: "310px" },
           { key: "event", title: "Мероприятие", width: "370px" },
-          { key: "project", title: "Проект", width: "450px" },
           { key: "specialization", title: "Специализация", width: "380px" },
-          { key: "status", title: user?.role === "student" ? "Статус" : "Статус" },
+          { key: "status", title: "Статус" },
         ]}
         data={mapped}
+        gridColumns="1.2fr 2fr 1.4fr 1fr"
         renderCell={(row: RequestTableRow, colKey: string) => {
           if (colKey !== "status") return undefined;
 
           if (user?.role === "organizer") {
             return (
               <select className="status-select" value={row.status || ""} onChange={(event) => handleStatusChange(row.id, event.target.value)}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {ORGANIZER_REQUEST_STATUSES.map((status) => (
                   <option key={status} value={status}>
                     {status}
@@ -184,7 +181,7 @@ export default function RequestsPage() {
           if (user?.role === "student" && client.USE_MOCK) {
             return (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
-                <div>{row.status || "—"}</div>
+                <div>{row.status || "-"}</div>
                 <button className="danger-outline" onClick={() => handleWithdraw(row.id)}>
                   Отозвать заявку
                 </button>
@@ -192,11 +189,11 @@ export default function RequestsPage() {
             );
           }
 
-          return <div>{row.status || "—"}</div>;
+          return <div>{row.status || "-"}</div>;
         }}
       />
 
-      <Modal isOpen={confirmOpen} onClose={() => setConfirmOpen(false)} title="Подтвердите">
+      <Modal isOpen={confirmOpen} onClose={() => setConfirmOpen(false)} title="Подтвердите действие">
         <div className="confirm-body">
           <div className="confirm-text">Вы уверены, что хотите отозвать заявку?</div>
           <div className="confirm-actions">
@@ -226,3 +223,4 @@ export default function RequestsPage() {
     </div>
   );
 }
+

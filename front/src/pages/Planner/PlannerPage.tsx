@@ -1,9 +1,10 @@
-import { useContext, useEffect, useMemo, useState } from "react";
-import { buildParticipantsFromRequests, getPlannerState, savePlannerState, syncParticipants } from "../../api/planner";
+﻿import { useContext, useEffect, useMemo, useState } from "react";
+import { buildParticipantsFromRequests, getPlannerState, hasStartedWork, savePlannerState, syncParticipants } from "../../api/planner";
 import { getRequests } from "../../api/requests";
-import { getEventById } from "../../api/events";
-import { getDirectionById } from "../../api/directions";
+import { getEventById, getEvents } from "../../api/events";
+import { getDirectionById, getDirectionsByEvent } from "../../api/directions";
 import { getProjectsByDirection } from "../../api/projects";
+import { useToast } from "../../components/Toast/ToastProvider";
 import { AuthContext } from "../../context/AuthContext";
 import { DEFAULT_KANBAN_COLUMNS, nextPlannerId, removeTeamCascade } from "../../storage/planner";
 import { getAllUsers } from "../../storage/storage";
@@ -24,8 +25,26 @@ import type { ApplicantsTreeNode, ParentEditDraft, PlannerTab, ProjectApplicants
 import { fullName, isFallbackParticipantName, PLANNED_KANBAN_STATUS, roleFlags } from "./planner.utils";
 import "./planner.scss";
 
+type PlannerCatalogProject = {
+  id: number;
+  title: string;
+};
+
+type PlannerCatalogDirection = {
+  id: number;
+  title: string;
+  projects: PlannerCatalogProject[];
+};
+
+type PlannerCatalogEvent = {
+  id: number;
+  title: string;
+  directions: PlannerCatalogDirection[];
+};
+
 export default function PlannerPage() {
   const { user } = useContext(AuthContext);
+  const { showToast } = useToast();
   const { isOrganizer, isCurator, isStudent } = roleFlags(user?.role);
   const userId = Number(user?.id || 0);
 
@@ -34,12 +53,12 @@ export default function PlannerPage() {
     if (raw === "teams" || raw === "backlog" || raw === "kanban" || raw === "gantt") return raw;
     return "teams";
   });
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isPlannerLoaded, setIsPlannerLoaded] = useState(false);
   const [teamFilter, setTeamFilter] = useState("");
   const [state, setState] = useState<PlannerState>({
     enrollmentClosed: false,
+    closedEventIds: [],
     participants: [],
     teams: [],
     parentTasks: [],
@@ -52,6 +71,7 @@ export default function PlannerPage() {
   const [selectedApplicantsByGroup, setSelectedApplicantsByGroup] = useState<Record<string, number[]>>({});
   const [teamNameByGroup, setTeamNameByGroup] = useState<Record<string, string>>({});
   const [teamCuratorByGroup, setTeamCuratorByGroup] = useState<Record<string, string>>({});
+  const [crmCatalog, setCrmCatalog] = useState<PlannerCatalogEvent[]>([]);
   const [eventTitleById, setEventTitleById] = useState<Record<number, string>>({});
   const [directionTitleById, setDirectionTitleById] = useState<Record<number, string>>({});
   const [projectTitleById, setProjectTitleById] = useState<Record<number, string>>({});
@@ -67,7 +87,7 @@ export default function PlannerPage() {
   const [subEnd, setSubEnd] = useState("");
   const [subInSprint, setSubInSprint] = useState(false);
   const [newColumn, setNewColumn] = useState("");
-  const [confirmCloseEnrollmentOpen, setConfirmCloseEnrollmentOpen] = useState(false);
+  const [closeEnrollmentTarget, setCloseEnrollmentTarget] = useState<{ eventId: number; eventTitle: string } | null>(null);
   const [teamInfoOpen, setTeamInfoOpen] = useState(false);
   const [teamInfoId, setTeamInfoId] = useState<number | null>(null);
   const [teamEditOpen, setTeamEditOpen] = useState(false);
@@ -79,6 +99,14 @@ export default function PlannerPage() {
   const [editingParentDraft, setEditingParentDraft] = useState<ParentEditDraft | null>(null);
   const [editingSubtaskId, setEditingSubtaskId] = useState<number | null>(null);
   const [editingSubtaskDraft, setEditingSubtaskDraft] = useState<SubtaskEditDraft | null>(null);
+
+  const notifyError = (message: string) => {
+    showToast("error", message);
+  };
+
+  const notifySuccess = (message: string) => {
+    showToast("success", message);
+  };
 
   useEffect(() => {
     if (!isPlannerLoaded) return;
@@ -103,7 +131,9 @@ export default function PlannerPage() {
         const usersData = Array.isArray(us) ? us : [];
         const requestsData = Array.isArray(rs) ? rs : [];
         const synced =
-          isOrganizer && planner.enrollmentClosed ? syncParticipants(planner, buildParticipantsFromRequests(usersData, requestsData)) : planner;
+          isOrganizer && planner.closedEventIds.length > 0
+            ? syncParticipants(planner, buildParticipantsFromRequests(usersData, requestsData, planner.closedEventIds))
+            : planner;
         setState(synced);
         setUsers(Array.isArray(us) ? us : []);
         setRequests(Array.isArray(rs) ? rs : []);
@@ -114,6 +144,68 @@ export default function PlannerPage() {
       mounted = false;
     };
   }, [isOrganizer, user?.id, user?.role]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadCrmCatalog = async () => {
+      try {
+        const events = await getEvents().catch(() => []);
+        const catalog = await Promise.all(
+          (events || []).map(async (event) => {
+            const directions = await getDirectionsByEvent(Number(event.id)).catch(() => []);
+            const mappedDirections = await Promise.all(
+              (directions || []).map(async (direction) => {
+                const projects = await getProjectsByDirection(Number(direction.id)).catch(() => []);
+                return {
+                  id: Number(direction.id),
+                  title: String(direction.title || "").trim() || `Направление #${direction.id}`,
+                  projects: (projects || []).map((project) => ({
+                    id: Number(project.id),
+                    title: String(project.title || "").trim() || `Проект #${project.id}`,
+                  })),
+                };
+              })
+            );
+
+            return {
+              id: Number(event.id),
+              title: String(event.title || "").trim() || `Мероприятие #${event.id}`,
+              directions: mappedDirections,
+            } satisfies PlannerCatalogEvent;
+          })
+        );
+
+        if (!mounted) return;
+
+        setCrmCatalog(catalog);
+        setEventTitleById((prev) => ({
+          ...prev,
+          ...Object.fromEntries(catalog.map((event) => [event.id, event.title])),
+        }));
+        setDirectionTitleById((prev) => ({
+          ...prev,
+          ...Object.fromEntries(catalog.flatMap((event) => event.directions.map((direction) => [direction.id, direction.title]))),
+        }));
+        setProjectTitleById((prev) => ({
+          ...prev,
+          ...Object.fromEntries(
+            catalog.flatMap((event) =>
+              event.directions.flatMap((direction) => direction.projects.map((project) => [project.id, project.title]))
+            )
+          ),
+        }));
+      } catch {
+        if (!mounted) return;
+        setCrmCatalog([]);
+      }
+    };
+
+    void loadCrmCatalog();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -271,7 +363,7 @@ export default function PlannerPage() {
   const displayAssigneeLabel = (id: number) => {
     const base = displayNameForUserId(id);
     const spec = specializationByOwnerId.get(id);
-    return spec ? `${base} — ${spec}` : base;
+    return spec ? `${base} - ${spec}` : base;
   };
   const getTeamMemberIds = (teamId: number) =>
     state.teams.find((t) => Number(t.id) === Number(teamId))?.memberIds || [];
@@ -312,14 +404,14 @@ export default function PlannerPage() {
     if (teamEditId == null) return;
     const unique = Array.from(new Set(teamEditMembers));
     if (unique.length === 0) {
-      setError("Выберите хотя бы одного участника");
+      notifyError("Выберите хотя бы одного участника");
       return;
     }
     setState((prev) => ({
       ...prev,
       teams: prev.teams.map((t) => (Number(t.id) === Number(teamEditId) ? { ...t, memberIds: unique } : t)),
     }));
-    setError("");
+    notifySuccess("Состав команды обновлён");
     closeTeamEdit();
   };
   const openTaskCard = (type: "parent" | "subtask", id: number) => {
@@ -330,11 +422,19 @@ export default function PlannerPage() {
     setTaskCardOpen(false);
     setTaskCard(null);
   };
+  const openCloseEnrollment = (eventId: number, eventTitle: string) => {
+    setCloseEnrollmentTarget({ eventId, eventTitle });
+  };
 
-  const snapshotParticipants = () => buildParticipantsFromRequests(users, requests);
+  const snapshotParticipants = (closedEventIds = state.closedEventIds) =>
+    buildParticipantsFromRequests(users, requests, closedEventIds);
 
   const projectApplicantGroups = useMemo<ProjectApplicantsGroup[]>(() => {
-    const groups = new Map<
+    const applicantsByEvent = new Map<
+      number,
+      Map<number, { ownerId: number; name: string; status?: string; requestIds: number[]; latestRequestId: number }>
+    >();
+    const fallbackGroups = new Map<
       string,
       {
         key: string;
@@ -344,89 +444,151 @@ export default function PlannerPage() {
         eventTitle: string;
         directionTitle: string;
         projectTitle: string;
-        applicantsByOwner: Map<number, { ownerId: number; name: string; status?: string; requestIds: number[]; latestRequestId: number }>;
+        applicantsByOwner: Map<number, { ownerId: number; name: string; status?: string; requestIds: number[]; latestRequestId: number }>; 
       }
     >();
+    const catalogEventIds = new Set(crmCatalog.map((event) => Number(event.id)));
 
-    requests.forEach((r) => {
-      const ownerId = Number(r.ownerId);
-      if (!Number.isFinite(ownerId)) return;
+    requests.forEach((request) => {
+      const ownerId = Number(request.ownerId);
+      const eventId = Number(request.eventId);
+      if (!Number.isFinite(ownerId) || !Number.isFinite(eventId)) return;
+      const isClosedEvent = state.closedEventIds.includes(eventId);
+      if (isClosedEvent && !hasStartedWork(request.status)) return;
 
-      const eventIdRaw = Number(r.eventId);
-      const directionIdRaw = Number(r.directionId);
-      const projectIdRaw = Number(r.projectId);
-      const eventId = Number.isFinite(eventIdRaw) ? eventIdRaw : undefined;
+      if (!applicantsByEvent.has(eventId)) applicantsByEvent.set(eventId, new Map());
+      const eventApplicants = applicantsByEvent.get(eventId);
+      if (!eventApplicants) return;
+
+      const displayName = (userNameById.get(ownerId) || request.studentName || `Участник #${ownerId}`).trim();
+      const current = eventApplicants.get(ownerId);
+      if (!current) {
+        eventApplicants.set(ownerId, {
+          ownerId,
+          name: displayName,
+          status: request.status,
+          requestIds: [request.id],
+          latestRequestId: Number(request.id) || 0,
+        });
+      } else {
+        current.requestIds.push(request.id);
+        if ((Number(request.id) || 0) >= current.latestRequestId) {
+          current.latestRequestId = Number(request.id) || current.latestRequestId;
+          current.status = request.status;
+          if (displayName) current.name = displayName;
+        }
+      }
+
+      if (catalogEventIds.has(eventId)) return;
+
+      const directionIdRaw = Number(request.directionId);
+      const projectIdRaw = Number(request.projectId);
       const directionId = Number.isFinite(directionIdRaw) ? directionIdRaw : undefined;
       const projectId = Number.isFinite(projectIdRaw) ? projectIdRaw : undefined;
+      const key = `${eventId}:${directionId ?? "none"}:${projectId ?? "none"}`;
 
-      const eventTitle = (r.eventTitle?.trim() || (eventId ? eventTitleById[eventId] : "") || (eventId ? `Мероприятие #${eventId}` : "Без мероприятия")).trim();
-      const directionTitle = ((directionId ? directionTitleById[directionId] : "") || (directionId ? `Направление #${directionId}` : "Без направления")).trim();
-      const projectTitle = (r.projectTitle?.trim() || (projectId ? projectTitleById[projectId] : "") || (projectId ? `Проект #${projectId}` : "Без проекта")).trim();
-
-      const key = `${eventId ?? "none"}:${directionId ?? "none"}:${projectId ?? "none"}`;
-      if (!groups.has(key)) {
-        groups.set(key, {
+      if (!fallbackGroups.has(key)) {
+        fallbackGroups.set(key, {
           key,
           eventId,
           directionId,
           projectId,
-          eventTitle,
-          directionTitle,
-          projectTitle,
+          eventTitle: request.eventTitle?.trim() || eventTitleById[eventId] || `Мероприятие #${eventId}` ,
+          directionTitle: (directionId ? directionTitleById[directionId] : "") || (directionId ? `Направление #${directionId}` : "Без направления"),
+          projectTitle: request.projectTitle?.trim() || (projectId ? projectTitleById[projectId] : "") || (projectId ? `Проект #${projectId}` : "Без проекта"),
           applicantsByOwner: new Map(),
         });
       }
-      const group = groups.get(key);
-      if (!group) return;
-      if (!group.eventTitle && eventTitle) group.eventTitle = eventTitle;
-      if (!group.directionTitle && directionTitle) group.directionTitle = directionTitle;
-      if (!group.projectTitle && projectTitle) group.projectTitle = projectTitle;
 
-      const displayName = (userNameById.get(ownerId) || r.studentName || `Участник #${ownerId}`).trim();
-      const current = group.applicantsByOwner.get(ownerId);
-      if (!current) {
-        group.applicantsByOwner.set(ownerId, {
+      const fallbackGroup = fallbackGroups.get(key);
+      if (!fallbackGroup) return;
+      const currentFallback = fallbackGroup.applicantsByOwner.get(ownerId);
+      if (!currentFallback) {
+        fallbackGroup.applicantsByOwner.set(ownerId, {
           ownerId,
           name: displayName,
-          status: r.status,
-          requestIds: [r.id],
-          latestRequestId: Number(r.id) || 0,
+          status: request.status,
+          requestIds: [request.id],
+          latestRequestId: Number(request.id) || 0,
         });
-        return;
-      }
-      current.requestIds.push(r.id);
-      if ((Number(r.id) || 0) >= current.latestRequestId) {
-        current.latestRequestId = Number(r.id) || current.latestRequestId;
-        current.status = r.status;
-        if (displayName) current.name = displayName;
+      } else {
+        currentFallback.requestIds.push(request.id);
+        if ((Number(request.id) || 0) >= currentFallback.latestRequestId) {
+          currentFallback.latestRequestId = Number(request.id) || currentFallback.latestRequestId;
+          currentFallback.status = request.status;
+          if (displayName) currentFallback.name = displayName;
+        }
       }
     });
 
-    return Array.from(groups.values())
-      .map((g) => ({
-        key: g.key,
-        eventId: g.eventId,
-        directionId: g.directionId,
-        projectId: g.projectId,
-        eventTitle: g.eventTitle,
-        directionTitle: g.directionTitle,
-        projectTitle: g.projectTitle,
-        applicants: Array.from(g.applicantsByOwner.values())
-          .map((a) => ({ ownerId: a.ownerId, name: a.name, status: a.status, requestIds: a.requestIds }))
-          .sort((a, b) => a.name.localeCompare(b.name, "ru")),
-      }))
-      .sort((a, b) =>
+    const catalogGroups: ProjectApplicantsGroup[] = crmCatalog.flatMap((event): ProjectApplicantsGroup[] => {
+      const eventApplicants = applicantsByEvent.get(Number(event.id)) ?? new Map();
+      const applicants = Array.from(eventApplicants.values())
+        .map((applicant) => ({
+          ownerId: applicant.ownerId,
+          name: applicant.name,
+          status: applicant.status,
+          requestIds: applicant.requestIds,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+
+      return event.directions.flatMap((direction): ProjectApplicantsGroup[] => {
+        if (direction.projects.length === 0) {
+          return [
+            {
+              key: `${event.id}:${direction.id}:empty`,
+              eventId: event.id,
+              directionId: direction.id,
+              projectId: undefined,
+              eventTitle: event.title,
+              directionTitle: direction.title,
+              projectTitle: "Проекты не добавлены",
+              applicants,
+            },
+          ];
+        }
+
+        return direction.projects.map((project): ProjectApplicantsGroup => ({
+          key: `${event.id}:${direction.id}:${project.id}`,
+          eventId: event.id,
+          directionId: direction.id,
+          projectId: project.id,
+          eventTitle: event.title,
+          directionTitle: direction.title,
+          projectTitle: project.title,
+          applicants,
+        }));
+      });
+    });
+
+    const unknownGroups = Array.from(fallbackGroups.values()).map((group) => ({
+      key: group.key,
+      eventId: group.eventId,
+      directionId: group.directionId,
+      projectId: group.projectId,
+      eventTitle: group.eventTitle,
+      directionTitle: group.directionTitle,
+      projectTitle: group.projectTitle,
+      applicants: Array.from(group.applicantsByOwner.values())
+        .map((applicant) => ({ ownerId: applicant.ownerId, name: applicant.name, status: applicant.status, requestIds: applicant.requestIds }))
+        .sort((a, b) => a.name.localeCompare(b.name, "ru")),
+    }));
+
+    return [...catalogGroups, ...unknownGroups].sort(
+      (a, b) =>
         a.eventTitle.localeCompare(b.eventTitle, "ru") ||
         a.directionTitle.localeCompare(b.directionTitle, "ru") ||
         a.projectTitle.localeCompare(b.projectTitle, "ru")
-      );
-  }, [directionTitleById, eventTitleById, projectTitleById, requests, userNameById]);
+    );
+  }, [crmCatalog, directionTitleById, eventTitleById, projectTitleById, requests, state.closedEventIds, userNameById]);
 
   const applicantsTree = useMemo<ApplicantsTreeNode[]>(() => {
     const eventsMap = new Map<
       string,
       {
         key: string;
+        eventId?: number;
+        eventClosed: boolean;
         title: string;
         directionsMap: Map<string, { key: string; title: string; projects: ProjectApplicantsGroup[] }>;
       }
@@ -435,7 +597,13 @@ export default function PlannerPage() {
     projectApplicantGroups.forEach((group) => {
       const eventKey = `e:${(group.eventTitle || "").trim().toLowerCase() || group.eventId || "none"}`;
       if (!eventsMap.has(eventKey)) {
-        eventsMap.set(eventKey, { key: eventKey, title: group.eventTitle, directionsMap: new Map() });
+        eventsMap.set(eventKey, {
+          key: eventKey,
+          title: group.eventTitle,
+          eventId: group.eventId,
+          eventClosed: typeof group.eventId === "number" ? state.closedEventIds.includes(group.eventId) : false,
+          directionsMap: new Map(),
+        });
       }
       const eventNode = eventsMap.get(eventKey);
       if (!eventNode) return;
@@ -450,6 +618,8 @@ export default function PlannerPage() {
     return Array.from(eventsMap.values())
       .map((eventNode) => ({
         key: eventNode.key,
+        eventId: eventNode.eventId,
+        eventClosed: eventNode.eventClosed,
         title: eventNode.title,
         directions: Array.from(eventNode.directionsMap.values())
           .map((directionNode) => ({
@@ -460,7 +630,7 @@ export default function PlannerPage() {
           .sort((a, b) => a.title.localeCompare(b.title, "ru")),
       }))
       .sort((a, b) => a.title.localeCompare(b.title, "ru"));
-  }, [projectApplicantGroups]);
+  }, [projectApplicantGroups, state.closedEventIds]);
 
   const toggleApplicantForGroup = (groupKey: string, ownerId: number) => {
     setSelectedApplicantsByGroup((prev) => {
@@ -476,13 +646,13 @@ export default function PlannerPage() {
     const availableIds = new Set(group.applicants.map((a) => a.ownerId));
     const memberIds = selectedOwnerIds.filter((id) => availableIds.has(id));
     if (memberIds.length === 0) {
-      setError("Выберите хотя бы одного участника проекта");
+      notifyError("Выберите хотя бы одного участника");
       return;
     }
 
     const rawName = (teamNameByGroup[group.key] || "").trim();
     if (!rawName) {
-      setError("Введите название команды");
+      notifyError("Введите название команды");
       return;
     }
     const teamName = rawName;
@@ -523,13 +693,19 @@ export default function PlannerPage() {
 
     setSelectedApplicantsByGroup((prev) => ({ ...prev, [group.key]: [] }));
     setTeamNameByGroup((prev) => ({ ...prev, [group.key]: "" }));
-    setError("");
+    notifySuccess("Команда сформирована");
   };
 
   const addParentTask = () => {
     const teamId = Number(activeTeamId);
-    if (!teamId || !canEditTeam(teamId)) return setError("Нет прав или команда не выбрана");
-    if (!parentTitle.trim() || !parentStart || !parentEnd || parentStart > parentEnd) return setError("Проверьте поля большой задачи");
+    if (!teamId || !canEditTeam(teamId)) {
+      notifyError("Нет прав или команда не выбрана");
+      return;
+    }
+    if (!parentTitle.trim() || !parentStart || !parentEnd || parentStart > parentEnd) {
+      notifyError("Проверьте поля большой задачи");
+      return;
+    }
     setState((prev) => ({
       ...prev,
       parentTasks: [...prev.parentTasks, { id: nextPlannerId(prev.parentTasks), teamId, title: parentTitle.trim(), startDate: parentStart, endDate: parentEnd }],
@@ -537,14 +713,26 @@ export default function PlannerPage() {
     setParentTitle("");
     setParentStart("");
     setParentEnd("");
-    setError("");
+    notifySuccess("Большая задача добавлена");
   };
 
   const addSubtask = () => {
-    if (!selectedParent) return setError("Выберите большую задачу");
-    if (!canEditTeam(selectedParent.teamId)) return setError("Нет прав на подзадачи этой команды");
-    if (!subTitle.trim() || !subAssigneeId || !subStart || !subEnd || subStart > subEnd) return setError("Проверьте поля подзадачи");
-    if (subStart < selectedParent.startDate || subEnd > selectedParent.endDate) return setError("Сроки подзадачи вне диапазона большой задачи");
+    if (!selectedParent) {
+      notifyError("Выберите большую задачу");
+      return;
+    }
+    if (!canEditTeam(selectedParent.teamId)) {
+      notifyError("Нет прав на подзадачи этой команды");
+      return;
+    }
+    if (!subTitle.trim() || !subAssigneeId || !subStart || !subEnd || subStart > subEnd) {
+      notifyError("Проверьте поля подзадачи");
+      return;
+    }
+    if (subStart < selectedParent.startDate || subEnd > selectedParent.endDate) {
+      notifyError("Сроки подзадачи вне диапазона большой задачи");
+      return;
+    }
     const created: PlannerSubtask = {
       id: nextPlannerId(state.subtasks),
       teamId: selectedParent.teamId,
@@ -563,7 +751,7 @@ export default function PlannerPage() {
     setSubStart("");
     setSubEnd("");
     setSubInSprint(false);
-    setError("");
+    notifySuccess("Подзадача добавлена");
   };
 
   const startEditParent = (parentId: number) => {
@@ -575,7 +763,6 @@ export default function PlannerPage() {
       startDate: parent.startDate,
       endDate: parent.endDate,
     });
-    setError("");
   };
 
   const cancelEditParent = () => {
@@ -587,7 +774,7 @@ export default function PlannerPage() {
     if (!editingParentId || !editingParentDraft) return;
     const nextTitle = editingParentDraft.title.trim();
     if (!nextTitle || !editingParentDraft.startDate || !editingParentDraft.endDate || editingParentDraft.startDate > editingParentDraft.endDate) {
-      setError("Проверьте поля большой задачи");
+      notifyError("Проверьте поля большой задачи");
       return;
     }
     const hasOutOfRangeSubtasks = state.subtasks.some(
@@ -596,7 +783,7 @@ export default function PlannerPage() {
         (s.startDate < editingParentDraft.startDate || s.endDate > editingParentDraft.endDate)
     );
     if (hasOutOfRangeSubtasks) {
-      setError("Сначала поправьте сроки подзадач: они должны быть в диапазоне большой задачи");
+      notifyError("Сначала исправьте сроки подзадач: они должны быть в диапазоне большой задачи");
       return;
     }
     setState((prev) => ({
@@ -608,7 +795,7 @@ export default function PlannerPage() {
       ),
     }));
     cancelEditParent();
-    setError("");
+    notifySuccess("Большая задача обновлена");
   };
 
   const startEditSubtask = (subtaskId: number) => {
@@ -623,7 +810,6 @@ export default function PlannerPage() {
       status: subtask.status,
       inSprint: subtask.inSprint,
     });
-    setError("");
   };
 
   const cancelEditSubtask = () => {
@@ -635,14 +821,14 @@ export default function PlannerPage() {
     if (!editingSubtaskId || !editingSubtaskDraft) return;
     const nextTitle = editingSubtaskDraft.title.trim();
     if (!nextTitle || !editingSubtaskDraft.assigneeId || !editingSubtaskDraft.startDate || !editingSubtaskDraft.endDate || editingSubtaskDraft.startDate > editingSubtaskDraft.endDate) {
-      setError("Проверьте поля подзадачи");
+      notifyError("Проверьте поля подзадачи");
       return;
     }
     const current = state.subtasks.find((s) => Number(s.id) === Number(editingSubtaskId));
     const parent = state.parentTasks.find((p) => Number(p.id) === Number(current?.parentTaskId));
     if (!current || !parent) return;
     if (editingSubtaskDraft.startDate < parent.startDate || editingSubtaskDraft.endDate > parent.endDate) {
-      setError("Сроки подзадачи вне диапазона большой задачи");
+      notifyError("Сроки подзадачи вне диапазона большой задачи");
       return;
     }
     const safeStatus =
@@ -670,16 +856,16 @@ export default function PlannerPage() {
       ),
     }));
     cancelEditSubtask();
-    setError("");
+    notifySuccess("Подзадача обновлена");
   };
 
   const removeKanbanColumn = (title: string) => {
     if (DEFAULT_KANBAN_COLUMNS.includes(title)) {
-      setError("Базовые колонки удалить нельзя");
+      notifyError("Базовые колонки удалять нельзя");
       return;
     }
     if (state.columns.length <= 1) {
-      setError("Должна остаться хотя бы одна колонка");
+      notifyError("Должна остаться хотя бы одна колонка");
       return;
     }
 
@@ -692,13 +878,20 @@ export default function PlannerPage() {
       subtasks: prev.subtasks.map((s) => (s.status === title ? { ...s, status: fallbackStatus } : s)),
     }));
 
-    setError("");
+    notifySuccess("Колонка удалена");
   };
 
   const confirmCloseEnrollment = () => {
-    setState((prev) => ({ ...prev, enrollmentClosed: true, participants: snapshotParticipants() }));
-    setConfirmCloseEnrollmentOpen(false);
-    setError("");
+    if (!closeEnrollmentTarget) return;
+    const eventId = closeEnrollmentTarget.eventId;
+    setState((prev) => ({
+      ...prev,
+      enrollmentClosed: true,
+      closedEventIds: Array.from(new Set([...prev.closedEventIds, eventId])),
+      participants: snapshotParticipants(Array.from(new Set([...prev.closedEventIds, eventId]))),
+    }));
+    setCloseEnrollmentTarget(null);
+    notifySuccess(`Набор по мероприятию «${closeEnrollmentTarget.eventTitle}» завершён`);
   };
 
   const moveKanbanSubtask = (subtaskId: number, column: string, position: number) => {
@@ -772,11 +965,14 @@ export default function PlannerPage() {
   const teamEditTeam = teamEditId != null ? state.teams.find((t) => Number(t.id) === Number(teamEditId)) ?? null : null;
   const teamEditCandidateIds = (() => {
     const ids = new Set<number>();
-    if (teamEditTeam?.projectId) {
+    if (teamEditTeam?.eventId) {
       requests.forEach((request) => {
         const ownerId = Number(request.ownerId);
         if (!Number.isFinite(ownerId)) return;
-        if (Number(request.projectId) === Number(teamEditTeam.projectId)) {
+        if (Number(request.eventId) === Number(teamEditTeam.eventId)) {
+          if (state.closedEventIds.includes(Number(teamEditTeam.eventId)) && !hasStartedWork(request.status)) {
+            return;
+          }
           ids.add(ownerId);
         }
       });
@@ -786,6 +982,9 @@ export default function PlannerPage() {
         const ownerId = Number(request.ownerId);
         if (!Number.isFinite(ownerId)) return;
         if (sourceIds.has(Number(request.id))) {
+          if (teamEditTeam.eventId && state.closedEventIds.includes(Number(teamEditTeam.eventId)) && !hasStartedWork(request.status)) {
+            return;
+          }
           ids.add(ownerId);
         }
       });
@@ -804,7 +1003,6 @@ export default function PlannerPage() {
     <div className="page planner-page">
       <PlannerHeader visibleTeams={visibleTeams} teamFilter={teamFilter} onTeamFilterChange={setTeamFilter} />
       <PlannerTabs tab={tab} onChange={setTab} />
-      {error && <div className="planner-error">{error}</div>}
 
       {tab === "teams" && (
         <TeamsTab
@@ -817,8 +1015,8 @@ export default function PlannerPage() {
           currentUser={user}
           visibleTeams={visibleTeams}
           userNameById={userNameById}
-          onOpenConfirmCloseEnrollment={() => setConfirmCloseEnrollmentOpen(true)}
-          onSyncParticipants={() => setState((prev) => ({ ...prev, participants: snapshotParticipants() }))}
+          onOpenConfirmCloseEnrollment={openCloseEnrollment}
+          onSyncParticipants={() => setState((prev) => ({ ...prev, participants: snapshotParticipants(prev.closedEventIds) }))}
           onToggleApplicantForGroup={toggleApplicantForGroup}
           onTeamNameChange={(groupKey, value) => setTeamNameByGroup((prev) => ({ ...prev, [groupKey]: value }))}
           onTeamCuratorChange={(groupKey, value) => setTeamCuratorByGroup((prev) => ({ ...prev, [groupKey]: value }))}
@@ -929,8 +1127,9 @@ export default function PlannerPage() {
       )}
 
       <ConfirmCloseEnrollmentModal
-        isOpen={confirmCloseEnrollmentOpen}
-        onClose={() => setConfirmCloseEnrollmentOpen(false)}
+        isOpen={Boolean(closeEnrollmentTarget)}
+        eventTitle={closeEnrollmentTarget?.eventTitle}
+        onClose={() => setCloseEnrollmentTarget(null)}
         onConfirm={confirmCloseEnrollment}
       />
       <TeamInfoModal

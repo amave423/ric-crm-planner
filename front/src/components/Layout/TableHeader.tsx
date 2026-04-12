@@ -1,4 +1,4 @@
-import "../../styles/table-header.scss";
+﻿import "../../styles/table-header.scss";
 import plusIcon from "../../assets/icons/plus.svg";
 import { useContext } from "react";
 import { AuthContext } from "../../context/AuthContext";
@@ -47,3 +47,4 @@ export default function TableHeader({
     </div>
   );
 }
+

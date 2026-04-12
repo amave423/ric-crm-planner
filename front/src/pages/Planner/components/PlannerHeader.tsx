@@ -1,4 +1,4 @@
-import type { PlannerTeam } from "../../../types/planner";
+﻿import type { PlannerTeam } from "../../../types/planner";
 
 type PlannerHeaderProps = {
   visibleTeams: PlannerTeam[];

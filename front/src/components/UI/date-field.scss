@@ -6,37 +6,49 @@
 
 .ui-date-input {
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .ui-date-input input {
   width: 100%;
-  padding-right: 44px;
+  padding-right: 52px;
+  margin-bottom: 0;
 }
 
 .ui-calendar-btn {
   position: absolute;
-  right: 12px;
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
-  background: transparent;
-  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: #fff;
   padding: 0;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
 }
 
 .ui-calendar-btn img {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
+  display: block;
   opacity: 0.62;
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
+.ui-calendar-btn:hover {
+  border-color: rgba(59, 130, 246, 0.38);
+  background: #f8fbff;
+}
+
 .ui-calendar-btn:hover img {
   opacity: 1;
-  transform: scale(1.08);
 }
 
 .ui-calendar-btn:disabled {

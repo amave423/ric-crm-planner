@@ -1,8 +1,8 @@
-import { useContext, useEffect, useState } from "react";
+﻿import { useContext, useEffect, useState } from "react";
 import client from "../../api/client";
-import type { Request } from "../../types/request";
 import { REQUEST_STATUS } from "../../constants/requestProgress";
 import { AuthContext } from "../../context/AuthContext";
+import type { Request } from "../../types/request";
 import Modal from "../Modal/Modal";
 import { useToast } from "../Toast/ToastProvider";
 
@@ -20,6 +20,7 @@ interface Props {
   projectId?: number;
   projectTitle?: string;
   eventId?: number;
+  eventTitle?: string;
   directionId?: number;
   specializations?: { id: number; title: string }[];
   onSubmit: (req: Request) => boolean | Promise<boolean>;
@@ -31,11 +32,13 @@ export default function ApplyModal({
   projectId,
   projectTitle,
   eventId,
+  eventTitle,
   directionId,
   specializations = [],
   onSubmit,
 }: Props) {
   const { user } = useContext(AuthContext);
+  const { showToast } = useToast();
 
   const [studentName, setStudentName] = useState("");
   const [telegram, setTelegram] = useState("");
@@ -44,7 +47,6 @@ export default function ApplyModal({
   const [specialization, setSpecialization] = useState<string>(specializations[0]?.title || "");
   const [about, setAbout] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const { showToast } = useToast();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -52,18 +54,19 @@ export default function ApplyModal({
 
     (async () => {
       try {
-        const prof = user && !client.USE_MOCK ? await client.get<ProfileResponse>("/api/users/profile/") : undefined;
+        const profile = user && !client.USE_MOCK ? await client.get<ProfileResponse>("/api/users/profile/") : undefined;
         const userRecord = (user ?? {}) as Record<string, unknown>;
         if (!mounted) return;
 
         setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");
-        setTelegram(String(prof?.telegram ?? userRecord.telegram ?? ""));
-        setUniversity(String(prof?.university ?? userRecord.university ?? ""));
-        setCourse(String(prof?.course ?? userRecord.course ?? ""));
-        setSpecialization(String(prof?.specialty ?? userRecord.specialty ?? specializations[0]?.title ?? ""));
-        setAbout(String(prof?.about ?? userRecord.about ?? ""));
+        setTelegram(String(profile?.telegram ?? userRecord.telegram ?? ""));
+        setUniversity(String(profile?.university ?? userRecord.university ?? ""));
+        setCourse(String(profile?.course ?? userRecord.course ?? ""));
+        setSpecialization(String(profile?.specialty ?? userRecord.specialty ?? specializations[0]?.title ?? ""));
+        setAbout(String(profile?.about ?? userRecord.about ?? ""));
         setErrors({});
       } catch {
+        if (!mounted) return;
         setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");
         setTelegram("");
         setUniversity("");
@@ -80,17 +83,15 @@ export default function ApplyModal({
   }, [isOpen, specializations, user]);
 
   const validate = () => {
-    const e: Record<string, string> = {};
-    if (!studentName.trim()) e.studentName = "Введите ФИО";
-    if (!telegram.trim()) e.telegram = "Укажите аккаунт в Telegram";
-    if (!university.trim()) e.university = "Укажите университет";
-    if (!course.trim()) e.course = "Укажите курс";
-    if (!specialization.trim()) e.specialization = "Выберите специализацию";
-    if (!projectTitle) e.project = "Проект не выбран";
-    if (!eventId) e.event = "Не найдено мероприятие";
-    if (!directionId) e.direction = "Не найдено направление";
-    setErrors(e);
-    return Object.keys(e).length === 0;
+    const nextErrors: Record<string, string> = {};
+    if (!studentName.trim()) nextErrors.studentName = "Введите ФИО";
+    if (!telegram.trim()) nextErrors.telegram = "Укажите аккаунт в Telegram";
+    if (!university.trim()) nextErrors.university = "Укажите университет";
+    if (!course.trim()) nextErrors.course = "Укажите курс";
+    if (!specialization.trim()) nextErrors.specialization = "Выберите специализацию";
+    if (!eventId) nextErrors.event = "Не найдено мероприятие";
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleSend = () => {
@@ -99,7 +100,8 @@ export default function ApplyModal({
       return;
     }
 
-    const req: Request = {
+    const selectedSpecialization = specializations.find((item) => item.title === specialization);
+    const request: Request = {
       id: 0,
       studentName: studentName.trim(),
       telegram: telegram.trim(),
@@ -108,7 +110,9 @@ export default function ApplyModal({
       projectId,
       projectTitle,
       eventId,
+      eventTitle,
       directionId,
+      specializationId: selectedSpecialization?.id,
       specialization,
       about: about.trim(),
       status: REQUEST_STATUS.SUBMITTED,
@@ -116,8 +120,8 @@ export default function ApplyModal({
       ownerId: user?.id,
     };
 
-    const res = onSubmit(req);
-    Promise.resolve(res).then((ok) => {
+    const result = onSubmit(request);
+    Promise.resolve(result).then((ok) => {
       if (ok) onClose();
     });
   };
@@ -126,7 +130,7 @@ export default function ApplyModal({
     <Modal isOpen={isOpen} onClose={onClose} title="Подать заявку" hideActions>
       <div className="apply-form">
         <div className="apply-header">
-          <div className="apply-project">{projectTitle || "Выбранный проект"}</div>
+          <div className="apply-project">{eventTitle || projectTitle || "Выбранное мероприятие"}</div>
         </div>
 
         <div className="form-body">
@@ -135,12 +139,12 @@ export default function ApplyModal({
             <input
               className="text-regular"
               value={studentName}
-              onChange={(e) => {
-                setStudentName(e.target.value);
+              onChange={(event) => {
+                setStudentName(event.target.value);
                 setErrors((prev) => {
-                  const p = { ...prev };
-                  delete p.studentName;
-                  return p;
+                  const next = { ...prev };
+                  delete next.studentName;
+                  return next;
                 });
               }}
               aria-invalid={!!errors.studentName}
@@ -153,12 +157,12 @@ export default function ApplyModal({
             <input
               className="text-regular"
               value={telegram}
-              onChange={(e) => {
-                setTelegram(e.target.value);
+              onChange={(event) => {
+                setTelegram(event.target.value);
                 setErrors((prev) => {
-                  const p = { ...prev };
-                  delete p.telegram;
-                  return p;
+                  const next = { ...prev };
+                  delete next.telegram;
+                  return next;
                 });
               }}
               aria-invalid={!!errors.telegram}
@@ -171,12 +175,12 @@ export default function ApplyModal({
             <input
               className="text-regular"
               value={university}
-              onChange={(e) => {
-                setUniversity(e.target.value);
+              onChange={(event) => {
+                setUniversity(event.target.value);
                 setErrors((prev) => {
-                  const p = { ...prev };
-                  delete p.university;
-                  return p;
+                  const next = { ...prev };
+                  delete next.university;
+                  return next;
                 });
               }}
               aria-invalid={!!errors.university}
@@ -189,12 +193,12 @@ export default function ApplyModal({
             <input
               className="text-regular"
               value={course}
-              onChange={(e) => {
-                setCourse(e.target.value);
+              onChange={(event) => {
+                setCourse(event.target.value);
                 setErrors((prev) => {
-                  const p = { ...prev };
-                  delete p.course;
-                  return p;
+                  const next = { ...prev };
+                  delete next.course;
+                  return next;
                 });
               }}
               aria-invalid={!!errors.course}
@@ -207,20 +211,20 @@ export default function ApplyModal({
             <select
               className="text-regular"
               value={specialization}
-              onChange={(e) => {
-                setSpecialization(e.target.value);
+              onChange={(event) => {
+                setSpecialization(event.target.value);
                 setErrors((prev) => {
-                  const p = { ...prev };
-                  delete p.specialization;
-                  return p;
+                  const next = { ...prev };
+                  delete next.specialization;
+                  return next;
                 });
               }}
               aria-invalid={!!errors.specialization}
             >
-              <option value="">—</option>
-              {specializations.map((s) => (
-                <option key={s.id} value={s.title}>
-                  {s.title}
+              <option value="">-</option>
+              {specializations.map((item) => (
+                <option key={item.id} value={item.title}>
+                  {item.title}
                 </option>
               ))}
             </select>
@@ -228,8 +232,8 @@ export default function ApplyModal({
           </div>
 
           <div className="form-field">
-            <label className="text-small">О вас (необязательно)</label>
-            <textarea value={about} onChange={(e) => setAbout(e.target.value)} />
+            <label className="text-small">О себе (необязательно)</label>
+            <textarea value={about} onChange={(event) => setAbout(event.target.value)} />
           </div>
         </div>
 

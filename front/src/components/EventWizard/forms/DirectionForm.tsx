@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useWizard } from "../EventWizardModal";
 import type { DirectionModel } from "../types";
 import { getDirectionsByEvent, saveDirectionsForEvent as persistDirections } from "../../../api/directions";
@@ -9,15 +9,15 @@ import type { User } from "../../../types/user";
 import { getAllUsers } from "../../../storage/storage";
 import { useToast } from "../../Toast/ToastProvider";
 
-function normalizeUser(u: User | Record<string, unknown>): User {
-  const obj = u as User & Record<string, unknown>;
+function normalizeUser(user: User | Record<string, unknown>): User {
+  const raw = user as User & Record<string, unknown>;
   return {
-    ...obj,
-    id: Number(obj.id),
-    email: String(obj.email ?? ""),
-    role: String(obj.role ?? ""),
-    name: obj.name ?? String(obj.firstName ?? obj.first_name ?? ""),
-    surname: obj.surname ?? String(obj.lastName ?? obj.last_name ?? ""),
+    ...raw,
+    id: Number(raw.id),
+    email: String(raw.email ?? ""),
+    role: String(raw.role ?? ""),
+    name: raw.name ?? String(raw.firstName ?? raw.first_name ?? ""),
+    surname: raw.surname ?? String(raw.lastName ?? raw.last_name ?? ""),
   };
 }
 
@@ -33,6 +33,7 @@ function toDirectionModel(direction: Direction): DirectionModel {
 
 export default function DirectionForm() {
   const { mode, saveDirections, eventId, savedDirections, directionId: ctxDirectionId } = useWizard();
+  const { showToast } = useToast();
 
   const [description, setDescription] = useState("");
   const [directions, setDirections] = useState<DirectionModel[]>([]);
@@ -42,9 +43,8 @@ export default function DirectionForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [usersList, setUsersList] = useState<User[]>([]);
-  const { showToast } = useToast();
 
-  const organizers = usersList.filter((u) => u.role === "organizer");
+  const organizers = usersList.filter((user) => user.role === "organizer");
 
   const fillForm = (direction?: DirectionModel) => {
     if (!direction) return;
@@ -60,11 +60,12 @@ export default function DirectionForm() {
     (async () => {
       try {
         const users = await getAllUsers();
-        if (mounted) setUsersList((users || []).map((u) => normalizeUser(u)));
+        if (mounted) setUsersList((users || []).map((user) => normalizeUser(user)));
       } catch {
         if (mounted) setUsersList([]);
       }
     })();
+
     return () => {
       mounted = false;
     };
@@ -72,12 +73,13 @@ export default function DirectionForm() {
 
   useEffect(() => {
     let mounted = true;
+
     (async () => {
       if (savedDirections && savedDirections.length > 0) {
         if (!mounted) return;
         setDirections(savedDirections);
         if (mode === "edit" && ctxDirectionId) {
-          fillForm(savedDirections.find((d) => Number(d.id) === Number(ctxDirectionId)));
+          fillForm(savedDirections.find((direction) => Number(direction.id) === Number(ctxDirectionId)));
         } else {
           setSelectedOrganizer((prev) => prev || savedDirections[0]?.organizer || "");
         }
@@ -87,19 +89,19 @@ export default function DirectionForm() {
       if (!eventId) return;
       setLoading(true);
       try {
-        const apiDirs = await getDirectionsByEvent(Number(eventId));
+        const apiDirections = await getDirectionsByEvent(Number(eventId));
         if (!mounted) return;
-        const mapped = apiDirs.map((d) => toDirectionModel(d));
+        const mapped = apiDirections.map((direction) => toDirectionModel(direction));
         setDirections(mapped);
 
         if (mode === "edit" && ctxDirectionId) {
-          fillForm(mapped.find((d) => Number(d.id) === Number(ctxDirectionId)));
+          fillForm(mapped.find((direction) => Number(direction.id) === Number(ctxDirectionId)));
         } else {
           const event = await getEventById(Number(eventId)).catch(() => undefined);
           if (!mounted) return;
           const leaderId = (event as Event | undefined)?.leader;
           if (leaderId != null) {
-            const organizer = usersList.find((u) => u.role === "organizer" && String(u.id) === String(leaderId));
+            const organizer = usersList.find((user) => user.role === "organizer" && String(user.id) === String(leaderId));
             if (organizer) {
               setSelectedOrganizer((prev) => prev || `${organizer.surname} ${organizer.name}`.trim());
             }
@@ -129,7 +131,8 @@ export default function DirectionForm() {
     if (!validateDraft()) return;
 
     const title = input.trim();
-    const desc = description.trim();
+    const nextDescription = description.trim();
+
     if (editingDirectionId != null) {
       setDirections((prev) =>
         prev.map((direction) =>
@@ -137,7 +140,7 @@ export default function DirectionForm() {
             ? {
                 ...direction,
                 title,
-                description: desc || undefined,
+                description: nextDescription || undefined,
                 organizer: selectedOrganizer,
               }
             : direction
@@ -152,7 +155,7 @@ export default function DirectionForm() {
       {
         id: Date.now(),
         title,
-        description: desc || undefined,
+        description: nextDescription || undefined,
         projects: [],
         organizer: selectedOrganizer,
       },
@@ -206,7 +209,7 @@ export default function DirectionForm() {
 
     type DirectionDraft = Omit<Direction, "id"> & { id?: number };
 
-    const toSend = preparedDirections.map((direction): DirectionDraft => {
+    const payload = preparedDirections.map((direction): DirectionDraft => {
       let leaderId: number | undefined;
       const organizerValue = String(direction.organizer ?? "").trim();
       const numericOrganizer = Number(organizerValue);
@@ -218,19 +221,19 @@ export default function DirectionForm() {
         if (foundOrganizer) leaderId = Number(foundOrganizer.id);
       }
 
-      const payload: DirectionDraft = {
+      const nextDirection: DirectionDraft = {
         ...(direction.id ? { id: Number(direction.id) } : {}),
         title: direction.title?.trim() ?? "",
         description: direction.description ?? "",
         organizer: organizerValue,
       };
 
-      if (typeof leaderId !== "undefined") payload.leader = leaderId;
-      return payload;
+      if (typeof leaderId !== "undefined") nextDirection.leader = leaderId;
+      return nextDirection;
     });
 
     try {
-      const saved = await persistDirections(Number(eventId), toSend as Direction[]);
+      const saved = await persistDirections(Number(eventId), payload as Direction[]);
       const mapped = (saved as Direction[]).map((direction) => toDirectionModel(direction));
       setDirections(mapped);
       saveDirections?.(mapped);
@@ -250,24 +253,29 @@ export default function DirectionForm() {
       <div className={`field-wrap ${errors.input ? "error" : ""}`}>
         <label className="text-small">
           Название направления
-          <input
-            placeholder="Введите название направления"
-            value={input}
-            onChange={(event) => {
-              setInput(event.target.value);
-              setErrors((prev) => {
-                const next = { ...prev };
-                delete next.input;
-                return next;
-              });
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                saveDraftToList();
-              }
-            }}
-          />
+          <div className="wizard-inline-add-row wizard-inline-add-row--entity">
+            <input
+              placeholder="Введите название направления"
+              value={input}
+              onChange={(event) => {
+                setInput(event.target.value);
+                setErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.input;
+                  return next;
+                });
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  saveDraftToList();
+                }
+              }}
+            />
+            <button className="primary wizard-inline-add-button wizard-inline-add-button--secondary" type="button" onClick={saveDraftToList}>
+              {editingDirectionId != null ? "Обновить" : "Добавить"}
+            </button>
+          </div>
         </label>
         {errors.input && <div className="field-error">{errors.input}</div>}
       </div>
@@ -321,17 +329,15 @@ export default function DirectionForm() {
                 {direction.description && <span className="text-small" style={{ opacity: 0.8 }}>{direction.description}</span>}
                 {direction.organizer && <span className="text-small" style={{ opacity: 0.8 }}>Организатор: {direction.organizer}</span>}
               </button>
-              <button type="button" onClick={() => removeDirection(Number(direction.id))}>x</button>
+              <button type="button" onClick={() => removeDirection(Number(direction.id))} aria-label="Удалить направление">
+                x
+              </button>
             </div>
           ))
         )}
       </div>
 
       <div className="wizard-actions">
-        <button className="primary" type="button" onClick={saveDraftToList} style={{ marginRight: 8 }}>
-          {editingDirectionId != null ? "Обновить направление" : "Добавить направление"}
-        </button>
-
         <button className="primary" onClick={handleSave} type="button">
           Сохранить направления
         </button>

@@ -1,18 +1,27 @@
-import client from "../api/client";
+﻿import client from "../api/client";
+import seedRequests from "../mock-data/requests.json";
 import type { Request as ReqType } from "../types/request";
 
 const USE_MOCK = client.USE_MOCK;
 
 export const LS_KEY = "ric_mock_requests";
 const LS_BACKEND_CACHE = "ric_backend_my_requests";
+const LS_SEED_VERSION = "ric_mock_seed_version";
+const CURRENT_SEED_VERSION = "v3";
+
+type UnknownRecord = Record<string, unknown>;
+
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
+}
 
 function readLS<T>(key: string, fallback: T): T {
   const raw = localStorage.getItem(key);
-  if (!raw) return fallback;
+  if (!raw) return clone(fallback);
   try {
     return JSON.parse(raw) as T;
   } catch {
-    return fallback;
+    return clone(fallback);
   }
 }
 
@@ -23,6 +32,17 @@ function writeLS<T>(key: string, value: T) {
 function nextId(items: Array<{ id?: number }>) {
   const max = items.reduce((acc, x) => Math.max(acc, Number(x.id || 0)), 0);
   return max + 1;
+}
+
+function ensureMockSeeded() {
+  const storedVersion = localStorage.getItem(LS_SEED_VERSION);
+  if (storedVersion !== CURRENT_SEED_VERSION) {
+    writeLS(LS_KEY, seedRequests as UnknownRecord[]);
+    localStorage.setItem(LS_SEED_VERSION, CURRENT_SEED_VERSION);
+    return;
+  }
+
+  if (!localStorage.getItem(LS_KEY)) writeLS(LS_KEY, seedRequests as UnknownRecord[]);
 }
 
 export function getBackendRequestCache(ownerId?: number): ReqType[] {
@@ -58,7 +78,8 @@ export async function getRequests(): Promise<ReqType[]> {
     }
   }
 
-  return readLS<ReqType[]>(LS_KEY, []);
+  ensureMockSeeded();
+  return readLS<ReqType[]>(LS_KEY, seedRequests as ReqType[]);
 }
 
 export async function saveRequest(req: ReqType): Promise<ReqType> {
@@ -70,7 +91,8 @@ export async function saveRequest(req: ReqType): Promise<ReqType> {
     return client.post("/api/users/applications/", req);
   }
 
-  const requests = readLS<ReqType[]>(LS_KEY, []);
+  ensureMockSeeded();
+  const requests = readLS<ReqType[]>(LS_KEY, seedRequests as ReqType[]);
   const id = req.id && req.id > 0 ? req.id : nextId(requests as Array<{ id?: number }>);
   const created: ReqType = {
     ...req,
@@ -88,7 +110,8 @@ export async function saveRequest(req: ReqType): Promise<ReqType> {
 export async function updateRequestStatus(id: number, status: string): Promise<ReqType | undefined> {
   if (!USE_MOCK) return client.put(`/api/users/applications/${id}/`, { status });
 
-  const requests = readLS<ReqType[]>(LS_KEY, []);
+  ensureMockSeeded();
+  const requests = readLS<ReqType[]>(LS_KEY, seedRequests as ReqType[]);
   const idx = requests.findIndex((r) => Number(r.id) === Number(id));
   if (idx < 0) return undefined;
   requests[idx] = { ...requests[idx], status };
@@ -99,7 +122,8 @@ export async function updateRequestStatus(id: number, status: string): Promise<R
 export async function removeRequest(id: number): Promise<ReqType | undefined> {
   if (!USE_MOCK) return client.del(`/api/users/applications/${id}/`);
 
-  const requests = readLS<ReqType[]>(LS_KEY, []);
+  ensureMockSeeded();
+  const requests = readLS<ReqType[]>(LS_KEY, seedRequests as ReqType[]);
   const target = requests.find((r) => Number(r.id) === Number(id));
   if (!target) return undefined;
   writeLS(

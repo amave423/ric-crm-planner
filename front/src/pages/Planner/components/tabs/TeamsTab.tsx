@@ -1,4 +1,4 @@
-import infoIcon from "../../../../assets/icons/info.svg";
+﻿import infoIcon from "../../../../assets/icons/info.svg";
 import type { PlannerState, PlannerTeam } from "../../../../types/planner";
 import type { User } from "../../../../types/user";
 import type { ApplicantsTreeNode, ProjectApplicantsGroup } from "../../planner.types";
@@ -14,7 +14,7 @@ type TeamsTabProps = {
   currentUser: User;
   visibleTeams: PlannerTeam[];
   userNameById: Map<number, string>;
-  onOpenConfirmCloseEnrollment: () => void;
+  onOpenConfirmCloseEnrollment: (eventId: number, eventTitle: string) => void;
   onSyncParticipants: () => void;
   onToggleApplicantForGroup: (groupKey: string, ownerId: number) => void;
   onTeamNameChange: (groupKey: string, value: string) => void;
@@ -51,6 +51,8 @@ export default function TeamsTab({
   onDeleteTeam,
   sourceLabelForTeam,
 }: TeamsTabProps) {
+  const hasClosedEvents = state.closedEventIds.length > 0;
+
   return (
     <div className={`teams-layout ${!isOrganizer ? "teams-layout--single" : ""}`}>
       {isOrganizer && (
@@ -59,22 +61,20 @@ export default function TeamsTab({
             <div>
               <div className="teams-eyebrow">Работа с заявками</div>
               <h3 className="h3">Формирование команд</h3>
-              <p>Выбери проектантов по проекту, задай название команды и назначь куратора.</p>
+              <p>Выбери проектантов по заявкам мероприятия, задай название команды и назначь куратора.</p>
             </div>
 
-            {!state.enrollmentClosed ? (
-              <button className="primary" type="button" onClick={onOpenConfirmCloseEnrollment}>
-                Завершить набор
-              </button>
-            ) : (
+            {hasClosedEvents && (
               <button className="primary" type="button" onClick={onSyncParticipants}>
                 Синхронизировать участников
               </button>
             )}
           </div>
 
-          {state.enrollmentClosed && (
-            <div className="planner-note teams-note">Список участников обновляется по заявкам со статусом «Приступил к ПШ».</div>
+          {hasClosedEvents && (
+            <div className="planner-note teams-note">
+              Для мероприятий с завершённым набором в планировщике остаются только участники со статусом «Приступил к ПШ».
+            </div>
           )}
 
           <div className="planner-source-tree">
@@ -84,7 +84,30 @@ export default function TeamsTab({
               applicantsTree.map((eventNode) => (
                 <details key={eventNode.key} className="planner-source-node planner-source-node--event" open>
                   <summary className="planner-source-summary">
-                    <span>Мероприятие: {eventNode.title}</span>
+                    <div className="planner-source-summary-main">
+                      <span>Мероприятие: {eventNode.title}</span>
+                    </div>
+
+                    <div className="planner-source-summary-actions">
+                      {eventNode.eventClosed ? (
+                        <span className="planner-source-meta planner-source-meta--closed">Набор завершён</span>
+                      ) : (
+                        isOrganizer &&
+                        eventNode.eventId && (
+                          <button
+                            type="button"
+                            className="planner-source-close-btn"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              onOpenConfirmCloseEnrollment(eventNode.eventId!, eventNode.title);
+                            }}
+                          >
+                            Завершить набор
+                          </button>
+                        )
+                      )}
+                    </div>
                   </summary>
 
                   <div className="planner-source-content">
@@ -103,49 +126,55 @@ export default function TeamsTab({
                               </summary>
 
                               <div className="planner-source-content">
-                                <div className="planner-members-grid">
-                                  {group.applicants.map((applicant) => (
-                                    <label key={`${group.key}:${applicant.ownerId}`} className="planner-check planner-applicant-row">
+                                {group.applicants.length === 0 ? (
+                                  <div className="planner-empty-inline">По этому проекту пока нет доступных участников для формирования команды.</div>
+                                ) : (
+                                  <>
+                                    <div className="planner-members-grid">
+                                      {group.applicants.map((applicant) => (
+                                        <label key={`${group.key}:${applicant.ownerId}`} className="planner-check planner-applicant-row">
+                                          <input
+                                            type="checkbox"
+                                            checked={(selectedApplicantsByGroup[group.key] || []).includes(applicant.ownerId)}
+                                            onChange={() => onToggleApplicantForGroup(group.key, applicant.ownerId)}
+                                          />
+                                          <span>
+                                            {applicant.name}
+                                            {applicant.status ? ` (${applicant.status})` : ""}
+                                          </span>
+                                        </label>
+                                      ))}
+                                    </div>
+
+                                    <div className="planner-grid planner-grid--team-from-project">
                                       <input
-                                        type="checkbox"
-                                        checked={(selectedApplicantsByGroup[group.key] || []).includes(applicant.ownerId)}
-                                        onChange={() => onToggleApplicantForGroup(group.key, applicant.ownerId)}
+                                        value={teamNameByGroup[group.key] || ""}
+                                        onChange={(event) => onTeamNameChange(group.key, event.target.value)}
+                                        placeholder="Название команды"
                                       />
-                                      <span>
-                                        {applicant.name}
-                                        {applicant.status ? ` (${applicant.status})` : ""}
-                                      </span>
-                                    </label>
-                                  ))}
-                                </div>
 
-                                <div className="planner-grid planner-grid--team-from-project">
-                                  <input
-                                    value={teamNameByGroup[group.key] || ""}
-                                    onChange={(event) => onTeamNameChange(group.key, event.target.value)}
-                                    placeholder="Название команды (обязательно)"
-                                  />
+                                      <select value={teamCuratorByGroup[group.key] || ""} onChange={(event) => onTeamCuratorChange(group.key, event.target.value)}>
+                                        <option value="" disabled>
+                                          Куратор (из заявок мероприятия)
+                                        </option>
+                                        {!group.applicants.some((applicant) => Number(applicant.ownerId) === Number(currentUser.id)) && (
+                                          <option value={String(currentUser.id)}>
+                                            Организатор: {fullName(currentUser) || currentUser.email || `ID ${currentUser.id}`}
+                                          </option>
+                                        )}
+                                        {group.applicants.map((applicant) => (
+                                          <option key={`${group.key}:curator:${applicant.ownerId}`} value={String(applicant.ownerId)}>
+                                            {applicant.name}
+                                          </option>
+                                        ))}
+                                      </select>
 
-                                  <select value={teamCuratorByGroup[group.key] || ""} onChange={(event) => onTeamCuratorChange(group.key, event.target.value)}>
-                                    <option value="" disabled>
-                                      Куратор (из заявок проекта)
-                                    </option>
-                                    {!group.applicants.some((applicant) => Number(applicant.ownerId) === Number(currentUser.id)) && (
-                                      <option value={String(currentUser.id)}>
-                                        Организатор: {fullName(currentUser) || currentUser.email || `ID ${currentUser.id}`}
-                                      </option>
-                                    )}
-                                    {group.applicants.map((applicant) => (
-                                      <option key={`${group.key}:curator:${applicant.ownerId}`} value={String(applicant.ownerId)}>
-                                        {applicant.name}
-                                      </option>
-                                    ))}
-                                  </select>
-
-                                  <button className="primary" type="button" onClick={() => onCreateTeamFromGroup(group)}>
-                                    Сформировать команду
-                                  </button>
-                                </div>
+                                      <button className="primary" type="button" onClick={() => onCreateTeamFromGroup(group)}>
+                                        Сформировать команду
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             </details>
                           ))}
@@ -196,13 +225,14 @@ export default function TeamsTab({
               <div className="team-meta-grid">
                 <div className="team-value">
                   <span>Куратор</span>
-                  {team.curatorId ? userNameById.get(team.curatorId) || `ID ${team.curatorId}` : "—"}
+                  {team.curatorId ? userNameById.get(team.curatorId) || `ID ${team.curatorId}` : "-"}
                 </div>
                 <div className="team-value">
                   <span>Участники</span>
                   {team.memberIds.length}
                 </div>
               </div>
+
               {sourceLabelForTeam(team) && (
                 <div className="team-value team-value--source">
                   <span>Источник</span>

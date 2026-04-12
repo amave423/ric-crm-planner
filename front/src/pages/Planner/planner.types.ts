@@ -28,6 +28,8 @@ export type ProjectApplicantsGroup = {
 
 export type ApplicantsTreeNode = {
   key: string;
+  eventId?: number;
+  eventClosed?: boolean;
   title: string;
   directions: Array<{
     key: string;

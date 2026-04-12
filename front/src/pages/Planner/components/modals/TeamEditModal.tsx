@@ -1,4 +1,4 @@
-import Modal from "../../../../components/Modal/Modal";
+﻿import Modal from "../../../../components/Modal/Modal";
 import type { PlannerTeam } from "../../../../types/planner";
 
 type TeamEditModalProps = {

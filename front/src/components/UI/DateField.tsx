@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import calendarIcon from "../../assets/icons/calendar.svg";
 import Calendar from "./Calendar";
 import "./date-field.scss";
@@ -56,16 +56,20 @@ export default function DateField({
 
   useEffect(() => {
     if (!open) return;
+
     const handleOutside = (event: MouseEvent) => {
       if (!wrapperRef.current?.contains(event.target as Node)) {
         setOpen(false);
       }
     };
+
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
+
     document.addEventListener("mousedown", handleOutside);
     document.addEventListener("keydown", handleEscape);
+
     return () => {
       document.removeEventListener("mousedown", handleOutside);
       document.removeEventListener("keydown", handleEscape);

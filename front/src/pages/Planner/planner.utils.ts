@@ -1,4 +1,4 @@
-import type { User } from "../../types/user";
+﻿import type { User } from "../../types/user";
 import { DEFAULT_KANBAN_COLUMNS } from "../../storage/planner";
 
 export const fullName = (user: User) => `${user.surname || ""} ${user.name || ""}`.trim();

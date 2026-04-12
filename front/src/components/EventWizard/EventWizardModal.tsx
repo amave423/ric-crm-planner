@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+﻿import { createContext, useContext, useState } from "react";
 import "./event-wizard.scss";
 
 import EventForm from "./forms/EventForm";
@@ -47,15 +47,15 @@ export default function EventWizardModal({
   initialDirectionId,
   onClose
 }: Props) {
-    const resolvedPage: WizardPage =
+  const resolvedPage: WizardPage =
     page ??
     (context?.type === "event"
       ? "events"
       : context?.type === "direction"
-      ? "directions"
-      : context?.type === "projects" || context?.type === "project"
-      ? "projects"
-      : "events");
+        ? "directions"
+        : context?.type === "projects" || context?.type === "project"
+          ? "projects"
+          : "events");
 
   const initialTab: WizardTab =
     resolvedPage === "projects" ? "projects" : resolvedPage === "directions" ? "directions" : "event";
@@ -104,8 +104,8 @@ export default function EventWizardModal({
         <div
           className={`wizard wizard-tab--${activeTab}`}
           onClick={(e) => e.stopPropagation()}
-          >
-          <button className="wizard-close" aria-label="Закрыть" onClick={onClose}>×</button>
+        >
+          <button className="wizard-close" aria-label="Закрыть" onClick={onClose}>x</button>
           <aside className="wizard-nav">
             <NavButton tab="event" label="Настройка мероприятия" />
             <NavButton tab="directions" label="Настройка направлений" />
@@ -151,3 +151,4 @@ function NavButton({ tab, label }: { tab: WizardTab; label: string }) {
     </button>
   );
 }
+
