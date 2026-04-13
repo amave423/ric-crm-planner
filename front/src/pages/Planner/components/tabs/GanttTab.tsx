@@ -3,6 +3,7 @@ import { Gantt, ViewMode, type Task } from "gantt-task-react";
 import type { PlannerParentTask, PlannerSubtask } from "../../../../types/planner";
 import { isDoneKanbanStatus } from "../../planner.utils";
 import "gantt-task-react/dist/index.css";
+import AppButton from "../../../../components/UI/Button";
 
 type PlannerGanttTask = Task & {
   plannerType: "parent" | "subtask";
@@ -419,7 +420,7 @@ export default function GanttTab({ activeTeamName, parents, subtasks, displayAss
             : "Без подзадач"
           : plannerTask.statusLabel || "Подзадача";
         return (
-          <button
+          <AppButton
             key={plannerTask.id}
             type="button"
             className={`planner-gantt-list-row ${isParent ? "is-parent" : "is-child"} ${isSelected ? "is-selected" : ""}`}
@@ -445,7 +446,7 @@ export default function GanttTab({ activeTeamName, parents, subtasks, displayAss
               </div>
               <span className="planner-gantt-list-row__meta">{metaText}</span>
             </div>
-          </button>
+          </AppButton>
         );
       })}
     </div>
@@ -462,14 +463,14 @@ export default function GanttTab({ activeTeamName, parents, subtasks, displayAss
         <div className="planner-gantt-head__controls">
           <div className="planner-gantt-switcher" role="tablist" aria-label="Масштаб диаграммы Ганта">
             {viewModes.map((mode) => (
-              <button
+              <AppButton
                 key={mode.id}
                 type="button"
                 className={viewMode === mode.id ? "is-active" : ""}
                 onClick={() => setViewMode(mode.id)}
               >
                 {mode.label}
-              </button>
+              </AppButton>
             ))}
           </div>
           <div className="planner-gantt-meta">{selectedLabel}</div>

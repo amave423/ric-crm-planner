@@ -1,4 +1,5 @@
 import type { PlannerTab } from "../planner.types";
+import AppButton from "../../../components/UI/Button";
 
 type PlannerTabsProps = {
   tab: PlannerTab;
@@ -8,18 +9,18 @@ type PlannerTabsProps = {
 export default function PlannerTabs({ tab, onChange }: PlannerTabsProps) {
   return (
     <div className="planner-tabs">
-      <button className={tab === "teams" ? "active" : ""} onClick={() => onChange("teams")}>
+      <AppButton className={tab === "teams" ? "active" : ""} onClick={() => onChange("teams")}>
         Команды
-      </button>
-      <button className={tab === "backlog" ? "active" : ""} onClick={() => onChange("backlog")}>
+      </AppButton>
+      <AppButton className={tab === "backlog" ? "active" : ""} onClick={() => onChange("backlog")}>
         Бэклог
-      </button>
-      <button className={tab === "kanban" ? "active" : ""} onClick={() => onChange("kanban")}>
+      </AppButton>
+      <AppButton className={tab === "kanban" ? "active" : ""} onClick={() => onChange("kanban")}>
         Канбан
-      </button>
-      <button className={tab === "gantt" ? "active" : ""} onClick={() => onChange("gantt")}>
+      </AppButton>
+      <AppButton className={tab === "gantt" ? "active" : ""} onClick={() => onChange("gantt")}>
         Гант
-      </button>
+      </AppButton>
     </div>
   );
 }

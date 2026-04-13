@@ -1,5 +1,6 @@
 import "./form.scss";
 import { useState } from "react";
+import AppButton from "../UI/Button";
 
 export type Field = {
   key: string;
@@ -45,9 +46,9 @@ export default function CreateForm({ fields, onCreate }: Props) {
         </div>
       ))}
 
-      <button className="primary-btn text-regular" type="submit">
+      <AppButton className="primary-btn text-regular" type="submit">
         Создать
-      </button>
+      </AppButton>
     </form>
   );
 }

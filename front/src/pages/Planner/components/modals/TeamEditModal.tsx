@@ -1,5 +1,6 @@
-﻿import Modal from "../../../../components/Modal/Modal";
+import Modal from "../../../../components/Modal/Modal";
 import type { PlannerTeam } from "../../../../types/planner";
+import AppButton from "../../../../components/UI/Button";
 
 type TeamEditModalProps = {
   isOpen: boolean;
@@ -44,12 +45,12 @@ export default function TeamEditModal({
               </div>
             )}
             <div className="planner-team-edit-actions">
-              <button className="link-btn" onClick={onClose}>
+              <AppButton className="link-btn" onClick={onClose}>
                 Отмена
-              </button>
-              <button className="primary" onClick={onSave}>
+              </AppButton>
+              <AppButton className="primary" onClick={onSave}>
                 Сохранить
-              </button>
+              </AppButton>
             </div>
           </>
         )}

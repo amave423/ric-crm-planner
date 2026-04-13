@@ -52,9 +52,17 @@
   padding: 8px 14px;
   background: $primary;
   color: white;
+  border: 1px solid $primary;
   border-radius: 8px;
-  border: none;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.close-btn:hover,
+.close-btn:focus {
+  background: #fff;
+  color: $primary;
+  border-color: $primary;
 }
 
 .apply-form {
@@ -119,12 +127,19 @@
 .btn-cancel {
   padding: 10px 16px;
   border-radius: 10px;
-  background: #e53935;
-  color: white;
-  border: none;
+  background: #fff;
+  color: #e53935;
+  border: 1px solid #e53935;
   cursor: pointer;
   font-weight: 600;
-  transition: background .12s ease;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+
+.btn-cancel:hover,
+.btn-cancel:focus {
+  background: rgba(229, 57, 53, 0.14);
+  color: #111;
+  border-color: #e53935;
 }
 
 .btn-cancel:disabled {
@@ -137,10 +152,17 @@
   border-radius: 10px;
   background: #7b4bdc;
   color: white;
-  border: none;
+  border: 1px solid #7b4bdc;
   cursor: pointer;
   font-weight: 600;
-  transition: background .12s ease;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+
+.btn-send:hover,
+.btn-send:focus {
+  background: #fff;
+  color: #7b4bdc;
+  border-color: #7b4bdc;
 }
 
 .btn-send:disabled {

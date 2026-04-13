@@ -316,6 +316,13 @@
   transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
 }
 
+.kanban-column-remove.ant-btn {
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  padding: 0 !important;
+}
+
 .kanban-column-remove:hover {
   border-color: #ef4444;
   color: #b91c1c;

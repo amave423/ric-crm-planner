@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "../../components/Toast/ToastProvider";
 import { AuthContext } from "../../context/AuthContext";
 import "../../styles/auth.scss";
+import AppButton from "../../components/UI/Button";
 
 export default function Login() {
   const { login } = useContext(AuthContext);
@@ -47,9 +48,9 @@ export default function Login() {
           required
         />
 
-        <button type="submit" className="auth-submit text-regular">
+        <AppButton type="submit" className="auth-submit text-regular">
           Войти
-        </button>
+        </AppButton>
       </form>
 
       <p className="switch-link text-small">

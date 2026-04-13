@@ -1,10 +1,11 @@
-﻿import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import client from "../../api/client";
 import { REQUEST_STATUS } from "../../constants/requestProgress";
 import { AuthContext } from "../../context/AuthContext";
 import type { Request } from "../../types/request";
 import Modal from "../Modal/Modal";
 import { useToast } from "../Toast/ToastProvider";
+import AppButton from "../UI/Button";
 
 type ProfileResponse = {
   telegram?: string;
@@ -238,12 +239,12 @@ export default function ApplyModal({
         </div>
 
         <div className="apply-actions">
-          <button type="button" className="btn-cancel" onClick={onClose}>
+          <AppButton type="button" className="btn-cancel" onClick={onClose}>
             Отмена
-          </button>
-          <button type="button" className="btn-send" onClick={handleSend}>
+          </AppButton>
+          <AppButton type="button" className="btn-send" onClick={handleSend}>
             Отправить
-          </button>
+          </AppButton>
         </div>
       </div>
     </Modal>

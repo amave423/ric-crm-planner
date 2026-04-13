@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useWizard } from "../EventWizardModal";
 import type { DirectionModel } from "../types";
 import { getDirectionsByEvent, saveDirectionsForEvent as persistDirections } from "../../../api/directions";
@@ -8,6 +8,7 @@ import type { Event } from "../../../types/event";
 import type { User } from "../../../types/user";
 import { getAllUsers } from "../../../storage/storage";
 import { useToast } from "../../Toast/ToastProvider";
+import AppButton from "../../UI/Button";
 
 function normalizeUser(user: User | Record<string, unknown>): User {
   const raw = user as User & Record<string, unknown>;
@@ -272,9 +273,9 @@ export default function DirectionForm() {
                 }
               }}
             />
-            <button className="primary wizard-inline-add-button wizard-inline-add-button--secondary" type="button" onClick={saveDraftToList}>
+            <AppButton className="primary wizard-inline-add-button wizard-inline-add-button--secondary" type="button" onClick={saveDraftToList}>
               {editingDirectionId != null ? "Обновить" : "Добавить"}
-            </button>
+            </AppButton>
           </div>
         </label>
         {errors.input && <div className="field-error">{errors.input}</div>}
@@ -320,7 +321,7 @@ export default function DirectionForm() {
               className="tag"
               style={Number(editingDirectionId) === Number(direction.id) ? { outline: "2px solid var(--wizard-accent)" } : undefined}
             >
-              <button
+              <AppButton
                 type="button"
                 style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", display: "flex", flexDirection: "column", gap: 2 }}
                 onClick={() => fillForm(direction)}
@@ -328,19 +329,19 @@ export default function DirectionForm() {
                 <strong style={{ lineHeight: 1 }}>{direction.title}</strong>
                 {direction.description && <span className="text-small" style={{ opacity: 0.8 }}>{direction.description}</span>}
                 {direction.organizer && <span className="text-small" style={{ opacity: 0.8 }}>Организатор: {direction.organizer}</span>}
-              </button>
-              <button type="button" onClick={() => removeDirection(Number(direction.id))} aria-label="Удалить направление">
+              </AppButton>
+              <AppButton type="button" onClick={() => removeDirection(Number(direction.id))} aria-label="Удалить направление">
                 x
-              </button>
+              </AppButton>
             </div>
           ))
         )}
       </div>
 
       <div className="wizard-actions">
-        <button className="primary" onClick={handleSave} type="button">
+        <AppButton className="primary" onClick={handleSave} type="button">
           Сохранить направления
-        </button>
+        </AppButton>
       </div>
     </div>
   );

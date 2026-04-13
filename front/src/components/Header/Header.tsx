@@ -1,4 +1,4 @@
-﻿import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../../styles/header.scss";
 import requestsIcon from "../../assets/icons/list.svg";
@@ -10,6 +10,7 @@ import notificationIcon from "../../assets/icons/notification.svg";
 import { AuthContext } from "../../context/AuthContext";
 import { useNotifications } from "../../context/NotificationsContext";
 import Modal from "../Modal/Modal";
+import AppButton from "../UI/Button";
 
 export default function Header() {
   const navigate = useNavigate();
@@ -88,23 +89,23 @@ export default function Header() {
     <header className={`app-header ${user ? "app-header--auth" : "app-header--guest"}`}>
       {user ? (
         <div className={`mobile-menu ${mobileMenuOpen ? "open" : ""}`} ref={mobileMenuRef}>
-          <button className="mobile-menu-btn" aria-label="Открыть меню" onClick={() => setMobileMenuOpen((prev) => !prev)}>
+          <AppButton className="mobile-menu-btn" aria-label="Открыть меню" onClick={() => setMobileMenuOpen((prev) => !prev)}>
             <img src={menuIcon} alt="menu" />
-          </button>
+          </AppButton>
 
           <div className="mobile-menu-panel">
-            <button className="mobile-menu-item" onClick={() => goTo("/requests")}>
+            <AppButton className="mobile-menu-item" onClick={() => goTo("/requests")}>
               <img src={requestsIcon} alt="requests" />
               <span>{user?.role === "student" ? "Мои заявки" : "Заявки"}</span>
-            </button>
-            <button className="mobile-menu-item" onClick={() => goTo("/planner")}>
+            </AppButton>
+            <AppButton className="mobile-menu-item" onClick={() => goTo("/planner")}>
               <img src={plannerIcon} alt="planner" />
               <span>Планировщик</span>
-            </button>
-            <button className="mobile-menu-item" onClick={() => goTo("/profile")}>
+            </AppButton>
+            <AppButton className="mobile-menu-item" onClick={() => goTo("/profile")}>
               <img src={userIcon} alt="profile" />
               <span>Профиль</span>
-            </button>
+            </AppButton>
           </div>
         </div>
       ) : (
@@ -114,23 +115,23 @@ export default function Header() {
       <div className="header-left">
         {user && (
           <>
-            <button className="head-btn head-btn--muted" onClick={() => navigate("/requests")}>
+            <AppButton className="head-btn head-btn--muted" onClick={() => navigate("/requests")}>
               <img src={requestsIcon} alt="requests" />
               <span>{user?.role === "student" ? "Мои заявки" : "Заявки"}</span>
-            </button>
+            </AppButton>
 
-            <button className="head-btn head-btn--muted" onClick={() => navigate("/planner")}>
+            <AppButton className="head-btn head-btn--muted" onClick={() => navigate("/planner")}>
               <img src={plannerIcon} alt="planner" />
               <span>Планировщик</span>
-            </button>
+            </AppButton>
           </>
         )}
       </div>
 
       <div className="header-center">
-        <button className="header-logo" onClick={() => goTo("/")}>
+        <AppButton className="header-logo" onClick={() => goTo("/")}>
           <img src="/src/assets/LogoIcon.png" alt="logo" className="header-logo" />
-        </button>
+        </AppButton>
       </div>
 
       <div className="header-right">
@@ -144,13 +145,13 @@ export default function Header() {
               </div>
             </div>
 
-            <button className="head-btn head-btn--notify" onClick={openNotifications} aria-label="Центр уведомлений">
+            <AppButton className="head-btn head-btn--notify" onClick={openNotifications} aria-label="Центр уведомлений">
               <img src={notificationIcon} alt="notifications" />
               <span>Уведомления</span>
               {unreadCount > 0 && <span className="notify-dot" />}
-            </button>
+            </AppButton>
 
-            <button
+            <AppButton
               className="head-btn head-btn--danger"
               onClick={() => {
                 setMobileMenuOpen(false);
@@ -160,12 +161,12 @@ export default function Header() {
             >
               <img src={exitIcon} alt="exit" />
               <span>Выйти</span>
-            </button>
+            </AppButton>
           </>
         ) : (
-          <button className="head-btn head-btn--login" onClick={() => navigate("/login")}>
+          <AppButton className="head-btn head-btn--login" onClick={() => navigate("/login")}>
             <span>Войти</span>
-          </button>
+          </AppButton>
         )}
       </div>
 
@@ -183,13 +184,13 @@ export default function Header() {
                 {n.message && <div className="notification-item__message">{n.message}</div>}
                 <div className="notification-item__actions">
                   {n.link && (
-                    <button className="notification-link-btn" onClick={() => openNotificationLink(n.id, n.link)}>
+                    <AppButton className="notification-link-btn" onClick={() => openNotificationLink(n.id, n.link)}>
                       Открыть ссылку
-                    </button>
+                    </AppButton>
                   )}
-                  <button className="notification-remove-btn" onClick={() => removeNotification(n.id)}>
+                  <AppButton className="notification-remove-btn" onClick={() => removeNotification(n.id)}>
                     Удалить
-                  </button>
+                  </AppButton>
                 </div>
               </div>
             ))

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "../../components/Toast/ToastProvider";
 import { AuthContext } from "../../context/AuthContext";
 import "../../styles/auth.scss";
+import AppButton from "../../components/UI/Button";
 
 export default function Register() {
   const { register } = useContext(AuthContext);
@@ -63,9 +64,9 @@ export default function Register() {
         <label className="text-small">Подтвердите пароль</label>
         <input type="password" required value={form.confirm} onChange={(e) => update("confirm", e.target.value)} className="text-regular" />
 
-        <button type="submit" className="auth-submit text-regular">
+        <AppButton type="submit" className="auth-submit text-regular">
           Зарегистрироваться
-        </button>
+        </AppButton>
       </form>
 
       <p className="switch-link text-small">

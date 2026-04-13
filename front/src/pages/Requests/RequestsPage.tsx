@@ -1,4 +1,4 @@
-﻿import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import client from "../../api/client";
 import { getRequests, removeRequest, updateRequestStatus } from "../../api/requests";
@@ -9,6 +9,7 @@ import { ORGANIZER_REQUEST_STATUSES, getRequestTransitionCopy } from "../../cons
 import { AuthContext } from "../../context/AuthContext";
 import type { Request as RequestType } from "../../types/request";
 import "../../styles/page-colors.scss";
+import AppButton from "../../components/UI/Button";
 
 type RequestRecord = RequestType & {
   eventName?: string;
@@ -182,9 +183,9 @@ export default function RequestsPage() {
             return (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
                 <div>{row.status || "-"}</div>
-                <button className="danger-outline" onClick={() => handleWithdraw(row.id)}>
+                <AppButton className="danger-outline" onClick={() => handleWithdraw(row.id)}>
                   Отозвать заявку
-                </button>
+                </AppButton>
               </div>
             );
           }
@@ -197,12 +198,12 @@ export default function RequestsPage() {
         <div className="confirm-body">
           <div className="confirm-text">Вы уверены, что хотите отозвать заявку?</div>
           <div className="confirm-actions">
-            <button className="close-btn" onClick={() => setConfirmOpen(false)}>
+            <AppButton className="close-btn" onClick={() => setConfirmOpen(false)}>
               Отмена
-            </button>
-            <button className="danger-outline" onClick={confirmWithdraw}>
+            </AppButton>
+            <AppButton className="danger-outline" onClick={confirmWithdraw}>
               Отозвать
-            </button>
+            </AppButton>
           </div>
         </div>
       </Modal>
@@ -211,12 +212,12 @@ export default function RequestsPage() {
         <div className="confirm-body">
           <div className="confirm-text">{pendingTransition?.message || "Подтвердите действие."}</div>
           <div className="confirm-actions">
-            <button className="close-btn" onClick={closeTransitionModal}>
+            <AppButton className="close-btn" onClick={closeTransitionModal}>
               Отмена
-            </button>
-            <button className="btn-send" onClick={confirmTransition}>
+            </AppButton>
+            <AppButton className="btn-send" onClick={confirmTransition}>
               Подтвердить
-            </button>
+            </AppButton>
           </div>
         </div>
       </Modal>

@@ -1,4 +1,5 @@
 import "./table-controls.scss";
+import AppButton from "../UI/Button";
 
 interface Props {
   search: string;
@@ -17,7 +18,7 @@ export default function TableControls({
   onSort,
   sortOptions,
   onCreate,
-  createLabel
+  createLabel,
 }: Props) {
   return (
     <div className="table-controls">
@@ -34,9 +35,9 @@ export default function TableControls({
         ))}
       </select>
 
-      <button className="create-btn" onClick={onCreate}>
+      <AppButton className="create-btn" onClick={onCreate}>
         {createLabel}
-      </button>
+      </AppButton>
     </div>
   );
 }

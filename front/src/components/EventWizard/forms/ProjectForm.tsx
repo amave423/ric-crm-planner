@@ -1,10 +1,11 @@
-﻿import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getDirectionsByEvent } from "../../../api/directions";
 import { getProjectsByDirection, saveProjectsForDirection } from "../../../api/projects";
 import type { Project } from "../../../types/project";
 import { useToast } from "../../Toast/ToastProvider";
 import { useWizard } from "../EventWizardModal";
 import type { DirectionModel, ProjectModel } from "../types";
+import AppButton from "../../UI/Button";
 
 type LocalProject = ProjectModel & { directionId?: string };
 
@@ -265,9 +266,9 @@ export default function ProjectForm() {
                 }
               }}
             />
-            <button className="primary wizard-inline-add-button wizard-inline-add-button--secondary" type="button" onClick={saveDraftToList}>
+            <AppButton className="primary wizard-inline-add-button wizard-inline-add-button--secondary" type="button" onClick={saveDraftToList}>
               {editingProjectId != null ? "Обновить" : "Добавить"}
-            </button>
+            </AppButton>
           </div>
         </label>
         {errors.title && <div className="field-error">{errors.title}</div>}
@@ -288,26 +289,26 @@ export default function ProjectForm() {
               className="tag"
               style={Number(editingProjectId) === Number(project.id) ? { outline: "2px solid var(--wizard-accent)" } : undefined}
             >
-              <button
+              <AppButton
                 type="button"
                 style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", display: "flex", flexDirection: "column", gap: 2 }}
                 onClick={() => fillForm(project)}
               >
                 <strong style={{ lineHeight: 1 }}>{project.title}</strong>
                 {project.description && <span className="text-small" style={{ opacity: 0.8 }}>{project.description}</span>}
-              </button>
-              <button type="button" onClick={() => removeProject(Number(project.id))} aria-label="Удалить проект">
+              </AppButton>
+              <AppButton type="button" onClick={() => removeProject(Number(project.id))} aria-label="Удалить проект">
                 x
-              </button>
+              </AppButton>
             </div>
           ))
         )}
       </div>
 
       <div className="wizard-actions">
-        <button className="primary" type="button" onClick={handleSave}>
+        <AppButton className="primary" type="button" onClick={handleSave}>
           Сохранить настройки проекта
-        </button>
+        </AppButton>
       </div>
     </div>
   );

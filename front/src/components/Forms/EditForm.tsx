@@ -1,5 +1,6 @@
 import "./form.scss";
 import { useState } from "react";
+import AppButton from "../UI/Button";
 
 export type Field = {
   key: string;
@@ -48,7 +49,7 @@ export default function EditForm({ fields, initial, onSave }: Props) {
         </div>
       ))}
 
-      <button className="primary-btn text-regular">Сохранить</button>
+      <AppButton className="primary-btn text-regular">Сохранить</AppButton>
     </form>
   );
 }

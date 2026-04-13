@@ -153,8 +153,26 @@
 }
 
 .head-btn--danger {
-  border-color: #ff3d3d;
-  color: #ff3d3d;
+  border-color: #ff3d3d !important;
+  background: #fff !important;
+  color: #ff3d3d !important;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.head-btn--danger img {
+  filter: brightness(0) saturate(100%) invert(38%) sepia(90%) saturate(3091%) hue-rotate(338deg) brightness(103%) contrast(103%);
+}
+
+.head-btn--danger:hover,
+.head-btn--danger:focus {
+  background: rgba(255, 61, 61, 0.14) !important;
+  color: #111 !important;
+  border-color: #ff3d3d !important;
+}
+
+.head-btn--danger:hover img,
+.head-btn--danger:focus img {
+  filter: brightness(0) saturate(100%);
 }
 
 .head-btn--notify {

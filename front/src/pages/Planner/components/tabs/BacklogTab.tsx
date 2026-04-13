@@ -1,7 +1,8 @@
-﻿import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import DateField from "../../../../components/UI/DateField";
 import type { PlannerParentTask, PlannerSubtask } from "../../../../types/planner";
 import type { ParentEditDraft, SubtaskEditDraft } from "../../planner.types";
+import AppButton from "../../../../components/UI/Button";
 
 type BacklogTabProps = {
   activeTeamName: string;
@@ -149,9 +150,9 @@ export default function BacklogTab({
               Дата окончания
               <DateField value={parentEnd} onChange={onParentEndChange} />
             </label>
-            <button className="primary backlog-add-parent" type="button" onClick={onAddParentTask}>
+            <AppButton className="primary backlog-add-parent" type="button" onClick={onAddParentTask}>
               Добавить большую задачу
-            </button>
+            </AppButton>
           </div>
         </div>
 
@@ -219,28 +220,28 @@ export default function BacklogTab({
                 </div>
 
                 <div className="planner-item-actions backlog-actions">
-                  <button className="link-btn" type="button" onClick={() => onOpenTaskCard("parent", parent.id)}>
+                  <AppButton className="link-btn" type="button" onClick={() => onOpenTaskCard("parent", parent.id)}>
                     Карточка
-                  </button>
+                  </AppButton>
                   {canEditTeam(parent.teamId) && (
                     <>
                       {editingParentId === parent.id ? (
                         <>
-                          <button className="link-btn" type="button" onClick={onSaveEditedParent}>
+                          <AppButton className="link-btn" type="button" onClick={onSaveEditedParent}>
                             Сохранить
-                          </button>
-                          <button className="link-btn" type="button" onClick={onCancelEditParent}>
+                          </AppButton>
+                          <AppButton className="link-btn" type="button" onClick={onCancelEditParent}>
                             Отмена
-                          </button>
+                          </AppButton>
                         </>
                       ) : (
-                        <button className="link-btn" type="button" onClick={() => onStartEditParent(parent.id)}>
+                        <AppButton className="link-btn" type="button" onClick={() => onStartEditParent(parent.id)}>
                           Редактировать
-                        </button>
+                        </AppButton>
                       )}
-                      <button className="link-btn danger" type="button" onClick={() => onDeleteParent(parent.id)}>
+                      <AppButton className="link-btn danger" type="button" onClick={() => onDeleteParent(parent.id)}>
                         Удалить
-                      </button>
+                      </AppButton>
                     </>
                   )}
                 </div>
@@ -301,9 +302,9 @@ export default function BacklogTab({
                 <span>В спринт</span>
               </label>
 
-              <button className="primary backlog-add-subtask" type="button" onClick={onAddSubtask}>
+              <AppButton className="primary backlog-add-subtask" type="button" onClick={onAddSubtask}>
                 Добавить подзадачу
-              </button>
+              </AppButton>
             </div>
           </div>
         ) : (
@@ -393,28 +394,28 @@ export default function BacklogTab({
                 </div>
 
                 <div className="planner-item-actions backlog-actions">
-                  <button className="link-btn" type="button" onClick={() => onOpenTaskCard("subtask", subtask.id)}>
+                  <AppButton className="link-btn" type="button" onClick={() => onOpenTaskCard("subtask", subtask.id)}>
                     Карточка
-                  </button>
+                  </AppButton>
                   {canEditTeam(subtask.teamId) && (
                     <>
                       {editingSubtaskId === subtask.id ? (
                         <>
-                          <button className="link-btn" type="button" onClick={onSaveEditedSubtask}>
+                          <AppButton className="link-btn" type="button" onClick={onSaveEditedSubtask}>
                             Сохранить
-                          </button>
-                          <button className="link-btn" type="button" onClick={onCancelEditSubtask}>
+                          </AppButton>
+                          <AppButton className="link-btn" type="button" onClick={onCancelEditSubtask}>
                             Отмена
-                          </button>
+                          </AppButton>
                         </>
                       ) : (
-                        <button className="link-btn" type="button" onClick={() => onStartEditSubtask(subtask.id)}>
+                        <AppButton className="link-btn" type="button" onClick={() => onStartEditSubtask(subtask.id)}>
                           Редактировать
-                        </button>
+                        </AppButton>
                       )}
-                      <button className="link-btn danger" type="button" onClick={() => onDeleteSubtask(subtask.id)}>
+                      <AppButton className="link-btn danger" type="button" onClick={() => onDeleteSubtask(subtask.id)}>
                         Удалить
-                      </button>
+                      </AppButton>
                     </>
                   )}
                 </div>

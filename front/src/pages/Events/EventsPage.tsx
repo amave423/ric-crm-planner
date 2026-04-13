@@ -1,4 +1,4 @@
-﻿import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../../api/client";
 import { getEvents } from "../../api/events";
@@ -16,6 +16,7 @@ import { useNotifications } from "../../context/NotificationsContext";
 import type { Event } from "../../types/event";
 import type { Request as RequestType } from "../../types/request";
 import "../../styles/page-colors.scss";
+import AppButton from "../../components/UI/Button";
 
 interface TestingImportMetaEnv {
   VITE_TESTING_URL?: string;
@@ -218,7 +219,7 @@ export default function EventsPage() {
           }
 
           return (
-            <button
+            <AppButton
               type="button"
               className={`event-apply-pill${alreadyApplied ? " is-disabled" : ""}`}
               disabled={alreadyApplied}
@@ -230,7 +231,7 @@ export default function EventsPage() {
               }}
             >
               {alreadyApplied ? "Заявка отправлена" : "Подать заявку"}
-            </button>
+            </AppButton>
           );
         }}
       />
@@ -287,21 +288,21 @@ export default function EventsPage() {
           <div className="confirm-body">
             <div className="confirm-text">Перейти к прохождению теста?</div>
             <div className="confirm-actions">
-              <button className="close-btn" onClick={startDirectScenario}>
+              <AppButton className="close-btn" onClick={startDirectScenario}>
                 Нет
-              </button>
-              <button className="btn-send" onClick={startTestingScenario}>
+              </AppButton>
+              <AppButton className="btn-send" onClick={startTestingScenario}>
                 Да
-              </button>
+              </AppButton>
             </div>
           </div>
         ) : (
           <div className="confirm-body">
             <div className="confirm-text">Ссылка для прохождения находится в центре уведомлений</div>
             <div className="confirm-actions">
-              <button className="close-btn" onClick={closeTestingPrompt}>
+              <AppButton className="close-btn" onClick={closeTestingPrompt}>
                 Понятно
-              </button>
+              </AppButton>
             </div>
           </div>
         )}

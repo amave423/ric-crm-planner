@@ -1,8 +1,9 @@
-﻿import React, { useContext } from "react";
+import React, { useContext } from "react";
 import editIcon from "../../assets/icons/edit.svg";
 import infoIcon from "../../assets/icons/info.svg";
 import { AuthContext } from "../../context/AuthContext";
 import "./table.scss";
+import AppButton from "../UI/Button";
 
 type Column = { key: string; title: string; width?: string };
 type RowWithId = { id?: number | string };
@@ -89,7 +90,7 @@ export default function Table<T>({
 
             const actionButton =
               isOrganizer && onEdit ? (
-                <button
+                <AppButton
                   className="edit-btn-icon"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -97,9 +98,9 @@ export default function Table<T>({
                   }}
                 >
                   <img src={editIcon} alt="edit" />
-                </button>
+                </AppButton>
               ) : !isOrganizer && onInfoClick ? (
-                <button
+                <AppButton
                   className="info-btn"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -108,7 +109,7 @@ export default function Table<T>({
                   aria-label="Информация"
                 >
                   <img src={infoIcon} alt="info" />
-                </button>
+                </AppButton>
               ) : null;
 
             return (

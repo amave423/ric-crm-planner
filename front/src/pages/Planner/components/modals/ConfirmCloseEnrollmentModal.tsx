@@ -1,4 +1,5 @@
-﻿import Modal from "../../../../components/Modal/Modal";
+import Modal from "../../../../components/Modal/Modal";
+import AppButton from "../../../../components/UI/Button";
 
 type ConfirmCloseEnrollmentModalProps = {
   isOpen: boolean;
@@ -7,7 +8,12 @@ type ConfirmCloseEnrollmentModalProps = {
   onConfirm: () => void;
 };
 
-export default function ConfirmCloseEnrollmentModal({ isOpen, eventTitle, onClose, onConfirm }: ConfirmCloseEnrollmentModalProps) {
+export default function ConfirmCloseEnrollmentModal({
+  isOpen,
+  eventTitle,
+  onClose,
+  onConfirm,
+}: ConfirmCloseEnrollmentModalProps) {
   const resolvedTitle = eventTitle?.trim() || "это мероприятие";
 
   return (
@@ -18,12 +24,12 @@ export default function ConfirmCloseEnrollmentModal({ isOpen, eventTitle, onClos
           «Приступил к ПШ»?
         </div>
         <div className="confirm-actions">
-          <button className="link-btn" onClick={onClose}>
+          <AppButton className="link-btn" onClick={onClose}>
             Отмена
-          </button>
-          <button className="primary" onClick={onConfirm}>
+          </AppButton>
+          <AppButton className="primary" onClick={onConfirm}>
             Подтвердить
-          </button>
+          </AppButton>
         </div>
       </div>
     </Modal>

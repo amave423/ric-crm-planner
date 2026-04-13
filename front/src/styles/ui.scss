@@ -15,6 +15,39 @@
   }
 }
 
+.app-button.ant-btn {
+  height: auto;
+  min-width: 0;
+  line-height: normal;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-button.ant-btn > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: inherit;
+}
+
+.danger-outline.ant-btn,
+.danger-outline {
+  border-color: #ef4444 !important;
+  background: #fff !important;
+  color: #b91c1c !important;
+}
+
+.danger-outline.ant-btn:hover,
+.danger-outline.ant-btn:focus,
+.danger-outline:hover,
+.danger-outline:focus {
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.14) !important;
+  color: #111 !important;
+}
+
 .ui-input {
   padding: 10px;
   border-radius: 10px;

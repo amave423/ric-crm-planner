@@ -2,6 +2,7 @@ import { useMemo, useState, type CSSProperties, type ComponentProps, type DragEv
 import { Kanban, type BoardData, type BoardItem } from "react-kanban-kit";
 import type { PlannerSubtask } from "../../../../types/planner";
 import { isDoneKanbanStatus } from "../../planner.utils";
+import AppButton from "../../../../components/UI/Button";
 
 const ROOT_ID = "root";
 const COLUMN_PREFIX = "column:";
@@ -248,9 +249,9 @@ export default function KanbanTab({
       <div className="planner-card">
         <div className="planner-inline-form">
           <input value={newColumn} onChange={(event) => onNewColumnChange(event.target.value)} placeholder="Кастомный статус" />
-          <button className="primary" onClick={onAddColumn}>
+          <AppButton className="primary" onClick={onAddColumn}>
             Добавить
-          </button>
+          </AppButton>
         </div>
       </div>
 
@@ -300,7 +301,7 @@ export default function KanbanTab({
                 <span className="kanban-column-drag-hint" aria-hidden="true">
                   {"\u2039"}
                 </span>
-                <button
+                <AppButton
                   type="button"
                   className="kanban-column-remove"
                   draggable={false}
@@ -313,7 +314,7 @@ export default function KanbanTab({
                   aria-label="Удалить колонку"
                 >
                   {"\u00d7"}
-                </button>
+                </AppButton>
               </div>
             </div>
           );

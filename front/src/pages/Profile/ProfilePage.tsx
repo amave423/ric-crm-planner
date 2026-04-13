@@ -3,6 +3,7 @@ import client from "../../api/client";
 import { useToast } from "../../components/Toast/ToastProvider";
 import { AuthContext } from "../../context/AuthContext";
 import "../../styles/profile.scss";
+import AppButton from "../../components/UI/Button";
 
 type ProfileResponse = {
   name?: string;
@@ -215,7 +216,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <button
+      <AppButton
         className="edit-btn h3"
         onClick={() => {
           if (editing) void onSave();
@@ -223,7 +224,7 @@ export default function ProfilePage() {
         }}
       >
         {editing ? "Сохранить изменения" : "Редактировать"}
-      </button>
+      </AppButton>
     </div>
   );
 }

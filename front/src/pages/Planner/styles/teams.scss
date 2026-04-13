@@ -188,18 +188,30 @@
 .planner-source-close-btn {
   padding: 8px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(37, 99, 235, 0.22);
-  background: #fff;
-  color: #2555c4;
+  border: 1px solid #2563eb !important;
+  background: #2563eb !important;
+  color: #fff !important;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease, transform 0.12s ease;
 }
 
-.planner-source-close-btn:hover {
-  border-color: rgba(37, 99, 235, 0.38);
-  background: #eff6ff;
+.planner-source-close-btn.ant-btn {
+  height: auto;
+  border-color: #2563eb !important;
+  background: #2563eb !important;
+  color: #fff !important;
+  box-shadow: none;
+}
+
+.planner-source-close-btn.ant-btn:hover,
+.planner-source-close-btn.ant-btn:focus,
+.planner-source-close-btn:hover,
+.planner-source-close-btn:focus {
+  border-color: #2563eb !important;
+  background: #fff !important;
+  color: #2563eb !important;
   transform: translateY(-1px);
 }
 

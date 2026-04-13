@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { getEventById, removeEvent as apiRemoveEvent, saveEvent as persistEvent } from "../../../api/events";
 import { SPECIALIZATION_OPTIONS } from "../../../constants/specializations";
@@ -9,6 +9,7 @@ import Modal from "../../Modal/Modal";
 import { useToast } from "../../Toast/ToastProvider";
 import DateField from "../../UI/DateField";
 import { useWizard } from "../EventWizardModal";
+import AppButton from "../../UI/Button";
 
 interface Specialization {
   id: number;
@@ -243,9 +244,9 @@ export default function EventForm() {
                 </option>
               ))}
             </select>
-            <button className="primary wizard-inline-add-button wizard-inline-add-button--event" type="button" onClick={addSpecialization}>
+            <AppButton className="primary wizard-inline-add-button wizard-inline-add-button--event" type="button" onClick={addSpecialization}>
               Добавить
-            </button>
+            </AppButton>
           </div>
         </label>
       </FieldWrap>
@@ -254,32 +255,32 @@ export default function EventForm() {
         {specializations.map((specialization) => (
           <div key={specialization.id} className="tag">
             {specialization.title}
-            <button type="button" onClick={() => removeSpecialization(specialization.id)} aria-label="Удалить специализацию">
+            <AppButton type="button" onClick={() => removeSpecialization(specialization.id)} aria-label="Удалить специализацию">
               x
-            </button>
+            </AppButton>
           </div>
         ))}
       </div>
 
       <div className="wizard-actions">
         {mode === "edit" && (
-          <button className="danger-outline" onClick={() => setConfirmOpen(true)} style={{ marginRight: "auto" }}>
+          <AppButton className="danger-outline" onClick={() => setConfirmOpen(true)} style={{ marginRight: "auto" }}>
             Удалить
-          </button>
+          </AppButton>
         )}
-        <button className="primary" onClick={handleSave} type="button">
+        <AppButton className="primary" onClick={handleSave} type="button">
           Сохранить мероприятие
-        </button>
+        </AppButton>
       </div>
 
       <Modal isOpen={confirmOpen} onClose={() => setConfirmOpen(false)} title="Подтвердите действие">
         <div style={{ padding: 8 }}>
           <div>Вы уверены, что хотите удалить мероприятие? Действие необратимо.</div>
           <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button className="close-btn" onClick={() => setConfirmOpen(false)}>
+            <AppButton className="close-btn" onClick={() => setConfirmOpen(false)}>
               Отмена
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               className="danger-outline"
               onClick={async () => {
                 if (!eventId) {
@@ -297,7 +298,7 @@ export default function EventForm() {
               }}
             >
               Удалить
-            </button>
+            </AppButton>
           </div>
         </div>
       </Modal>

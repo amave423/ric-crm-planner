@@ -1,8 +1,9 @@
-﻿import "../../styles/table-header.scss";
+import "../../styles/table-header.scss";
 import plusIcon from "../../assets/icons/plus.svg";
 import { useContext } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import searchIcon from "../../assets/icons/search.svg";
+import AppButton from "../UI/Button";
 
 interface Props {
   title: React.ReactNode;
@@ -26,9 +27,9 @@ export default function TableHeader({
         <h1 className="h1">{title}</h1>
 
         {isOrganizer && onCreate && (
-          <button className="create-btn" onClick={onCreate}>
+          <AppButton className="create-btn" onClick={onCreate}>
             <img src={plusIcon} alt="add" />
-          </button>
+          </AppButton>
         )}
       </div>
 

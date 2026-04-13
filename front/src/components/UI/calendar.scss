@@ -11,6 +11,15 @@
   border: 1px solid #dbe5f3;
 }
 
+.calendar--antd {
+  width: 360px;
+  max-width: calc(100vw - 24px);
+}
+
+.calendar--antd .ant-picker-calendar {
+  padding: 0 12px 12px;
+}
+
 .calendar-header {
   display: flex;
   justify-content: space-between;

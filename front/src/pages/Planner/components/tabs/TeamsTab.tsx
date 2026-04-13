@@ -1,8 +1,9 @@
-﻿import infoIcon from "../../../../assets/icons/info.svg";
+import infoIcon from "../../../../assets/icons/info.svg";
 import type { PlannerState, PlannerTeam } from "../../../../types/planner";
 import type { User } from "../../../../types/user";
 import type { ApplicantsTreeNode, ProjectApplicantsGroup } from "../../planner.types";
 import { fullName } from "../../planner.utils";
+import AppButton from "../../../../components/UI/Button";
 
 type TeamsTabProps = {
   isOrganizer: boolean;
@@ -65,9 +66,9 @@ export default function TeamsTab({
             </div>
 
             {hasClosedEvents && (
-              <button className="primary" type="button" onClick={onSyncParticipants}>
+              <AppButton className="primary" type="button" onClick={onSyncParticipants}>
                 Синхронизировать участников
-              </button>
+              </AppButton>
             )}
           </div>
 
@@ -94,7 +95,7 @@ export default function TeamsTab({
                       ) : (
                         isOrganizer &&
                         eventNode.eventId && (
-                          <button
+                          <AppButton
                             type="button"
                             className="planner-source-close-btn"
                             onClick={(event) => {
@@ -104,7 +105,7 @@ export default function TeamsTab({
                             }}
                           >
                             Завершить набор
-                          </button>
+                          </AppButton>
                         )
                       )}
                     </div>
@@ -169,9 +170,9 @@ export default function TeamsTab({
                                         ))}
                                       </select>
 
-                                      <button className="primary" type="button" onClick={() => onCreateTeamFromGroup(group)}>
+                                      <AppButton className="primary" type="button" onClick={() => onCreateTeamFromGroup(group)}>
                                         Сформировать команду
-                                      </button>
+                                      </AppButton>
                                     </div>
                                   </>
                                 )}
@@ -215,9 +216,9 @@ export default function TeamsTab({
                 ) : (
                   <div className="team-badge-stack">
                     <div className={`team-badge ${team.confirmed ? "ok" : "draft"}`}>{team.confirmed ? "Подтверждена" : "Черновик"}</div>
-                    <button className="info-icon-btn" type="button" onClick={() => onOpenTeamInfo(team.id)} aria-label="Информация о команде">
+                    <AppButton className="info-icon-btn" type="button" onClick={() => onOpenTeamInfo(team.id)} aria-label="Информация о команде">
                       <img src={infoIcon} alt="info" />
-                    </button>
+                    </AppButton>
                   </div>
                 )}
               </div>
@@ -242,15 +243,15 @@ export default function TeamsTab({
 
               {isOrganizer && (
                 <div className="team-actions">
-                  <button className="primary" type="button" onClick={() => onToggleTeamConfirmed(team.id)}>
+                  <AppButton className="primary" type="button" onClick={() => onToggleTeamConfirmed(team.id)}>
                     {team.confirmed ? "Снять подтверждение" : "Подтвердить"}
-                  </button>
-                  <button className="link-btn" type="button" onClick={() => onOpenTeamEdit(team.id)}>
+                  </AppButton>
+                  <AppButton className="link-btn" type="button" onClick={() => onOpenTeamEdit(team.id)}>
                     Состав
-                  </button>
-                  <button className="danger-outline" type="button" onClick={() => onDeleteTeam(team.id)}>
+                  </AppButton>
+                  <AppButton className="danger-outline" type="button" onClick={() => onDeleteTeam(team.id)}>
                     Удалить
-                  </button>
+                  </AppButton>
                 </div>
               )}
             </div>

@@ -55,6 +55,30 @@
   color: #1d4ed8;
 }
 
+.planner-gantt-switcher .app-button.ant-btn {
+  height: auto;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  border-radius: 999px;
+  padding: 8px 14px;
+}
+
+.planner-gantt-switcher .app-button.ant-btn:hover,
+.planner-gantt-switcher .app-button.ant-btn:focus {
+  background: #fff;
+  color: #1d4ed8;
+  border-color: #94a3b8;
+}
+
+.planner-gantt-switcher .app-button.ant-btn.is-active,
+.planner-gantt-switcher .app-button.ant-btn.is-active:hover,
+.planner-gantt-switcher .app-button.ant-btn.is-active:focus {
+  border-color: #2563eb;
+  background: #eef4ff;
+  color: #1d4ed8;
+}
+
 .planner-gantt-meta {
   color: #6b7280;
   font-size: 13px;

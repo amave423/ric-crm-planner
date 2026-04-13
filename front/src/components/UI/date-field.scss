@@ -34,6 +34,11 @@
   transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
 }
 
+.ui-calendar-btn.ant-btn {
+  min-width: 32px;
+  padding: 0;
+}
+
 .ui-calendar-btn img {
   width: 18px;
   height: 18px;
@@ -57,4 +62,109 @@
 
 .ui-calendar-btn:disabled img {
   opacity: 0.35;
+}
+
+.ui-calendar-card {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  border: 1px solid #dbe5f3;
+  border-radius: 16px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+}
+
+.ui-calendar-card .ant-picker-calendar {
+  padding: 0 12px 12px;
+}
+
+.ui-calendar-card .ant-picker-calendar-header {
+  display: none;
+}
+
+.ui-calendar-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid #edf2f7;
+  background: #fff;
+}
+
+.ui-calendar-select {
+  width: auto !important;
+  height: 32px !important;
+  min-height: 32px;
+  margin: 0 !important;
+  padding: 0 24px 0 9px !important;
+  border: 1px solid #dbe5f3 !important;
+  border-radius: 9px !important;
+  background: #fff;
+  color: #111827 !important;
+  font-size: 14px;
+  line-height: 30px;
+  cursor: pointer;
+}
+
+.ui-calendar-select--year {
+  width: 84px !important;
+}
+
+.ui-calendar-select--month {
+  width: 94px !important;
+}
+
+.ui-calendar-mode {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  margin-left: auto;
+  border: 1px solid #dbe5f3;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.ui-calendar-mode-btn {
+  height: 30px;
+  min-width: 50px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: #374151;
+  font-size: 14px;
+  line-height: 30px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ui-calendar-mode-btn.ant-btn {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 0;
+}
+
+.ui-calendar-mode-btn.is-active {
+  background: #6495ed;
+  color: #fff;
+}
+
+.ui-calendar-mode-btn:not(.is-active):hover {
+  background: #f8fbff;
+  color: #2563eb;
+}
+
+.ui-calendar-card .ant-picker-calendar-date {
+  border-radius: 9px;
+}
+
+.ui-calendar-card .ant-picker-calendar-date-today {
+  border-color: #6495ed;
+}
+
+.ui-calendar-card .ant-picker-cell-selected .ant-picker-calendar-date {
+  background: #6495ed;
 }
