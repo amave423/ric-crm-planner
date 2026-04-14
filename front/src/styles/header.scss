@@ -198,6 +198,10 @@
   }
 }
 
+.head-btn.ant-btn:focus:not(:focus-visible) {
+  box-shadow: none !important;
+}
+
 .head-btn--muted {
   border-color: #d1d5db !important;
   background: #fff !important;
@@ -210,14 +214,14 @@
 }
 
 .head-btn--muted:hover,
-.head-btn--muted:focus {
+.head-btn--muted:focus-visible {
   background: var(--event-color) !important;
   color: #fff !important;
   border-color: var(--event-color) !important;
 }
 
 .head-btn--muted:hover .anticon,
-.head-btn--muted:focus .anticon {
+.head-btn--muted:focus-visible .anticon {
   color: #fff;
 }
 
@@ -233,14 +237,14 @@
 }
 
 .head-btn--planner:hover,
-.head-btn--planner:focus {
+.head-btn--planner:focus-visible {
   background: var(--event-color) !important;
   color: #fff !important;
   border-color: var(--event-color) !important;
 }
 
 .head-btn--planner:hover .anticon,
-.head-btn--planner:focus .anticon {
+.head-btn--planner:focus-visible .anticon {
   color: #fff;
 }
 
@@ -256,14 +260,14 @@
 }
 
 .head-btn--danger:hover,
-.head-btn--danger:focus {
+.head-btn--danger:focus-visible {
   background: rgba(255, 61, 61, 0.14) !important;
   color: #111 !important;
   border-color: #ff3d3d !important;
 }
 
 .head-btn--danger:hover .anticon,
-.head-btn--danger:focus .anticon {
+.head-btn--danger:focus-visible .anticon {
   color: #111;
 }
 
@@ -276,7 +280,7 @@
 }
 
 .head-btn--notify:hover,
-.head-btn--notify:focus {
+.head-btn--notify:focus-visible {
   border-color: var(--event-color) !important;
   background: var(--event-color) !important;
   color: #fff !important;
@@ -352,7 +356,7 @@
 }
 
 .head-btn--login:hover,
-.head-btn--login:focus {
+.head-btn--login:focus-visible {
   background: #fff !important;
   color: var(--event-color) !important;
   border-color: var(--event-color) !important;
