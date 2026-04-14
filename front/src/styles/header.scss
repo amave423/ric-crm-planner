@@ -199,14 +199,14 @@
 }
 
 .head-btn--muted {
-  border-color: var(--event-color) !important;
+  border-color: #d1d5db !important;
   background: #fff !important;
-  color: var(--event-color) !important;
+  color: #111827 !important;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .head-btn--muted .anticon {
-  color: var(--event-color);
+  color: #111827;
 }
 
 .head-btn--muted:hover,

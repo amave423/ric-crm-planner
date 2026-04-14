@@ -25,6 +25,8 @@
 }
 
 .requests-toolbar--student .requests-toolbar__filters {
+  grid-column: 3;
+  justify-self: end;
   grid-template-columns: minmax(220px, 310px);
 }
 
@@ -287,6 +289,7 @@
   .requests-view-toggle.ant-segmented,
   .requests-toolbar__search,
   .requests-toolbar__filters {
+    grid-column: auto;
     justify-self: stretch;
     width: 100%;
   }

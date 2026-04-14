@@ -319,29 +319,29 @@ export default function RequestsPage() {
           />
         )}
 
-        <div className="requests-toolbar__filters">
-          {isOrganizer && (
-            <Dropdown
-              menu={{ items: eventDropdownItems, onClick: handleEventMenuClick, selectedKeys: [String(selectedEventId)] }}
-              placement="bottom"
+	        {isOrganizer && (
+	          <div className="requests-toolbar__filters">
+	            <Dropdown
+	              menu={{ items: eventDropdownItems, onClick: handleEventMenuClick, selectedKeys: [String(selectedEventId)] }}
+	              placement="bottom"
               trigger={["click"]}
             >
               <AppButton className="requests-event-dropdown">
                 <span>{selectedEvent?.title || TEXT.allEvents}</span>
                 <DownOutlined />
-              </AppButton>
-            </Dropdown>
-          )}
+	              </AppButton>
+	            </Dropdown>
 
-          <AppSearch
-            className="search-box"
-            placeholder={TEXT.search}
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onSearch={handleSearchSubmit}
-          />
-        </div>
-      </div>
+	            <AppSearch
+	              className="search-box"
+	              placeholder={TEXT.search}
+	              value={search}
+	              onChange={(event) => setSearch(event.target.value)}
+	              onSearch={handleSearchSubmit}
+	            />
+	          </div>
+	        )}
+	      </div>
 
       {view === "list" ? (
         <Table
@@ -371,16 +371,20 @@ export default function RequestsPage() {
               );
             }
 
-            if (user?.role === "student" && client.USE_MOCK) {
-              return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
-                  <div>{row.status || "-"}</div>
-                  <AppButton className="danger-outline" onClick={() => handleWithdraw(row.id)}>
-                    {TEXT.withdrawRequest}
-                  </AppButton>
-                </div>
-              );
-            }
+	            if (user?.role === "student" && client.USE_MOCK) {
+	              const canWithdraw = row.status !== REQUEST_STATUS.STARTED;
+
+	              return (
+	                <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+	                  <div>{row.status || "-"}</div>
+	                  {canWithdraw && (
+	                    <AppButton className="danger-outline" onClick={() => handleWithdraw(row.id)}>
+	                      {TEXT.withdrawRequest}
+	                    </AppButton>
+	                  )}
+	                </div>
+	              );
+	            }
 
             return <div>{row.status || "-"}</div>;
           }}
