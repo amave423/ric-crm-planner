@@ -1,4 +1,5 @@
-import client from "../api/client";
+﻿import client from "../api/client";
+import { readPlannerState } from "../storage/planner";
 import {
   getAllUsers,
   getDirectionsByEvent as _getDirectionsByEvent,
@@ -196,17 +197,25 @@ async function resolveOrganizer(e: BackendEvent): Promise<string | undefined> {
 async function mapEventToUi(data: unknown): Promise<Event> {
   const event = normalizeBackendEvent(data);
   const specs = await getSpecializations();
+  const plannerState = readPlannerState(USE_MOCK);
+  const eventId = Number(event.id ?? 0);
+  const isEnrollmentClosed = plannerState.closedEventIds.includes(eventId);
 
   return {
-    id: Number(event.id ?? 0),
+    id: eventId,
     title: event.title ?? event.name ?? "",
     description: event.description ?? "",
     startDate: event.startDate ?? event.start_date,
     endDate: event.endDate ?? event.end_date,
     applyDeadline: event.applyDeadline ?? event.end_app_date,
-    leader: typeof event.leader !== "undefined" ? String(event.leader) : undefined,
+    leader:
+      typeof event.leader !== "undefined"
+        ? String(event.leader)
+        : typeof event.organizer !== "undefined"
+          ? String(event.organizer)
+          : undefined,
     specializations: normalizeSpecList(event, specs),
-    status: computeStatus(event.endDate ?? event.end_date),
+    status: isEnrollmentClosed ? "Набор завершен" : computeStatus(event.endDate ?? event.end_date),
     organizer: await resolveOrganizer(event),
   };
 }
@@ -238,15 +247,16 @@ async function resolveSpecializationId(data: Event): Promise<number | undefined>
   const first = Array.isArray(data.specializations) && data.specializations.length > 0 ? data.specializations[0] : null;
   if (!first) return undefined;
 
+  const title = String(first.title ?? "").trim();
+  const specs = await getSpecializations();
+  if (title && specs.length > 0) {
+    const found = specs.find((s) => getSpecName(s).toLowerCase() === title.toLowerCase());
+    if (found) return found.id;
+  }
+
   const fromFirstId = toNumber(first.id);
   if (typeof fromFirstId !== "undefined") return fromFirstId;
-
-  const title = String(first.title ?? "").trim();
   if (!title) return undefined;
-
-  const specs = await getSpecializations();
-  const found = specs.find((s) => getSpecName(s).toLowerCase() === title.toLowerCase());
-  if (found) return found.id;
 
   throw new Error(`Специализация "${title}" не найдена на сервере. Выберите специализацию из существующих.`);
 }
@@ -260,7 +270,7 @@ async function toBackendEvent(data: Event): Promise<BackendEventPayload> {
     start_date: data.startDate,
     end_date: data.endDate,
     end_app_date: fmtEndApp(data.applyDeadline),
-    stage: stageValue && stageValue.trim() ? stageValue : "—",
+    stage: stageValue && stageValue.trim() ? stageValue : "-",
   };
 
   const specializationId = await resolveSpecializationId(data);
@@ -284,3 +294,7 @@ export async function removeEvent(id: number): Promise<unknown> {
   if (USE_MOCK) return _removeEvent(id);
   return client.del(`/api/users/events/${id}/`);
 }
+
+
+
+

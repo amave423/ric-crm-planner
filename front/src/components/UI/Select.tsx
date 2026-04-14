@@ -1,6 +1,40 @@
-import type { SelectHTMLAttributes } from "react";
+import { Select as AntSelect } from "antd";
+import type { SelectProps } from "antd";
 import "../../styles/ui.scss";
 
-export default function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className="ui-select" />;
+type AppSelectTone = "event" | "directions" | "projects";
+
+type AppSelectProps = SelectProps<string | number> & {
+  tone?: AppSelectTone;
+};
+
+export default function Select({
+  className = "",
+  classNames,
+  tone,
+  popupMatchSelectWidth = false,
+  listHeight = 260,
+  showSearch = false,
+  ...props
+}: AppSelectProps) {
+  const toneClass = tone ? `app-select--${tone}` : "";
+  const popupToneClass = tone ? `app-select-dropdown--${tone}` : "";
+  const popupRootClass = ["app-select-dropdown", popupToneClass, classNames?.popup?.root].filter(Boolean).join(" ");
+
+  return (
+    <AntSelect
+      {...props}
+      popupMatchSelectWidth={popupMatchSelectWidth}
+      listHeight={listHeight}
+      showSearch={showSearch}
+      className={`app-select ${toneClass} ${className}`.trim()}
+      classNames={{
+        ...classNames,
+        popup: {
+          ...classNames?.popup,
+          root: popupRootClass,
+        },
+      }}
+    />
+  );
 }

@@ -14,6 +14,7 @@ import type {
   DirectionModel
 } from "./types";
 import type { Event } from "../../types/event";
+import AppButton from "../UI/Button";
 
 export interface WizardLaunchContext {
   type?: string;
@@ -47,15 +48,15 @@ export default function EventWizardModal({
   initialDirectionId,
   onClose
 }: Props) {
-    const resolvedPage: WizardPage =
+  const resolvedPage: WizardPage =
     page ??
     (context?.type === "event"
       ? "events"
       : context?.type === "direction"
-      ? "directions"
-      : context?.type === "projects" || context?.type === "project"
-      ? "projects"
-      : "events");
+        ? "directions"
+        : context?.type === "projects" || context?.type === "project"
+          ? "projects"
+          : "events");
 
   const initialTab: WizardTab =
     resolvedPage === "projects" ? "projects" : resolvedPage === "directions" ? "directions" : "event";
@@ -86,6 +87,7 @@ export default function EventWizardModal({
     page: resolvedPage,
     eventId: eventIdState,
     directionId: initialDirectionId ?? context?.directionId,
+    projectId: context?.projectId,
     setActiveTab,
 
     isEventSaved,
@@ -103,8 +105,8 @@ export default function EventWizardModal({
         <div
           className={`wizard wizard-tab--${activeTab}`}
           onClick={(e) => e.stopPropagation()}
-          >
-          <button className="wizard-close" aria-label="Закрыть" onClick={onClose}>×</button>
+        >
+          <AppButton className="wizard-close" aria-label="Закрыть" onClick={onClose}>x</AppButton>
           <aside className="wizard-nav">
             <NavButton tab="event" label="Настройка мероприятия" />
             <NavButton tab="directions" label="Настройка направлений" />
@@ -141,12 +143,13 @@ function NavButton({ tab, label }: { tab: WizardTab; label: string }) {
   };
 
   return (
-    <button
+    <AppButton
       type="button"
       className={`wizard-nav-btn ${activeTab === tab ? "active" : ""} wizard-nav-btn--${tab}`}
       onClick={handleClick}
     >
       {label}
-    </button>
+    </AppButton>
   );
 }
+

@@ -8,6 +8,11 @@
     grid-template-columns: 1fr 1fr;
   }
 
+  body .date-row .app-date-range-field,
+  body .date-row .app-date-field {
+    max-width: none;
+  }
+
   body .modal {
     width: min(560px, calc(100% - 20px));
     padding: 18px;

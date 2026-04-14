@@ -1,4 +1,7 @@
 import "./table-controls.scss";
+import AppButton from "../UI/Button";
+import { AppSearch } from "../UI/Input";
+import AppSelect from "../UI/Select";
 
 interface Props {
   search: string;
@@ -17,26 +20,25 @@ export default function TableControls({
   onSort,
   sortOptions,
   onCreate,
-  createLabel
+  createLabel,
 }: Props) {
   return (
     <div className="table-controls">
-      <input
-        type="text"
+      <AppSearch
         placeholder="Поиск..."
         value={search}
         onChange={(e) => onSearch(e.target.value)}
       />
 
-      <select value={sortKey} onChange={(e) => onSort(e.target.value)}>
-        {sortOptions.map((s) => (
-          <option key={s.key} value={s.key}>{s.title}</option>
-        ))}
-      </select>
+      <AppSelect
+        value={sortKey}
+        onChange={(value) => onSort(String(value))}
+        options={sortOptions.map((s) => ({ value: s.key, label: s.title }))}
+      />
 
-      <button className="create-btn" onClick={onCreate}>
+      <AppButton className="create-btn" onClick={onCreate}>
         {createLabel}
-      </button>
+      </AppButton>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import Modal from "./Modal";
+﻿import Modal from "./Modal";
 
 interface Props {
   isOpen: boolean;
@@ -18,3 +18,4 @@ export default function InfoModal({ isOpen, onClose, title, description }: Props
     </Modal>
   );
 }
+

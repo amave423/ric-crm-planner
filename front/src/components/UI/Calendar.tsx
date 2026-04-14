@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { Button as AntButton, Calendar as AntCalendar, Card } from "antd";
+import type { CalendarProps } from "antd";
+import type { Dayjs } from "dayjs";
+import dayjs from "dayjs";
+import AppSelect from "./Select";
 import "./calendar.scss";
 
 interface Props {
@@ -6,50 +10,85 @@ interface Props {
   onSelect: (date: string) => void;
 }
 
-export default function Calendar({ onSelect }: Props) {
-  const today = new Date();
-  const [current, setCurrent] = useState(today);
+function parseIsoDate(value?: string) {
+  if (!value) return dayjs();
+  const parsed = dayjs(value, "YYYY-MM-DD", true);
+  return parsed.isValid() ? parsed : dayjs();
+}
 
-  const year = current.getFullYear();
-  const month = current.getMonth();
+const MONTH_NAMES = [
+  "Январь",
+  "Февраль",
+  "Март",
+  "Апрель",
+  "Май",
+  "Июнь",
+  "Июль",
+  "Август",
+  "Сентябрь",
+  "Октябрь",
+  "Ноябрь",
+  "Декабрь",
+];
 
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDay = new Date(year, month, 1).getDay() || 7;
+const YEAR_OPTIONS = Array.from({ length: 201 }, (_, index) => 1900 + index);
 
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+const renderCalendarHeader: CalendarProps<Dayjs>["headerRender"] = ({
+  value,
+  type,
+  onChange,
+  onTypeChange,
+}) => (
+  <div className="ui-calendar-header" onMouseDown={(event) => event.stopPropagation()}>
+    <AppSelect
+      className="ui-calendar-select ui-calendar-select--year"
+      aria-label="Год"
+      value={value.year()}
+      onChange={(nextYear) => onChange(value.year(Number(nextYear)))}
+      popupMatchSelectWidth={false}
+      options={YEAR_OPTIONS.map((year) => ({ value: year, label: year }))}
+    />
 
-  const selectDate = (day: number) => {
-    const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    onSelect(iso);
+    <AppSelect
+      className="ui-calendar-select ui-calendar-select--month"
+      aria-label="Месяц"
+      value={value.month()}
+      onChange={(nextMonth) => onChange(value.month(Number(nextMonth)))}
+      popupMatchSelectWidth={false}
+      options={MONTH_NAMES.map((month, index) => ({ value: index, label: month }))}
+    />
+
+    <div className="ui-calendar-mode" aria-label="Режим календаря">
+      <AntButton
+        htmlType="button"
+        type="text"
+        className={`ui-calendar-mode-btn${type === "month" ? " is-active" : ""}`}
+        onClick={() => onTypeChange("month")}
+      >
+        Месяц
+      </AntButton>
+      <AntButton
+        htmlType="button"
+        type="text"
+        className={`ui-calendar-mode-btn${type === "year" ? " is-active" : ""}`}
+        onClick={() => onTypeChange("year")}
+      >
+        Год
+      </AntButton>
+    </div>
+  </div>
+);
+
+export default function Calendar({ value, onSelect }: Props) {
+  const selected = parseIsoDate(value);
+
+  const handleSelect = (date: Dayjs) => {
+    onSelect(date.format("YYYY-MM-DD"));
   };
 
   return (
-    <div className="calendar">
-      <div className="calendar-header">
-        <button onClick={() => setCurrent(new Date(year, month - 1, 1))}>‹</button>
-        <span>{current.toLocaleString("ru", { month: "long", year: "numeric" })}</span>
-        <button onClick={() => setCurrent(new Date(year, month + 1, 1))}>›</button>
-      </div>
-
-      <div className="calendar-grid">
-        {["Пн","Вт","Ср","Чт","Пт","Сб","Вс"].map(d => (
-          <span key={d} className="calendar-day-name">{d}</span>
-        ))}
-
-        {Array(firstDay - 1).fill(null).map((_, i) => (
-          <span key={`e-${i}`} />
-        ))}
-
-        {days.map(day => (
-          <button
-            key={day}
-            className="calendar-day"
-            onClick={() => selectDate(day)}
-          >
-            {day}
-          </button>
-        ))}
-      </div>
-    </div>
+    <Card className="calendar calendar--antd" styles={{ body: { padding: 0 } }}>
+      <AntCalendar fullscreen={false} value={selected} headerRender={renderCalendarHeader} onSelect={handleSelect} />
+    </Card>
   );
 }

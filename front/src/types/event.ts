@@ -10,7 +10,7 @@ export interface Event {
   startDate?: string;
   endDate?: string;
   applyDeadline?: string;
-  leader?: string;
+  leader?: number | string;
   organizer?: string;
   specializations?: Specialization[];
   status?: string;

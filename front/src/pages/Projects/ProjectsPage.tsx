@@ -1,78 +1,113 @@
-import { useContext, useEffect, useState, useCallback } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getDirectionById } from "../../api/directions";
 import { getEventById } from "../../api/events";
+import { getPlannerState } from "../../api/planner";
 import { getProjectsByDirection } from "../../api/projects";
-import { getRequests as apiGetRequests, saveRequest } from "../../api/requests";
 import EventWizardModal, { type WizardLaunchContext } from "../../components/EventWizard/EventWizardModal";
 import TableHeader from "../../components/Layout/TableHeader";
 import InfoModal from "../../components/Modal/InfoModal";
-import ApplyModal from "../../components/Requests/ApplyModal";
 import Table from "../../components/Table/Table";
 import { useToast } from "../../components/Toast/ToastProvider";
 import BackButton from "../../components/UI/BackButton";
-import { AuthContext } from "../../context/AuthContext";
+import { useSearchSubmitFeedback } from "../../hooks/useSearchSubmitFeedback";
+import { getAllUsers } from "../../storage/storage";
 import type { Direction } from "../../types/direction";
 import type { Event } from "../../types/event";
 import type { Project } from "../../types/project";
-import type { Request as RequestType } from "../../types/request";
+import type { User } from "../../types/user";
 import "../../styles/page-colors.scss";
+
+function fullName(user: User) {
+  return `${user.surname || ""} ${user.name || ""}`.trim() || user.email || `ID ${user.id}`;
+}
+
+function buildCuratorLabel(curatorIds: number[], userNameById: Map<number, string>) {
+  const uniqueIds = Array.from(new Set(curatorIds.filter((id) => Number.isFinite(id) && id > 0)));
+  if (uniqueIds.length === 0) return "Не назначен";
+  return uniqueIds.map((id) => userNameById.get(id) || `ID ${id}`).join(", ");
+}
+
+function filterProjectsByQuery(items: Project[], query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return items;
+
+  return items.filter(
+    (project) =>
+      (project.title || "").toLowerCase().includes(normalizedQuery) ||
+      (project.curator || "").toLowerCase().includes(normalizedQuery)
+  );
+}
 
 export default function ProjectsPage() {
   const { eventId, directionId } = useParams();
   const navigate = useNavigate();
   const eventIdNum = Number(eventId);
   const directionIdNum = Number(directionId);
-
-  const { user } = useContext(AuthContext);
-  const isStudent = user?.role === "student";
+  const { showToast } = useToast();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [direction, setDirection] = useState<Direction | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [requests, setRequests] = useState<RequestType[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardContext, setWizardContext] = useState<WizardLaunchContext | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [search, setSearch] = useState("");
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-  const [applyOpen, setApplyOpen] = useState(false);
 
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoItem, setInfoItem] = useState<{ title?: string; description?: string } | null>(null);
 
-  const { showToast } = useToast();
-
   const loadAll = useCallback(async () => {
     setLoading(true);
-    const ownerId = user?.id;
-    const role = user?.role;
+    try {
+      const [loadedEvent, loadedDirection, loadedProjects, plannerState, users] = await Promise.all([
+        getEventById(eventIdNum).catch(() => null),
+        getDirectionById(directionIdNum).catch(() => null),
+        getProjectsByDirection(directionIdNum).catch(() => []),
+        getPlannerState().catch(() => null),
+        getAllUsers().catch(() => []),
+      ]);
 
-    const [ev, dir, projs, reqs] = await Promise.all([
-      getEventById(eventIdNum).catch(() => null),
-      getDirectionById(directionIdNum).catch(() => null),
-      getProjectsByDirection(directionIdNum).catch(() => []),
-      apiGetRequests({ ownerId, role }).catch(() => []),
-    ]);
+      const userNameById = new Map<number, string>((users || []).map((user) => [Number(user.id), fullName(user)]));
+      const teams = plannerState?.teams || [];
+      const mappedProjects = (loadedProjects || []).map((project) => {
+        const curatorIds = teams
+          .filter((team) => Number(team.projectId) === Number(project.id))
+          .map((team) => Number(team.curatorId))
+          .filter((id) => Number.isFinite(id) && id > 0);
 
-    setEvent(ev || null);
-    setDirection(dir || null);
-    setProjects(Array.isArray(projs) ? projs : []);
-    setRequests(Array.isArray(reqs) ? reqs : []);
-    setLoading(false);
-  }, [directionIdNum, eventIdNum, user?.id, user?.role]);
+        return {
+          ...project,
+          curator: buildCuratorLabel(curatorIds, userNameById),
+        };
+      });
+
+      setEvent(loadedEvent || null);
+      setDirection(loadedDirection || null);
+      setProjects(mappedProjects);
+    } catch {
+      setEvent(null);
+      setDirection(null);
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [directionIdNum, eventIdNum]);
 
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
 
-  const filteredProjects = !search.trim()
-    ? projects
-    : projects.filter(
-        (p) => (p.title || "").toLowerCase().includes(search.toLowerCase()) || (p.curator || "").toLowerCase().includes(search.toLowerCase())
-      );
+  const filteredProjects = useMemo(() => filterProjectsByQuery(projects, search), [projects, search]);
+
+  const { animatedIds: searchAnimatedIds, handleSearchSubmit } = useSearchSubmitFeedback({
+    getMatches: (query) => filterProjectsByQuery(projects, query),
+    getId: (project) => project.id,
+    notFoundMessage: "Такого проекта не существует!",
+    showToast,
+  });
 
   return (
     <div className="page page--projects">
@@ -80,11 +115,12 @@ export default function ProjectsPage() {
         title={
           <>
             <BackButton onClick={() => navigate(`/events/${eventId}/directions`)} />
-            {`${event?.title || ""} / ${direction?.title || ""} — Проекты`}
+            {`${event?.title || "Мероприятие"} / ${direction?.title || "Направление"} - Проекты`}
           </>
         }
         search={search}
         onSearch={setSearch}
+        onSearchSubmit={handleSearchSubmit}
         onCreate={() => {
           setMode("create");
           setWizardContext({ type: "project", eventId: eventIdNum, directionId: directionIdNum });
@@ -96,9 +132,9 @@ export default function ProjectsPage() {
         columns={[
           { key: "title", title: "Название" },
           { key: "curator", title: "Куратор" },
-          { key: "teams", title: "Команды" },
         ]}
         data={filteredProjects}
+        animatedIds={searchAnimatedIds}
         onEdit={(row) => {
           setMode("edit");
           setWizardContext({
@@ -110,64 +146,21 @@ export default function ProjectsPage() {
           setWizardOpen(true);
         }}
         onInfoClick={(row) => {
-          setInfoItem({ title: row.title || "—", description: row.description || "Нет описания" });
+          setInfoItem({ title: row.title || "-", description: row.description || "Нет описания" });
           setInfoOpen(true);
         }}
-        onRowClick={(row) => setSelectedProjectId(row.id)}
-        selectedId={selectedProjectId ?? undefined}
       />
 
-      {isStudent && selectedProjectId && (
-        <div className="apply-container">
-          <div
-            className="apply-box"
-            onClick={() => {
-              const ownerId = user?.id;
-              const existing = requests.find((r) => Number(r.ownerId) === Number(ownerId) && Number(r.projectId) === Number(selectedProjectId));
-              if (existing) {
-                showToast("error", "Вы уже отправляли заявку на этот проект");
-                return;
-              }
-              setApplyOpen(true);
-            }}
-          >
-            <h1 className="h1">Подать заявку</h1>
-          </div>
-        </div>
+      {wizardOpen && wizardContext && (
+        <EventWizardModal
+          mode={mode}
+          context={wizardContext}
+          onClose={() => {
+            setWizardOpen(false);
+            void loadAll();
+          }}
+        />
       )}
-
-      {wizardOpen && wizardContext && <EventWizardModal mode={mode} context={wizardContext} onClose={() => setWizardOpen(false)} />}
-
-      <ApplyModal
-        isOpen={applyOpen}
-        onClose={() => setApplyOpen(false)}
-        projectId={selectedProjectId ?? undefined}
-        projectTitle={projects.find((p) => p.id === selectedProjectId)?.title}
-        eventId={eventIdNum}
-        directionId={directionIdNum}
-        specializations={event?.specializations || []}
-        onSubmit={async (req) => {
-          const ownerId = user?.id;
-          if (ownerId) req.ownerId = ownerId;
-
-          const existing = requests.find((r) => Number(r.ownerId) === Number(ownerId) && Number(r.projectId) === Number(req.projectId));
-          if (existing) {
-            showToast("error", "Вы уже отправляли заявку на этот проект");
-            return false;
-          }
-
-          try {
-            await saveRequest(req);
-            showToast("success", "Заявка отправлена");
-            const rs = await apiGetRequests({ ownerId, role: user?.role }).catch(() => []);
-            setRequests(Array.isArray(rs) ? rs : []);
-            return true;
-          } catch {
-            showToast("error", "Ошибка при отправке заявки");
-            return false;
-          }
-        }}
-      />
 
       <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} title={infoItem?.title} description={infoItem?.description} />
 
@@ -175,3 +168,4 @@ export default function ProjectsPage() {
     </div>
   );
 }
+

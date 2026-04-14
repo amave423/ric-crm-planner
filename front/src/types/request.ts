@@ -9,6 +9,7 @@ export interface Request {
   eventId?: number;
   eventTitle?: string;
   directionId?: number;
+  specializationId?: number;
   specialization?: string;
   about?: string;
   status?: string;

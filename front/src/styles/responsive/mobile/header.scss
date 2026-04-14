@@ -22,12 +22,8 @@
   }
 
   body .mobile-menu-btn {
-    width: 40px;
-    height: 40px;
-  }
-
-  body .mobile-menu-panel {
-    min-width: 220px;
+    width: 42px;
+    height: 42px;
   }
 
   body .header-left {
@@ -48,7 +44,12 @@
     pointer-events: auto;
   }
 
-  body .header-logo {
+  body .header-logo.ant-btn {
+    width: 62px;
+    height: 42px;
+  }
+
+  body .header-logo-img {
     width: 62px;
     height: 42px;
   }
@@ -77,6 +78,11 @@
     font-size: 13px;
   }
 
+  body .head-btn--notify {
+    min-width: 40px;
+    justify-content: center;
+  }
+
   body .app-header--guest .head-btn--login {
     min-width: 104px;
     justify-content: center;
@@ -94,6 +100,10 @@
     display: none;
   }
 
+  body .header-right .head-btn--notify span {
+    display: none;
+  }
+
   body .header-right .head-btn--login span {
     display: inline;
   }
@@ -102,7 +112,7 @@
     min-width: 104px;
   }
 
-  body .mobile-menu-panel {
-    min-width: 200px;
+  body .mobile-menu-dropdown .ant-dropdown-menu {
+    min-width: 210px;
   }
 }

@@ -1,154 +1,179 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { useWizard } from "../EventWizardModal";
-import calendarIcon from "../../../assets/icons/calendar.svg";
-import type { User } from "../../../types/user";
+import { getEventById, removeEvent as apiRemoveEvent, saveEvent as persistEvent } from "../../../api/events";
+import { SPECIALIZATION_OPTIONS } from "../../../constants/specializations";
 import { getAllUsers } from "../../../storage/storage";
-import Calendar from "../../UI/Calendar";
-import { getEventById, saveEvent as persistEvent, removeEvent as apiRemoveEvent } from "../../../api/events";
 import type { Event } from "../../../types/event";
+import type { User } from "../../../types/user";
 import Modal from "../../Modal/Modal";
-import { useToast } from "../../../components/Toast/ToastProvider";
+import { useToast } from "../../Toast/ToastProvider";
+import DateField, { DateRangeField } from "../../UI/DateField";
+import { useWizard } from "../EventWizardModal";
+import AppButton from "../../UI/Button";
+import AppInput, { AppTextArea } from "../../UI/Input";
+import AppSelect from "../../UI/Select";
 
 interface Specialization {
   id: number;
   title: string;
 }
 
+function FieldWrap({ name, errors, children }: { name: string; errors: Record<string, string>; children: ReactNode }) {
+  return (
+    <div className={`field-wrap ${errors[name] ? "error" : ""}`}>
+      {children}
+      {errors[name] && <div className="field-error">{errors[name]}</div>}
+    </div>
+  );
+}
+
 export default function EventForm() {
   const { mode, saveEvent, savedEvent, eventId } = useWizard();
+  const seededEvent = savedEvent as Event | undefined;
+  const { showToast } = useToast();
 
-  const se = savedEvent as Event | undefined;
-  const titleRef = useRef<HTMLInputElement | null>(null);
-  const specInputRef = useRef<HTMLInputElement | null>(null);
-
-  const [description, setDescription] = useState<string>(se?.description ?? "");
+  const [description, setDescription] = useState(seededEvent?.description ?? "");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [applyDeadline, setApplyDeadline] = useState("");
   const [leader, setLeader] = useState<string>("");
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
+  const [selectedSpecializationId, setSelectedSpecializationId] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [usersList, setUsersList] = useState<User[]>([]);
-  const { showToast } = useToast();
 
   useEffect(() => {
     let mounted = true;
+
     (async () => {
       try {
         const users = await getAllUsers();
-        const mapped = (users || []).map((u) => {
-          const raw = u as User & Record<string, unknown>;
+        const normalized = (users || []).map((user) => {
+          const raw = user as User & Record<string, unknown>;
           return {
             ...raw,
             name: raw.name ?? String(raw.firstName ?? raw.first_name ?? ""),
             surname: raw.surname ?? String(raw.lastName ?? raw.last_name ?? ""),
           };
         });
-        if (mounted) setUsersList(mapped);
+
+        if (mounted) setUsersList(normalized);
       } catch {
         if (mounted) setUsersList([]);
       }
     })();
-    return () => { mounted = false; };
+
+    return () => {
+      mounted = false;
+    };
   }, []);
-  
-  const organizers = usersList.filter((u) => u.role === "organizer");
+
+  const organizers = usersList.filter((user) => user.role === "organizer");
 
   useEffect(() => {
     let mounted = true;
+
+    const fillState = (event: Event) => {
+      setTitle(event.title || "");
+      setDescription(event.description || "");
+      setStartDate(event.startDate || "");
+      setEndDate(event.endDate || "");
+      setApplyDeadline(event.applyDeadline || "");
+      setLeader(String(event.leader ?? ""));
+      setSpecializations(event.specializations || []);
+      setSelectedSpecializationId("");
+    };
+
     (async () => {
-      if (se) {
-        if (titleRef.current) titleRef.current.value = se.title || "";
-        setDescription(se.description || "");
-        setStartDate(se.startDate || "");
-        setEndDate(se.endDate || "");
-        setApplyDeadline(se.applyDeadline || "");
-        setLeader(se.leader ?? "");
-        setSpecializations(se.specializations || []);
-        setTitle(se.title || "");
+      if (seededEvent) {
+        fillState(seededEvent);
         return;
       }
 
       if (mode === "edit" && eventId) {
         try {
-          const e = await getEventById(Number(eventId));
-          if (!mounted) return;
-          if (e) {
-            if (titleRef.current) titleRef.current.value = e.title || "";
-            setDescription(e.description || "");
-            setStartDate(e.startDate || "");
-            setEndDate(e.endDate || "");
-            setApplyDeadline(e.applyDeadline || "");
-            setLeader(e.leader ?? "");
-            setSpecializations(e.specializations || []);
-            setTitle(e.title || "");
-          }
+          const event = await getEventById(Number(eventId));
+          if (!mounted || !event) return;
+          fillState(event);
         } catch {
+          return;
         }
-      } else {
-        if (!se && mode === "create") {
-          if (titleRef.current) titleRef.current.value = "";
-          setDescription("");
-          setStartDate("");
-          setEndDate("");
-          setApplyDeadline("");
-          setLeader("");
-          setTitle("");
-          setSpecializations([]);
-        }
+        return;
+      }
+
+      if (mode === "create") {
+        setTitle("");
+        setDescription("");
+        setStartDate("");
+        setEndDate("");
+        setApplyDeadline("");
+        setLeader("");
+        setSpecializations([]);
+        setSelectedSpecializationId("");
       }
     })();
+
     return () => {
       mounted = false;
     };
-  }, [se, mode, eventId]);
+  }, [eventId, mode, seededEvent]);
 
-  const addSpec = () => {
-    const val = specInputRef.current?.value || "";
-    if (!val.trim()) return;
-    setSpecializations((prev) => [...prev, { id: Date.now(), title: val.trim() }]);
-    if (specInputRef.current) specInputRef.current.value = "";
+  const addSpecialization = () => {
+    const selected = SPECIALIZATION_OPTIONS.find((item) => String(item.id) === String(selectedSpecializationId));
+    if (!selected) return;
+
+    setSpecializations((prev) => {
+      if (prev.some((item) => Number(item.id) === Number(selected.id) || item.title.trim().toLowerCase() === selected.title.trim().toLowerCase())) {
+        return prev;
+      }
+      return [...prev, selected];
+    });
+
+    setSelectedSpecializationId("");
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.specializations;
+      return next;
+    });
   };
 
-  const removeSpec = (id: number) => {
-    setSpecializations(specializations.filter((s) => s.id !== id));
+  const removeSpecialization = (id: number) => {
+    setSpecializations((prev) => prev.filter((item) => Number(item.id) !== Number(id)));
   };
 
   const validate = () => {
-    const e: Record<string, string> = {};
-    const curTitle = (title || "").trim();
-    if (!curTitle) e.title = "Вы пропустили поле";
-    if (!startDate) e.startDate = "Вы пропустили поле";
-    if (!endDate) e.endDate = "Вы пропустили поле";
-    if (!applyDeadline) e.applyDeadline = "Вы пропустили поле";
-    if (!leader) e.leader = "Вы пропустили поле";
-    if (!specializations || specializations.length === 0) e.specializations = "Вы пропустили поле";
-    setErrors(e);
-    return Object.keys(e).length === 0;
+    const nextErrors: Record<string, string> = {};
+    const trimmedTitle = title.trim();
+
+    if (!trimmedTitle) nextErrors.title = "Заполните поле";
+    if (!startDate) nextErrors.startDate = "Заполните поле";
+    if (!endDate) nextErrors.endDate = "Заполните поле";
+    if (!applyDeadline) nextErrors.applyDeadline = "Заполните поле";
+    if (!leader) nextErrors.leader = "Заполните поле";
+    if (!specializations.length) nextErrors.specializations = "Выберите хотя бы одну специализацию";
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleSave = async () => {
     if (!validate()) return;
 
-    const computedStatus = (() => {
-      const endObj = new Date(endDate);
-      return endObj >= new Date() ? "Активно" : "Неактивно";
-    })();
-
+    const computedStatus = new Date(endDate) >= new Date() ? "Активно" : "Неактивно";
     const payload: Event = {
       id: mode === "edit" && eventId ? Number(eventId) : 0,
-      title: (title || "").trim(),
+      title: title.trim(),
       description: description.trim(),
       startDate,
       endDate,
       applyDeadline,
       leader,
       specializations,
-      status: computedStatus
+      status: computedStatus,
     };
+
     try {
       const saved = await persistEvent(payload);
       saveEvent?.(saved);
@@ -158,183 +183,139 @@ export default function EventForm() {
     }
   };
 
-  const FieldWrap = ({ name, children }: { name: string; children: ReactNode }) => (
-    <div className={`field-wrap ${errors[name] ? "error" : ""}`} style={{ marginBottom: 8 }}>
-      {children}
-      {errors[name] && <div className="field-error">{errors[name]}</div>}
-    </div>
-  );
-
   return (
     <div className="wizard-form">
       <h2 className="h2">{mode === "create" ? "Добавление мероприятия" : "Редактирование мероприятия"}</h2>
 
-      <FieldWrap name="title">
+      <FieldWrap name="title" errors={errors}>
         <label className="text-small">
-            Название мероприятия
-            <input
-              ref={titleRef}
-              defaultValue={title}
-              onBlur={() => {
-                const v = titleRef.current?.value ?? "";
-                setTitle(v);
-              }}
-              autoComplete="off"
-              spellCheck={false}
-              />
-        </label>
-      </FieldWrap>
-
-      <label className="text-small">
-        Описание
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-      </label>
-
-      <div className="date-row">
-        <FieldWrap name="startDate">
-          <DateField label="Дата начала" value={startDate} onChange={setStartDate} />
-        </FieldWrap>
-
-        <FieldWrap name="endDate">
-          <DateField label="Дата завершения" value={endDate} onChange={setEndDate} />
-        </FieldWrap>
-
-        <FieldWrap name="applyDeadline">
-          <DateField label="Срок приёма заявок" value={applyDeadline} onChange={setApplyDeadline} />
-        </FieldWrap>
-      </div>
-
-      <FieldWrap name="leader">
-        <label className="text-small">Руководитель мероприятия</label>
-        <select value={leader ?? ""} onChange={(e) => setLeader(e.target.value)}>
-          <option value="" disabled>
-            Выберите руководителя
-          </option>
-          {organizers.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.surname} {o.name}
-            </option>
-          ))}
-        </select>
-      </FieldWrap>
-
-      <FieldWrap name="specializations">
-        <label className="text-small">
-          Специализации
-          <input
-            ref={specInputRef}
-            defaultValue=""
-            onKeyDown={(e) => e.key === "Enter" && addSpec()}
-            placeholder="Введите специализацию и нажмите Enter"
+          Название мероприятия
+          <AppInput
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
             autoComplete="off"
             spellCheck={false}
           />
         </label>
       </FieldWrap>
 
+      <label className="text-small">
+        Описание
+        <AppTextArea value={description} onChange={(event) => setDescription(event.target.value)} />
+      </label>
+      <div className="date-row">
+        <div className={`field-wrap ${errors.startDate || errors.endDate ? "error" : ""}`}>
+          <DateRangeField
+            className="app-date-range-field--compact"
+            label={"Дата начала и завершения"}
+            startValue={startDate}
+            endValue={endDate}
+            placeholders={["Дата начала", "Дата завершения"]}
+            onChange={(nextStartDate, nextEndDate) => {
+              setStartDate(nextStartDate);
+              setEndDate(nextEndDate);
+            }}
+          />
+          {(errors.startDate || errors.endDate) && <div className="field-error">{errors.startDate || errors.endDate}</div>}
+        </div>
+
+        <FieldWrap name="applyDeadline" errors={errors}>
+          <DateField label={"Срок приёма заявок"} value={applyDeadline} onChange={setApplyDeadline} placeholder="Срок приёма" />
+        </FieldWrap>
+      </div>
+
+      <FieldWrap name="leader" errors={errors}>
+        <label className="text-small">
+          Руководитель мероприятия
+          <AppSelect
+            tone="event"
+            value={leader}
+            onChange={(value) => setLeader(String(value))}
+            options={[
+              { value: "", label: "Выберите руководителя" },
+              ...organizers.map((organizer) => ({
+                value: String(organizer.id),
+                label: `${organizer.surname} ${organizer.name}`.trim(),
+              })),
+            ]}
+          />
+        </label>
+      </FieldWrap>
+
+      <FieldWrap name="specializations" errors={errors}>
+        <label className="text-small">
+          Специализации
+          <div className="wizard-inline-add-row wizard-inline-add-row--specializations">
+            <AppSelect
+              tone="event"
+              value={selectedSpecializationId}
+              onChange={(value) => setSelectedSpecializationId(String(value))}
+              options={[
+                { value: "", label: "Выберите специализацию" },
+                ...SPECIALIZATION_OPTIONS.map((specialization) => ({
+                  value: String(specialization.id),
+                  label: specialization.title,
+                })),
+              ]}
+            />
+            <AppButton className="primary wizard-inline-add-button wizard-inline-add-button--event" type="button" onClick={addSpecialization}>
+              Добавить
+            </AppButton>
+          </div>
+        </label>
+      </FieldWrap>
+
       <div className="tags">
-        {specializations.map((s) => (
-          <div key={s.id} className="tag">
-            {s.title}
-            <button onClick={() => removeSpec(s.id)}>×</button>
+        {specializations.map((specialization) => (
+          <div key={specialization.id} className="tag">
+            {specialization.title}
+            <AppButton className="tag-remove" type="button" onClick={() => removeSpecialization(specialization.id)} aria-label="Удалить специализацию">
+              x
+            </AppButton>
           </div>
         ))}
       </div>
 
       <div className="wizard-actions">
         {mode === "edit" && (
-          <button className="danger-outline" onClick={() => setConfirmOpen(true)} style={{ marginRight: "auto" }}>
-          Удалить
-          </button>
+          <AppButton className="danger-outline" onClick={() => setConfirmOpen(true)} style={{ marginRight: "auto" }}>
+            Удалить
+          </AppButton>
         )}
-        <button
-          className="primary"
-          onClick={handleSave}
-          type="button"
-        >
+        <AppButton className="primary" onClick={handleSave} type="button">
           Сохранить мероприятие
-        </button>
+        </AppButton>
       </div>
-      <Modal isOpen={confirmOpen} onClose={() => setConfirmOpen(false)} title="Подтвердите">
+
+      <Modal isOpen={confirmOpen} onClose={() => setConfirmOpen(false)} title="Подтвердите действие">
         <div style={{ padding: 8 }}>
-            <div>Вы уверены, что хотите удалить мероприятие? Действие необратимо.</div>
-            <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button className="close-btn" onClick={() => setConfirmOpen(false)}>Отмена</button>
-            <button
-                className="danger-outline"
-                onClick={async () => {
-                if (eventId) {
-                    try {
-                      await apiRemoveEvent(Number(eventId));
-                      showToast("success", "Мероприятие успешно удалено");
-                      window.location.reload();
-                    } catch {
-                      showToast("error", "Ошибка при удалении мероприятия");
-                    }
-                } else {
-                    showToast("error", "Невозможно удалить: id мероприятия не найден");
+          <div>Вы уверены, что хотите удалить мероприятие? Действие необратимо.</div>
+          <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <AppButton className="close-btn" onClick={() => setConfirmOpen(false)}>
+              Отмена
+            </AppButton>
+            <AppButton
+              className="danger-outline"
+              onClick={async () => {
+                if (!eventId) {
+                  showToast("error", "Невозможно удалить мероприятие: id не найден");
+                  return;
                 }
-                }}
+
+                try {
+                  await apiRemoveEvent(Number(eventId));
+                  showToast("success", "Мероприятие успешно удалено");
+                  window.location.reload();
+                } catch {
+                  showToast("error", "Ошибка при удалении мероприятия");
+                }
+              }}
             >
-                Удалить
-            </button>
-            </div>
+              Удалить
+            </AppButton>
+          </div>
         </div>
       </Modal>
     </div>
-  );
-}
-
-function DateField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (inputRef.current && value !== inputRef.current.value) {
-      inputRef.current.value = value || "";
-    }
-  }, [value]);
-
-  return (
-    <label className="date-field">
-      <span className="text-small">{label}</span>
-
-      <div className="date-input">
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder="YYYY-MM-DD"
-          defaultValue={value}
-          onBlur={() => {
-            const v = inputRef.current?.value ?? "";
-            if (v !== value) onChange(v);
-          }}
-          onFocus={() => setOpen(true)}
-        />
-
-        <button type="button" className="calendar-btn" onClick={() => setOpen((prev) => !prev)}>
-          <img src={calendarIcon} alt="calendar" />
-        </button>
-
-        {open && (
-          <Calendar
-            value={value}
-            onSelect={(date) => {
-              onChange(date);
-              setOpen(false);
-              if (inputRef.current) inputRef.current.value = date;
-            }}
-          />
-        )}
-      </div>
-    </label>
   );
 }

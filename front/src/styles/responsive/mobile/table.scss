@@ -248,7 +248,8 @@
     width: 100%;
   }
 
-  body .request-card-mobile__status-body .status-select {
+  body .request-card-mobile__status-body .status-select,
+  body .request-card-mobile__status-body .status-select.app-select.ant-select {
     width: 100%;
   }
 
@@ -263,18 +264,23 @@
     height: 30px;
   }
 
-  body .info-btn img {
-    width: 30px;
-    height: 30px;
+  body .info-btn .anticon {
+    font-size: 18px;
   }
 
-  body .status-select {
+  body .status-select,
+  body .status-select.app-select.ant-select {
     width: 100%;
   }
 
   body .apply-box {
     width: 100%;
     max-width: none;
+  }
+
+  body .event-apply-pill {
+    width: 100%;
+    min-width: 0;
   }
 }
 
@@ -285,15 +291,17 @@
   }
 
   body .create-btn {
-    width: 28px;
-    height: 28px;
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
   }
 
   body .cell-badge {
     font-size: 12px;
   }
 
-  body .status-select {
+  body .status-select,
+  body .status-select.app-select.ant-select {
     font-size: 13px;
   }
 

@@ -3,6 +3,7 @@ import secrets
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
 from rest_framework import status
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -42,9 +43,58 @@ from users.serializers import (
     SpecializationSerializer,
     StatusSerializer,
 )
-from users.models import Application, Direction, Event, Profile, Project, Specialization, Status
+from users.models import (
+    Application,
+    Direction,
+    Event,
+    Profile,
+    Project,
+    Specialization,
+    Status,
+)
+
+TAG_AUTH = "Auth"
+TAG_USERS = "Users"
+TAG_PROFILE = "Profile"
+TAG_EVENTS = "Events"
+TAG_DIRECTIONS = "Directions"
+TAG_PROJECTS = "Projects"
+TAG_APPLICATIONS = "Applications"
+TAG_REFERENCE = "Reference"
+
+MESSAGE_RESPONSE_SCHEMA = openapi.Schema(
+    type=openapi.TYPE_OBJECT,
+    properties={"message": openapi.Schema(type=openapi.TYPE_STRING)},
+)
+
+ERROR_RESPONSE_SCHEMA = openapi.Schema(
+    type=openapi.TYPE_OBJECT,
+    additional_properties=openapi.Schema(type=openapi.TYPE_STRING),
+)
+
+LOGIN_RESPONSE_SCHEMA = openapi.Schema(
+    type=openapi.TYPE_OBJECT,
+    properties={"user": openapi.Schema(type=openapi.TYPE_OBJECT)},
+)
+
+REFRESH_RESPONSE_SCHEMA = openapi.Schema(
+    type=openapi.TYPE_OBJECT,
+    properties={
+        "access": openapi.Schema(type=openapi.TYPE_STRING),
+        "refresh": openapi.Schema(type=openapi.TYPE_STRING),
+    },
+)
 
 
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_USERS],
+        operation_summary="Get current user info",
+        operation_description="Get current user info",
+        responses={200: UserSerializer, 401: ERROR_RESPONSE_SCHEMA},
+    ),
+)
 class UserInfoView(RetrieveAPIView):
     permission_classes = (IsAuthenticated,)
     serializer_class = UserSerializer
@@ -53,10 +103,29 @@ class UserInfoView(RetrieveAPIView):
         return self.request.user
 
 
+@method_decorator(
+    name="post",
+    decorator=swagger_auto_schema(
+        tags=[TAG_AUTH],
+        operation_summary="Register user",
+        operation_description="Register user",
+        request_body=RegisterUserSerializer,
+        responses={201: UserSerializer, 400: ERROR_RESPONSE_SCHEMA},
+    ),
+)
 class UserRegistrationView(CreateAPIView):
     permission_classes = (AllowAny,)
     serializer_class = RegisterUserSerializer
 
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_USERS],
+        operation_summary="List users",
+        operation_description="List users",
+        responses={200: UserSerializer(many=True), 401: ERROR_RESPONSE_SCHEMA},
+    ),
+)
 class UserListView(ListAPIView):
     permission_classes = (IsAuthenticated,)
     serializer_class = UserSerializer
@@ -95,6 +164,13 @@ def _set_csrf_cookie(response):
 class LoginView(APIView):
     permission_classes = (AllowAny,)
 
+    @swagger_auto_schema(
+        tags=[TAG_AUTH],
+        operation_summary="Login",
+        operation_description="Login",
+        request_body=LoginUserSerializer,
+        responses={200: LOGIN_RESPONSE_SCHEMA, 400: ERROR_RESPONSE_SCHEMA},
+    )
     def post(self, request):
         serializer = LoginUserSerializer(data=request.data)
 
@@ -115,6 +191,12 @@ class LoginView(APIView):
 class LogoutView(APIView):
     permission_classes = (IsAuthenticated,)
 
+    @swagger_auto_schema(
+        tags=[TAG_AUTH],
+        operation_summary="Logout",
+        operation_description="Logout",
+        responses={200: MESSAGE_RESPONSE_SCHEMA, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA},
+    )
     def post(self, request):
         refresh_token = request.COOKIES.get("refresh_token")
         if refresh_token:
@@ -133,6 +215,12 @@ class LogoutView(APIView):
 class CookieTokenRefreshView(TokenRefreshView):
     permission_classes = (AllowAny,)
 
+    @swagger_auto_schema(
+        tags=[TAG_AUTH],
+        operation_summary="Refresh access token",
+        operation_description="Refresh access token",
+        responses={200: REFRESH_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA},
+    )
     def post(self, request):
         refresh_token = request.COOKIES.get("refresh_token")
 
@@ -157,6 +245,13 @@ class CookieTokenRefreshView(TokenRefreshView):
 class PasswordResetRequestView(APIView):
     permission_classes = (AllowAny,)
 
+    @swagger_auto_schema(
+        tags=[TAG_AUTH],
+        operation_summary="Request password reset",
+        operation_description="Request password reset",
+        request_body=PasswordResetRequestSerializer,
+        responses={200: MESSAGE_RESPONSE_SCHEMA, 400: ERROR_RESPONSE_SCHEMA},
+    )
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data, context={"request": request})
 
@@ -170,6 +265,16 @@ class PasswordResetRequestView(APIView):
 class PasswordResetConfirmView(APIView):
     permission_classes = (AllowAny,)
 
+    @swagger_auto_schema(
+        tags=[TAG_AUTH],
+        operation_summary="Validate password reset token",
+        operation_description="Validate password reset token",
+        manual_parameters=[
+            openapi.Parameter("email", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=True),
+            openapi.Parameter("token", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=True),
+        ],
+        responses={200: MESSAGE_RESPONSE_SCHEMA, 400: ERROR_RESPONSE_SCHEMA},
+    )
     def get(self, request):
         email = request.query_params.get("email")
         token = request.query_params.get("token")
@@ -196,6 +301,13 @@ class PasswordResetConfirmView(APIView):
 
         return Response({"message": "Токен подтверждён"}, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(
+        tags=[TAG_AUTH],
+        operation_summary="Confirm password reset",
+        operation_description="Confirm password reset",
+        request_body=PasswordResetConfirmSerializer,
+        responses={200: MESSAGE_RESPONSE_SCHEMA, 400: ERROR_RESPONSE_SCHEMA},
+    )
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
 
@@ -209,6 +321,16 @@ class PasswordResetConfirmView(APIView):
 class EmailConfirmationView(APIView):
     permission_classes = (AllowAny,)
 
+    @swagger_auto_schema(
+        tags=[TAG_AUTH],
+        operation_summary="Confirm email by query params",
+        operation_description="Confirm email by query params",
+        manual_parameters=[
+            openapi.Parameter("email", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=True),
+            openapi.Parameter("token", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=True),
+        ],
+        responses={200: MESSAGE_RESPONSE_SCHEMA, 400: ERROR_RESPONSE_SCHEMA},
+    )
     def get(self, request):
         serializer = EmailConfirmationSerializer(data=request.query_params)
 
@@ -218,6 +340,13 @@ class EmailConfirmationView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @swagger_auto_schema(
+        tags=[TAG_AUTH],
+        operation_summary="Confirm email by body",
+        operation_description="Confirm email by body",
+        request_body=EmailConfirmationSerializer,
+        responses={200: MESSAGE_RESPONSE_SCHEMA, 400: ERROR_RESPONSE_SCHEMA},
+    )
     def post(self, request):
         serializer = EmailConfirmationSerializer(data=request.data)
 
@@ -228,6 +357,35 @@ class EmailConfirmationView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_PROFILE],
+        operation_summary="Get current profile",
+        operation_description="Get current profile",
+        responses={200: ProfileSerializer, 401: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="put",
+    decorator=swagger_auto_schema(
+        tags=[TAG_PROFILE],
+        operation_summary="Replace current profile",
+        operation_description="Replace current profile",
+        request_body=ProfileSerializer,
+        responses={200: ProfileSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="patch",
+    decorator=swagger_auto_schema(
+        tags=[TAG_PROFILE],
+        operation_summary="Update current profile",
+        operation_description="Update current profile",
+        request_body=ProfileSerializer,
+        responses={200: ProfileSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA},
+    ),
+)
 class ProfileView(RetrieveUpdateAPIView):
     permission_classes = (IsAuthenticated,)
     serializer_class = ProfileSerializer
@@ -250,6 +408,25 @@ class ProfileView(RetrieveUpdateAPIView):
         return profile
 
 
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_EVENTS],
+        operation_summary="List events",
+        operation_description="List events",
+        responses={200: EventSerializer(many=True), 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="post",
+    decorator=swagger_auto_schema(
+        tags=[TAG_EVENTS],
+        operation_summary="Create event",
+        operation_description="Create event",
+        request_body=EventSerializer,
+        responses={201: EventSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA},
+    ),
+)
 class EventListCreateView(ListCreateAPIView):
     permission_classes = (ProjectantReadCuratorAdminWritePermission,)
     serializer_class = EventSerializer
@@ -257,23 +434,98 @@ class EventListCreateView(ListCreateAPIView):
     lookup_url_kwarg = "event_id"
 
 
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_EVENTS],
+        operation_summary="Get event",
+        operation_description="Get event",
+        responses={200: EventSerializer, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="put",
+    decorator=swagger_auto_schema(
+        tags=[TAG_EVENTS],
+        operation_summary="Replace event",
+        operation_description="Replace event",
+        request_body=EventSerializer,
+        responses={200: EventSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="patch",
+    decorator=swagger_auto_schema(
+        tags=[TAG_EVENTS],
+        operation_summary="Update event",
+        operation_description="Update event",
+        request_body=EventSerializer,
+        responses={200: EventSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="delete",
+    decorator=swagger_auto_schema(
+        tags=[TAG_EVENTS],
+        operation_summary="Delete event",
+        operation_description="Delete event",
+        responses={204: "No content", 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
 class EventDetailView(RetrieveUpdateDestroyAPIView):
     permission_classes = (ProjectantReadCuratorAdminWritePermission,)
     serializer_class = EventSerializer
     queryset = Event.objects.all()
     lookup_url_kwarg = "event_id"
 
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_REFERENCE],
+        operation_summary="List statuses",
+        operation_description="List statuses",
+        responses={200: StatusSerializer(many=True)},
+    ),
+)
 class StatusListView(ListAPIView):
     permission_classes = (AllowAny,)
     serializer_class = StatusSerializer
     queryset = Status.objects.all()
 
 
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_REFERENCE],
+        operation_summary="List specializations",
+        operation_description="List specializations",
+        responses={200: SpecializationSerializer(many=True)},
+    ),
+)
 class SpecializationListView(ListAPIView):
     permission_classes = (AllowAny,)
     serializer_class = SpecializationSerializer
     queryset = Specialization.objects.all()
     
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_DIRECTIONS],
+        operation_summary="List directions in event",
+        operation_description="List directions in event",
+        responses={200: DirectionSerializer(many=True), 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="post",
+    decorator=swagger_auto_schema(
+        tags=[TAG_DIRECTIONS],
+        operation_summary="Create direction in event",
+        operation_description="Create direction in event",
+        request_body=DirectionSerializer,
+        responses={201: DirectionSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
 class DirectionListCreateView(ListCreateAPIView):
     permission_classes = (ProjectantReadCuratorAdminWritePermission,)
     serializer_class = DirectionSerializer
@@ -288,6 +540,44 @@ class DirectionListCreateView(ListCreateAPIView):
         return context
 
 
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_DIRECTIONS],
+        operation_summary="Get direction",
+        operation_description="Get direction",
+        responses={200: DirectionSerializer, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="put",
+    decorator=swagger_auto_schema(
+        tags=[TAG_DIRECTIONS],
+        operation_summary="Replace direction",
+        operation_description="Replace direction",
+        request_body=DirectionSerializer,
+        responses={200: DirectionSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="patch",
+    decorator=swagger_auto_schema(
+        tags=[TAG_DIRECTIONS],
+        operation_summary="Update direction",
+        operation_description="Update direction",
+        request_body=DirectionSerializer,
+        responses={200: DirectionSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="delete",
+    decorator=swagger_auto_schema(
+        tags=[TAG_DIRECTIONS],
+        operation_summary="Delete direction",
+        operation_description="Delete direction",
+        responses={204: "No content", 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
 class DirectionDetailView(RetrieveUpdateDestroyAPIView):
     permission_classes = (ProjectantReadCuratorAdminWritePermission,)
     serializer_class = DirectionSerializer
@@ -297,6 +587,25 @@ class DirectionDetailView(RetrieveUpdateDestroyAPIView):
         event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
         return Direction.objects.filter(event=event)
 
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_PROJECTS],
+        operation_summary="List projects in direction",
+        operation_description="List projects in direction",
+        responses={200: ProjectSerializer(many=True), 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="post",
+    decorator=swagger_auto_schema(
+        tags=[TAG_PROJECTS],
+        operation_summary="Create project in direction",
+        operation_description="Create project in direction",
+        request_body=ProjectSerializer,
+        responses={201: ProjectSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
 class ProjectListCreateView(ListCreateAPIView):
     permission_classes = (ProjectantReadCuratorAdminWritePermission,)
     serializer_class = ProjectSerializer
@@ -318,18 +627,84 @@ class ProjectListCreateView(ListCreateAPIView):
         return context
 
 
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_PROJECTS],
+        operation_summary="Get project",
+        operation_description="Get project",
+        responses={200: ProjectSerializer, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="put",
+    decorator=swagger_auto_schema(
+        tags=[TAG_PROJECTS],
+        operation_summary="Replace project",
+        operation_description="Replace project",
+        request_body=ProjectSerializer,
+        responses={200: ProjectSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="patch",
+    decorator=swagger_auto_schema(
+        tags=[TAG_PROJECTS],
+        operation_summary="Update project",
+        operation_description="Update project",
+        request_body=ProjectSerializer,
+        responses={200: ProjectSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="delete",
+    decorator=swagger_auto_schema(
+        tags=[TAG_PROJECTS],
+        operation_summary="Delete project",
+        operation_description="Delete project",
+        responses={204: "No content", 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
 class ProjectDetailView(RetrieveUpdateDestroyAPIView):
     permission_classes = (ProjectantReadCuratorAdminWritePermission,)
     serializer_class = ProjectSerializer
     lookup_url_kwarg = "project_id"
     queryset = Project.objects.select_related("direction", "curator", "direction__event")
 
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_PROJECTS],
+        operation_summary="List all projects",
+        operation_description="List all projects",
+        responses={200: ProjectSerializer(many=True), 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="post",
+    decorator=swagger_auto_schema(
+        tags=[TAG_PROJECTS],
+        operation_summary="Create project",
+        operation_description="Create project",
+        request_body=ProjectSerializer,
+        responses={201: ProjectSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA},
+    ),
+)
 class UserProjectListCreateView(ListCreateAPIView):
     permission_classes = (ProjectantReadCuratorAdminWritePermission,)
     serializer_class = ProjectSerializer
     queryset = Project.objects.select_related("direction", "curator", "direction__event")
 
 
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_DIRECTIONS],
+        operation_summary="List all directions",
+        operation_description="List all directions",
+        responses={200: DirectionSerializer(many=True), 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA},
+    ),
+)
 class UserDirectionListView(ListAPIView):
     permission_classes = (ProjectantReadCuratorAdminWritePermission,)
     serializer_class = DirectionSerializer
@@ -384,7 +759,7 @@ class ApplicationListView(ListCreateAPIView):
     ]
     def get_permissions(self):
         if self.request.method.lower() == "get":
-            permissions = (CuratorOrAdminPermission,)
+            permissions = (IsAuthenticated,)
         else:
             permissions = (ProjectantOnlyPermission,)
         return [permission() for permission in permissions]
@@ -393,14 +768,33 @@ class ApplicationListView(ListCreateAPIView):
         if self.request.method.lower() == "post":
             return ApplicationCreateSerializer
         return ApplicationSerializer
-    @swagger_auto_schema(manual_parameters=filter_parameters)
+    @swagger_auto_schema(
+        tags=[TAG_APPLICATIONS],
+        operation_summary="List applications",
+        operation_description="List applications",
+        manual_parameters=filter_parameters,
+        responses={200: ApplicationSerializer(many=True), 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA},
+    )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        tags=[TAG_APPLICATIONS],
+        operation_summary="Create application",
+        operation_description="Create application",
+        request_body=ApplicationCreateSerializer,
+        responses={201: ApplicationSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA},
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
     def get_queryset(self):
         queryset = Application.objects.select_related(
             "user", "direction", "event", "specialization", "status"
         ).order_by("-date_sub")
+        
+        if not CuratorOrAdminPermission().has_permission(self.request, self):
+            queryset = queryset.filter(user=self.request.user)
 
         filters = {
             "event": "event_id",
@@ -446,21 +840,39 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
     serializer_class = ApplicationSerializer
     lookup_url_kwarg = "application_id"
     def get_permissions(self):
-        if self.request.method.lower() in {"get", "patch", "delete"}:
+        if self.request.method.lower() == "get":
+            permissions = (IsAuthenticated,)
+        elif self.request.method.lower() in {"patch", "delete"}:
             permissions = (CuratorOrAdminPermission,)
         else:
             permissions = (IsAuthenticated,)
         return [permission() for permission in permissions]
 
-    @swagger_auto_schema(operation_description="Получение заявки")
+    @swagger_auto_schema(
+        tags=[TAG_APPLICATIONS],
+        operation_summary="Get application",
+        operation_description="Получение заявки",
+        responses={200: ApplicationSerializer, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
-    @swagger_auto_schema(operation_description="Обновление заявки")
+    @swagger_auto_schema(
+        tags=[TAG_APPLICATIONS],
+        operation_summary="Update application",
+        operation_description="Обновление заявки",
+        request_body=ApplicationSerializer,
+        responses={200: ApplicationSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    )
     def patch(self, request, *args, **kwargs):
         return super().patch(request, *args, **kwargs)
 
-    @swagger_auto_schema(operation_description="Удаление заявки")
+    @swagger_auto_schema(
+        tags=[TAG_APPLICATIONS],
+        operation_summary="Delete application",
+        operation_description="Удаление заявки",
+        responses={204: "No content", 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    )
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
 
@@ -472,14 +884,19 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
         if CuratorOrAdminPermission().has_permission(self.request, self):
             return queryset
 
-        if self.request.method.lower() == "put" and not (
-            self.request.user.is_staff or self.request.user.is_superuser
-        ):
-            return queryset.filter(user=self.request.user)
-
-        return queryset
+        return queryset.filter(user=self.request.user)
 
 
+@method_decorator(
+    name="post",
+    decorator=swagger_auto_schema(
+        tags=[TAG_APPLICATIONS],
+        operation_summary="Create application for direction",
+        operation_description="Create application for direction",
+        request_body=ApplicationCreateSerializer,
+        responses={201: ApplicationSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
 class DirectionApplicationCreateView(CreateAPIView):
     permission_classes = (ProjectantOnlyPermission,)
     serializer_class = ApplicationCreateSerializer
@@ -492,4 +909,3 @@ class DirectionApplicationCreateView(CreateAPIView):
         )
         context.update({"event": event, "direction": direction})
         return context
-

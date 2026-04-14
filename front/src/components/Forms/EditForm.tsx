@@ -1,5 +1,7 @@
 import "./form.scss";
 import { useState } from "react";
+import AppButton from "../UI/Button";
+import AppInput, { AppTextArea } from "../UI/Input";
 
 export type Field = {
   key: string;
@@ -32,13 +34,13 @@ export default function EditForm({ fields, initial, onSave }: Props) {
           <label className="text-small">{f.label}</label>
 
           {f.type === "textarea" ? (
-            <textarea
+            <AppTextArea
               className="text-regular"
               value={form[f.key] || ""}
               onChange={(e) => update(f.key, e.target.value)}
             />
           ) : (
-            <input
+            <AppInput
               type={f.type === "date" ? "date" : "text"}
               className="text-regular"
               value={form[f.key] || ""}
@@ -48,7 +50,7 @@ export default function EditForm({ fields, initial, onSave }: Props) {
         </div>
       ))}
 
-      <button className="primary-btn text-regular">Сохранить</button>
+      <AppButton className="primary-btn text-regular">Сохранить</AppButton>
     </form>
   );
 }

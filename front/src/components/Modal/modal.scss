@@ -50,11 +50,19 @@
 
 .close-btn {
   padding: 8px 14px;
-  background: $primary;
-  color: white;
+  background: #fff;
+  color: $primary;
+  border: 1px solid $primary;
   border-radius: 8px;
-  border: none;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.close-btn:hover,
+.close-btn:focus {
+  background: $primary;
+  color: #fff;
+  border-color: $primary;
 }
 
 .apply-form {
@@ -80,16 +88,9 @@
   gap: 12px;
 }
 
-.form-field input,
-.form-field textarea,
-.form-field select {
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid $gray;
-  background: #fafafa;
+.form-field .app-input,
+.form-field .app-select {
   width: 100%;
-  font-size: 14px;
-  resize: vertical;
 }
 
 .apply-actions {
@@ -97,6 +98,40 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.apply-btn-cancel,
+.apply-btn-send {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.apply-btn-cancel {
+  border: 1px solid #ef4444 !important;
+  color: #b91c1c !important;
+}
+
+.apply-btn-cancel:hover,
+.apply-btn-cancel:focus {
+  background: #ef4444 !important;
+  color: #fff !important;
+  border-color: #ef4444 !important;
+}
+
+.apply-btn-send {
+  border: 1px solid var(--event-color, #6495ed) !important;
+  color: var(--event-color, #6495ed) !important;
+}
+
+.apply-btn-send:hover,
+.apply-btn-send:focus {
+  background: var(--event-color, #6495ed) !important;
+  color: #fff !important;
+  border-color: var(--event-color, #6495ed) !important;
 }
 
 .confirm-body {
@@ -116,15 +151,56 @@
   gap: 8px;
 }
 
+.confirm-btn-primary,
+.confirm-btn-danger {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.confirm-btn-primary {
+  border: 1px solid var(--event-color, #6495ed) !important;
+  color: var(--event-color, #6495ed) !important;
+}
+
+.confirm-btn-primary:hover,
+.confirm-btn-primary:focus {
+  background: var(--event-color, #6495ed) !important;
+  color: #fff !important;
+  border-color: var(--event-color, #6495ed) !important;
+}
+
+.confirm-btn-danger {
+  border: 1px solid #ef4444 !important;
+  color: #b91c1c !important;
+}
+
+.confirm-btn-danger:hover,
+.confirm-btn-danger:focus {
+  background: #ef4444 !important;
+  color: #fff !important;
+  border-color: #ef4444 !important;
+}
+
 .btn-cancel {
   padding: 10px 16px;
   border-radius: 10px;
-  background: #e53935;
-  color: white;
-  border: none;
+  background: #fff;
+  color: #e53935;
+  border: 1px solid #e53935;
   cursor: pointer;
   font-weight: 600;
-  transition: background .12s ease;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+
+.btn-cancel:hover,
+.btn-cancel:focus {
+  background: #e53935;
+  color: #fff;
+  border-color: #e53935;
 }
 
 .btn-cancel:disabled {
@@ -135,12 +211,19 @@
 .btn-send {
   padding: 10px 16px;
   border-radius: 10px;
-  background: #7b4bdc;
-  color: white;
-  border: none;
+  background: #fff;
+  color: var(--event-color, #6495ed);
+  border: 1px solid var(--event-color, #6495ed);
   cursor: pointer;
   font-weight: 600;
-  transition: background .12s ease;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+
+.btn-send:hover,
+.btn-send:focus {
+  background: var(--event-color, #6495ed);
+  color: #fff;
+  border-color: var(--event-color, #6495ed);
 }
 
 .btn-send:disabled {
@@ -148,27 +231,45 @@
   cursor: not-allowed;
 }
 
-.modal-close {
+.modal-close.app-button.ant-btn {
   position: absolute;
   right: 12px;
   top: 12px;
-  width: 36px;
-  height: 36px;
-  border: none;
-  background: transparent;
-  font-size: 24px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  font-size: 0;
   line-height: 1;
   cursor: pointer;
-  color: #666;
-  border-radius: 8px;
+  color: #4b5563 !important;
+  border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: none !important;
+  transition: background 0.14s ease, color 0.14s ease;
 }
 
-.modal-close:hover {
-  background: rgba(0,0,0,0.04);
-  color: #111;
+.modal-close.app-button.ant-btn > span {
+  display: none;
+}
+
+.modal-close.app-button.ant-btn::before {
+  content: "×";
+  display: block;
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.modal-close.app-button.ant-btn:hover,
+.modal-close.app-button.ant-btn:focus {
+  background: rgba(15, 23, 42, 0.07) !important;
+  color: #111827 !important;
 }
 
 .form-field .field-error {

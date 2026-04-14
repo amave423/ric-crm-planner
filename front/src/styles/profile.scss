@@ -31,21 +31,12 @@
     flex-direction: column;
     gap: 12px;
 
-    input, textarea {
+    .app-input {
       width: 100%;
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-
-      &:disabled {
-        background: #f5f5f5;
-        color: #333;
-      }
     }
 
-    textarea {
+    .app-textarea {
       min-height: 120px;
-      resize: vertical;
     }
   }
 }
@@ -54,14 +45,19 @@
   margin-top: 25px;
   padding: 12px 22px;
   border-radius: 12px;
-  border: none;
+  border: 1px solid $primary !important;
   cursor: pointer;
 
-  background: $primary;
-  color: #fff;
+  background: #fff !important;
+  color: $primary !important;
+  box-shadow: none !important;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 
-  &:hover {
-    background: $primary-hover;
+  &:hover,
+  &:focus {
+    background: $primary !important;
+    color: #fff !important;
+    border-color: $primary !important;
   }
 }
 

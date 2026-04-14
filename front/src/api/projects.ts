@@ -54,29 +54,14 @@ function displayName(user: BackendUser): string {
 async function getUserMaps() {
   const users = (await getAllUsers().catch(() => [])) as BackendUser[];
   const userNameById = new Map<number, string>();
-  const userIdByDisplay = new Map<string, number>();
 
   users.forEach((u) => {
     const id = Number(u.id);
     const name = displayName(u);
     if (!Number.isNaN(id)) userNameById.set(id, name || String(id));
-    if (name) userIdByDisplay.set(name, id);
   });
 
-  return { userNameById, userIdByDisplay };
-}
-
-function resolveCuratorId(rawCurator: unknown, userIdByDisplay: Map<string, number>): number | undefined {
-  const direct = toNumber(rawCurator);
-  if (typeof direct !== "undefined") return direct;
-
-  if (typeof rawCurator === "string") {
-    const trimmed = rawCurator.trim();
-    if (!trimmed) return undefined;
-    return userIdByDisplay.get(trimmed);
-  }
-
-  return undefined;
+  return { userNameById };
 }
 
 function mapBackendProject(item: BackendProject, userNameById: Map<number, string>): Project {
@@ -110,17 +95,14 @@ export async function getProjectsByDirection(directionId: number): Promise<Proje
 export async function saveProjectsForDirection(directionId: number, projects: Project[]) {
   if (USE_MOCK) return _saveProjectsForDirection(directionId, projects);
 
-  const { userNameById, userIdByDisplay } = await getUserMaps();
+  const { userNameById } = await getUserMaps();
   const results: Project[] = [];
 
   for (const p of projects) {
-    const curatorId = resolveCuratorId(p.curatorId ?? p.curator, userIdByDisplay);
     const payload: Record<string, unknown> = {
       name: p.title ?? "",
       description: p.description ?? "",
-      teams: typeof p.teams === "number" ? p.teams : p.teams ? Number(p.teams) : null,
     };
-    if (typeof curatorId !== "undefined") payload.curator = curatorId;
 
     if (p.id && !isTempId(p.id)) {
       const updated = await client.put<BackendProject>(`/api/users/projects/${p.id}/`, payload);

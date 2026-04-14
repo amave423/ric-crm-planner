@@ -1,6 +1,6 @@
 @import "../../styles/variables.scss";
 
-.back-btn {
+.back-btn--text {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -18,9 +18,8 @@
   transition: opacity .15s ease;
 
   .icon {
-    width: 18px;
-    height: 18px;
-    transform: rotate(180deg);
+    font-size: 18px;
+    line-height: 1;
     opacity: 0.8;
   }
 

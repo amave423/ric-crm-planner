@@ -8,6 +8,16 @@
   padding: 12px;
   z-index: 10;
   width: 280px;
+  border: 1px solid #dbe5f3;
+}
+
+.calendar--antd {
+  width: 360px;
+  max-width: calc(100vw - 24px);
+}
+
+.calendar--antd .ant-picker-calendar {
+  padding: 0 12px 12px;
 }
 
 .calendar-header {
@@ -17,10 +27,25 @@
   margin-bottom: 10px;
 
   button {
-    border: none;
-    background: transparent;
-    font-size: 18px;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #dbe5f3;
+    border-radius: 10px;
+    background: #f8fbff;
+    font-size: 16px;
     cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+
+  button:hover {
+    background: #eef4ff;
+    border-color: #bcd1f7;
+  }
+
+  span {
+    font-weight: 600;
+    color: #0f172a;
+    text-transform: capitalize;
   }
 }
 
@@ -37,14 +62,27 @@
 }
 
 .calendar-day {
-  border: none;
-  background: transparent;
+  border: 1px solid transparent;
+  background: #fff;
   padding: 6px;
   border-radius: 8px;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .calendar-day:hover {
-  background: var(--row-border-color);
+  background: #eef4ff;
+  color: #1d4ed8;
+  border-color: #bfd5ff;
+}
+
+.calendar-day.is-today {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.calendar-day.is-selected {
+  background: #2563eb;
   color: #fff;
+  border-color: #2563eb;
 }

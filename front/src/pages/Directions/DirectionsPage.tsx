@@ -1,53 +1,67 @@
-import { useParams, useNavigate } from "react-router-dom";
+﻿import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { getDirectionsByEvent } from "../../api/directions";
 import { getEventById } from "../../api/events";
-import { useState, useEffect } from "react";
+import EventWizardModal, { type WizardLaunchContext } from "../../components/EventWizard/EventWizardModal";
+import TableHeader from "../../components/Layout/TableHeader";
+import InfoModal from "../../components/Modal/InfoModal";
+import Table from "../../components/Table/Table";
+import { useToast } from "../../components/Toast/ToastProvider";
+import BackButton from "../../components/UI/BackButton";
+import { useSearchSubmitFeedback } from "../../hooks/useSearchSubmitFeedback";
 import type { Direction } from "../../types/direction";
 import type { Event } from "../../types/event";
-
-import Table from "../../components/Table/Table";
-import TableHeader from "../../components/Layout/TableHeader";
-import BackButton from "../../components/UI/BackButton";
-import EventWizardModal, { type WizardLaunchContext } from "../../components/EventWizard/EventWizardModal";
-import InfoModal from "../../components/Modal/InfoModal";
-
 import "../../styles/page-colors.scss";
+
+function filterDirectionsByQuery(items: Direction[], query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return items;
+
+  return items.filter(
+    (direction) =>
+      (direction.title || "").toLowerCase().includes(normalizedQuery) ||
+      (direction.organizer || "").toLowerCase().includes(normalizedQuery)
+  );
+}
 
 export default function DirectionsPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const eventIdNum = Number(eventId);
-  const [search, setSearch] = useState("");
+  const { showToast } = useToast();
 
+  const [search, setSearch] = useState("");
   const [event, setEvent] = useState<Event | null>(null);
   const [directions, setDirections] = useState<Direction[]>([]);
-
-  useEffect(() => {
-    let mounted = true;
-    Promise.all([getEventById(eventIdNum), getDirectionsByEvent(eventIdNum)]).then(([ev, dirs]) => {
-      if (!mounted) return;
-      setEvent(ev || null);
-      setDirections(dirs || []);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [eventIdNum]);
-
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardContext, setWizardContext] = useState<WizardLaunchContext | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
-
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoItem, setInfoItem] = useState<{ title?: string; description?: string } | null>(null);
 
-  const filteredDirections = !search.trim()
-    ? directions
-    : directions.filter(
-        (d) =>
-          (d.title || "").toLowerCase().includes(search.toLowerCase()) ||
-          (d.organizer || "").toLowerCase().includes(search.toLowerCase())
-      );
+  const loadDirections = useCallback(async () => {
+    try {
+      const [loadedEvent, loadedDirections] = await Promise.all([getEventById(eventIdNum), getDirectionsByEvent(eventIdNum)]);
+      setEvent(loadedEvent || null);
+      setDirections(loadedDirections || []);
+    } catch {
+      setEvent(null);
+      setDirections([]);
+    }
+  }, [eventIdNum]);
+
+  useEffect(() => {
+    void loadDirections();
+  }, [loadDirections]);
+
+  const filteredDirections = filterDirectionsByQuery(directions, search);
+
+  const { animatedIds: searchAnimatedIds, handleSearchSubmit } = useSearchSubmitFeedback({
+    getMatches: (query) => filterDirectionsByQuery(directions, query),
+    getId: (direction) => direction.id,
+    notFoundMessage: "Такого направления не существует!",
+    showToast,
+  });
 
   return (
     <div className="page page--directions">
@@ -55,11 +69,12 @@ export default function DirectionsPage() {
         title={
           <>
             <BackButton onClick={() => navigate("/events")} />
-            {`${event?.title || "Мероприятие"} — Направления`}
+            {`${event?.title || "Мероприятие"} - Направления`}
           </>
         }
         search={search}
         onSearch={setSearch}
+        onSearchSubmit={handleSearchSubmit}
         onCreate={() => {
           setMode("create");
           setWizardContext({ type: "direction", eventId: eventIdNum });
@@ -73,6 +88,7 @@ export default function DirectionsPage() {
           { key: "organizer", title: "Организатор" },
         ]}
         data={filteredDirections}
+        animatedIds={searchAnimatedIds}
         onRowClick={(row) => navigate(`/events/${eventId}/directions/${row.id}/projects`)}
         onEdit={(row) => {
           setMode("edit");
@@ -84,14 +100,24 @@ export default function DirectionsPage() {
           setWizardOpen(true);
         }}
         onInfoClick={(row) => {
-          setInfoItem({ title: row.title || "—", description: row.description || "Нет описания" });
+          setInfoItem({ title: row.title || "-", description: row.description || "Нет описания" });
           setInfoOpen(true);
         }}
       />
 
-      {wizardOpen && wizardContext && <EventWizardModal mode={mode} context={wizardContext} onClose={() => setWizardOpen(false)} />}
+      {wizardOpen && wizardContext && (
+        <EventWizardModal
+          mode={mode}
+          context={wizardContext}
+          onClose={() => {
+            setWizardOpen(false);
+            void loadDirections();
+          }}
+        />
+      )}
 
       <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} title={infoItem?.title} description={infoItem?.description} />
     </div>
   );
 }
+
