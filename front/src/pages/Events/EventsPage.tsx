@@ -13,6 +13,7 @@ import { useToast } from "../../components/Toast/ToastProvider";
 import { buildMockRequestTransitionUrl, REQUEST_STATUS } from "../../constants/requestProgress";
 import { AuthContext } from "../../context/AuthContext";
 import { useNotifications } from "../../context/NotificationsContext";
+import { useSearchSubmitFeedback } from "../../hooks/useSearchSubmitFeedback";
 import type { Event } from "../../types/event";
 import type { Request as RequestType } from "../../types/request";
 import "../../styles/page-colors.scss";
@@ -35,6 +36,18 @@ function buildTestingUrl(req: RequestType) {
   } catch {
     return TESTING_BASE_URL;
   }
+}
+
+function filterEventsByQuery(items: Event[], query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return items;
+
+  return items.filter(
+    (event) =>
+      (event.title || "").toLowerCase().includes(normalizedQuery) ||
+      (event.organizer || "").toLowerCase().includes(normalizedQuery) ||
+      (event.status || "").toLowerCase().includes(normalizedQuery)
+  );
 }
 
 export default function EventsPage() {
@@ -86,16 +99,14 @@ export default function EventsPage() {
     setRequests(Array.isArray(loadedRequests) ? loadedRequests : []);
   }, [user]);
 
-  const events = useMemo(() => {
-    if (!search.trim()) return allEvents;
-    const query = search.toLowerCase();
-    return allEvents.filter(
-      (event) =>
-        (event.title || "").toLowerCase().includes(query) ||
-        (event.organizer || "").toLowerCase().includes(query) ||
-        (event.status || "").toLowerCase().includes(query)
-    );
-  }, [allEvents, search]);
+  const events = useMemo(() => filterEventsByQuery(allEvents, search), [allEvents, search]);
+
+  const { animatedIds: searchAnimatedIds, handleSearchSubmit } = useSearchSubmitFeedback({
+    getMatches: (query) => filterEventsByQuery(allEvents, query),
+    getId: (event) => event.id,
+    notFoundMessage: "Такого мероприятия не существует!",
+    showToast,
+  });
 
   const hasRequestForEvent = useCallback(
     (eventId: number) => requests.some((request) => Number(request.ownerId) === Number(user?.id) && Number(request.eventId) === Number(eventId)),
@@ -178,6 +189,7 @@ export default function EventsPage() {
         title="Мероприятия"
         search={search}
         onSearch={setSearch}
+        onSearchSubmit={handleSearchSubmit}
         onCreate={() => {
           setMode("create");
           setWizardContext({ type: "event" });
@@ -195,6 +207,7 @@ export default function EventsPage() {
           ...(isStudent ? [{ key: "apply", title: "Заявка", width: "190px" }] : []),
         ]}
         data={events}
+        animatedIds={searchAnimatedIds}
         badgeKeys={["startDate", "endDate", "status"]}
         onRowClick={(row) => navigate(`/events/${row.id}/directions`)}
         onEdit={(row) => {

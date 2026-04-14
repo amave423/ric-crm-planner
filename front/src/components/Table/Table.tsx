@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect, useRef } from "react";
 import { FormOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { AuthContext } from "../../context/AuthContext";
 import "./table.scss";
@@ -11,6 +11,7 @@ interface Props<T> {
   columns: Column[];
   data: T[];
   badgeKeys?: string[];
+  animatedIds?: Array<number | string>;
   onInfoClick?: (row: T) => void;
   onRowClick?: (row: T) => void;
   onEdit?: (row: T) => void;
@@ -43,6 +44,7 @@ export default function Table<T>({
   columns,
   data,
   badgeKeys = [],
+  animatedIds = [],
   onRowClick,
   onEdit,
   onInfoClick,
@@ -61,6 +63,33 @@ export default function Table<T>({
 
   const template = buildGridTemplate(columns, hasActionColumn, gridColumns);
   const gridStyle = { "--table-grid": template } as React.CSSProperties;
+  const rowRefs = useRef(new Map<string, HTMLDivElement>());
+
+  useEffect(() => {
+    if (!animatedIds.length) return;
+
+    const uniqueIds = Array.from(new Set(animatedIds.map((id) => String(id))));
+
+    uniqueIds.forEach((id) => {
+      const node = rowRefs.current.get(id);
+      if (!node || typeof node.animate !== "function") return;
+
+      node.animate(
+        [
+          { transform: "translateX(0)" },
+          { transform: "translateX(7px)" },
+          { transform: "translateX(-6px)" },
+          { transform: "translateX(5px)" },
+          { transform: "translateX(-3px)" },
+          { transform: "translateX(0)" },
+        ],
+        {
+          duration: 550,
+          easing: "ease-in-out",
+        }
+      );
+    });
+  }, [animatedIds]);
 
   return (
     <div className="custom-table-container">
@@ -111,15 +140,25 @@ export default function Table<T>({
                 </AppButton>
               ) : null;
 
+            const rowId = getRowId(row);
+
             return (
               <div
-                key={getRowId(row) ?? idx}
+                key={rowId ?? idx}
                 className={`row-box table-grid${getRowId(row) === selectedId ? " selected" : ""}${
                   isEventMobileLayout ? " row-box--event-mobile" : ""
                 }${isDirectionMobileLayout ? " row-box--direction-mobile" : ""}${
                   isProjectMobileLayout ? " row-box--project-mobile" : ""
                 }${isRequestMobileLayout ? " row-box--request-mobile" : ""}`}
                 style={gridStyle}
+                ref={(node) => {
+                  const refKey = String(rowId ?? idx);
+                  if (node) {
+                    rowRefs.current.set(refKey, node);
+                  } else {
+                    rowRefs.current.delete(refKey);
+                  }
+                }}
                 onClick={() => onRowClick?.(row)}
               >
                 {columns.map((column) => {

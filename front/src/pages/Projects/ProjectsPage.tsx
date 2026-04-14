@@ -8,7 +8,9 @@ import EventWizardModal, { type WizardLaunchContext } from "../../components/Eve
 import TableHeader from "../../components/Layout/TableHeader";
 import InfoModal from "../../components/Modal/InfoModal";
 import Table from "../../components/Table/Table";
+import { useToast } from "../../components/Toast/ToastProvider";
 import BackButton from "../../components/UI/BackButton";
+import { useSearchSubmitFeedback } from "../../hooks/useSearchSubmitFeedback";
 import { getAllUsers } from "../../storage/storage";
 import type { Direction } from "../../types/direction";
 import type { Event } from "../../types/event";
@@ -26,11 +28,23 @@ function buildCuratorLabel(curatorIds: number[], userNameById: Map<number, strin
   return uniqueIds.map((id) => userNameById.get(id) || `ID ${id}`).join(", ");
 }
 
+function filterProjectsByQuery(items: Project[], query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return items;
+
+  return items.filter(
+    (project) =>
+      (project.title || "").toLowerCase().includes(normalizedQuery) ||
+      (project.curator || "").toLowerCase().includes(normalizedQuery)
+  );
+}
+
 export default function ProjectsPage() {
   const { eventId, directionId } = useParams();
   const navigate = useNavigate();
   const eventIdNum = Number(eventId);
   const directionIdNum = Number(directionId);
+  const { showToast } = useToast();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [direction, setDirection] = useState<Direction | null>(null);
@@ -86,13 +100,14 @@ export default function ProjectsPage() {
     void loadAll();
   }, [loadAll]);
 
-  const filteredProjects = useMemo(() => {
-    if (!search.trim()) return projects;
-    const query = search.toLowerCase();
-    return projects.filter(
-      (project) => (project.title || "").toLowerCase().includes(query) || (project.curator || "").toLowerCase().includes(query)
-    );
-  }, [projects, search]);
+  const filteredProjects = useMemo(() => filterProjectsByQuery(projects, search), [projects, search]);
+
+  const { animatedIds: searchAnimatedIds, handleSearchSubmit } = useSearchSubmitFeedback({
+    getMatches: (query) => filterProjectsByQuery(projects, query),
+    getId: (project) => project.id,
+    notFoundMessage: "Такого проекта не существует!",
+    showToast,
+  });
 
   return (
     <div className="page page--projects">
@@ -105,6 +120,7 @@ export default function ProjectsPage() {
         }
         search={search}
         onSearch={setSearch}
+        onSearchSubmit={handleSearchSubmit}
         onCreate={() => {
           setMode("create");
           setWizardContext({ type: "project", eventId: eventIdNum, directionId: directionIdNum });
@@ -118,6 +134,7 @@ export default function ProjectsPage() {
           { key: "curator", title: "Куратор" },
         ]}
         data={filteredProjects}
+        animatedIds={searchAnimatedIds}
         onEdit={(row) => {
           setMode("edit");
           setWizardContext({

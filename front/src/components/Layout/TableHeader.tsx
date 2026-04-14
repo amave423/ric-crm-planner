@@ -9,6 +9,7 @@ interface Props {
   title: React.ReactNode;
   search?: string;
   onSearch?: (v: string) => void;
+  onSearchSubmit?: (v: string) => void;
   onCreate?: () => void;
 }
 
@@ -16,6 +17,7 @@ export default function TableHeader({
   title,
   search,
   onSearch,
+  onSearchSubmit,
   onCreate
 }: Props) {
   const { user } = useContext(AuthContext);
@@ -40,6 +42,7 @@ export default function TableHeader({
             placeholder="Поиск..."
             value={search}
             onChange={(e) => onSearch?.(e.target.value)}
+            onSearch={(value) => onSearchSubmit?.(value)}
           />
         </div>
       )}

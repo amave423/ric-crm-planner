@@ -6,15 +6,29 @@ import EventWizardModal, { type WizardLaunchContext } from "../../components/Eve
 import TableHeader from "../../components/Layout/TableHeader";
 import InfoModal from "../../components/Modal/InfoModal";
 import Table from "../../components/Table/Table";
+import { useToast } from "../../components/Toast/ToastProvider";
 import BackButton from "../../components/UI/BackButton";
+import { useSearchSubmitFeedback } from "../../hooks/useSearchSubmitFeedback";
 import type { Direction } from "../../types/direction";
 import type { Event } from "../../types/event";
 import "../../styles/page-colors.scss";
+
+function filterDirectionsByQuery(items: Direction[], query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return items;
+
+  return items.filter(
+    (direction) =>
+      (direction.title || "").toLowerCase().includes(normalizedQuery) ||
+      (direction.organizer || "").toLowerCase().includes(normalizedQuery)
+  );
+}
 
 export default function DirectionsPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const eventIdNum = Number(eventId);
+  const { showToast } = useToast();
 
   const [search, setSearch] = useState("");
   const [event, setEvent] = useState<Event | null>(null);
@@ -40,13 +54,14 @@ export default function DirectionsPage() {
     void loadDirections();
   }, [loadDirections]);
 
-  const filteredDirections = !search.trim()
-    ? directions
-    : directions.filter(
-        (direction) =>
-          (direction.title || "").toLowerCase().includes(search.toLowerCase()) ||
-          (direction.organizer || "").toLowerCase().includes(search.toLowerCase())
-      );
+  const filteredDirections = filterDirectionsByQuery(directions, search);
+
+  const { animatedIds: searchAnimatedIds, handleSearchSubmit } = useSearchSubmitFeedback({
+    getMatches: (query) => filterDirectionsByQuery(directions, query),
+    getId: (direction) => direction.id,
+    notFoundMessage: "Такого направления не существует!",
+    showToast,
+  });
 
   return (
     <div className="page page--directions">
@@ -59,6 +74,7 @@ export default function DirectionsPage() {
         }
         search={search}
         onSearch={setSearch}
+        onSearchSubmit={handleSearchSubmit}
         onCreate={() => {
           setMode("create");
           setWizardContext({ type: "direction", eventId: eventIdNum });
@@ -72,6 +88,7 @@ export default function DirectionsPage() {
           { key: "organizer", title: "Организатор" },
         ]}
         data={filteredDirections}
+        animatedIds={searchAnimatedIds}
         onRowClick={(row) => navigate(`/events/${eventId}/directions/${row.id}/projects`)}
         onEdit={(row) => {
           setMode("edit");
