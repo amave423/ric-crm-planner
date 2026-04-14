@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Dropdown } from "antd";
+import { Badge, Dropdown } from "antd";
 import type { MenuProps } from "antd";
 import {
   BarsOutlined,
@@ -17,11 +17,16 @@ import { useNotifications } from "../../context/NotificationsContext";
 import Modal from "../Modal/Modal";
 import AppButton from "../UI/Button";
 
+const HEADER_TEXT = {
+  deleteAllNotifications:
+    "\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0432\u0441\u0435",
+} as const;
+
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useContext(AuthContext);
-  const { notifications, unreadCount, markAllAsRead, markAsRead, removeNotification } = useNotifications();
+  const { notifications, unreadCount, markAllAsRead, markAsRead, removeNotification, clearNotifications } = useNotifications();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -172,9 +177,10 @@ export default function Header() {
             </div>
 
             <AppButton className="head-btn head-btn--notify" onClick={openNotifications} aria-label="Центр уведомлений">
-              <BellOutlined />
+              <Badge dot={unreadCount > 0} className="notification-badge">
+                <BellOutlined />
+              </Badge>
               <span>Уведомления</span>
-              {unreadCount > 0 && <span className="notify-dot" />}
             </AppButton>
 
             <AppButton
@@ -202,7 +208,13 @@ export default function Header() {
           {notifications.length === 0 ? (
             <div className="notification-empty">Пока нет уведомлений</div>
           ) : (
-            notifications.map((n) => (
+            <>
+              <div className="notification-center__toolbar">
+                <AppButton className="notification-clear-btn" onClick={clearNotifications}>
+                  {HEADER_TEXT.deleteAllNotifications}
+                </AppButton>
+              </div>
+              {notifications.map((n) => (
               <div key={n.id} className={`notification-item ${n.read ? "is-read" : "is-unread"}`}>
                 <div className="notification-item__head">
                   <div className="notification-item__title">{n.title}</div>
@@ -210,7 +222,7 @@ export default function Header() {
                 </div>
                 {n.message && <div className="notification-item__message">{n.message}</div>}
                 <div className="notification-item__actions">
-                  {n.link && (
+                  {n.link && user?.role !== "organizer" && (
                     <AppButton className="notification-link-btn" onClick={() => openNotificationLink(n.id, n.link)}>
                       Открыть ссылку
                     </AppButton>
@@ -220,7 +232,8 @@ export default function Header() {
                   </AppButton>
                 </div>
               </div>
-            ))
+              ))}
+            </>
           )}
         </div>
       </Modal>

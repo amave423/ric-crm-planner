@@ -21,22 +21,22 @@
   align-items: center;
   justify-content: center;
 
-  background: var(--row-border-color, var(--event-color, #6495ed));
+  background: #fff;
   border-radius: 10px;
-  border: 1px solid transparent;
+  border: 1px solid var(--row-border-color, var(--event-color, #6495ed));
 
   cursor: pointer;
 
   img {
     width: 22px;
     height: 22px;
-    filter: brightness(0) invert(1);
+    filter: none;
   }
 
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 
   &:hover {
-    background: #fff;
+    background: var(--row-border-color, var(--event-color, #6495ed));
     border-color: var(--row-border-color, var(--event-color, #6495ed));
     opacity: 0.9;
   }
@@ -48,15 +48,15 @@
   min-width: 32px !important;
   flex: 0 0 32px;
   padding: 0 !important;
-  color: #fff;
+  color: var(--row-border-color, var(--event-color, #6495ed));
   line-height: 1 !important;
   transform: translateY(-2px);
 }
 
 .create-btn.ant-btn:hover,
 .create-btn.ant-btn:focus {
-  background: #fff !important;
-  color: var(--row-border-color, var(--event-color, #6495ed)) !important;
+  background: var(--row-border-color, var(--event-color, #6495ed)) !important;
+  color: #fff !important;
   border-color: var(--row-border-color, var(--event-color, #6495ed)) !important;
 }
 
@@ -71,7 +71,7 @@
 
 .create-btn.ant-btn:hover img,
 .create-btn.ant-btn:focus img {
-  filter: none;
+  filter: brightness(0) invert(1);
 }
 
 

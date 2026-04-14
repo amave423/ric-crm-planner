@@ -11,6 +11,7 @@ interface NotificationsContextType {
   markAllAsRead: () => void;
   markAsRead: (id: string) => void;
   removeNotification: (id: string) => void;
+  clearNotifications: () => void;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | null>(null);
@@ -94,6 +95,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const clearNotifications = useCallback(() => {
+    if (!user) return;
+    setItems((prev) =>
+      prev.filter((x) => typeof x.userId !== "undefined" && Number(x.userId) !== Number(user.id))
+    );
+  }, [user]);
+
   const value = useMemo<NotificationsContextType>(
     () => ({
       notifications,
@@ -102,8 +110,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       markAllAsRead,
       markAsRead,
       removeNotification,
+      clearNotifications,
     }),
-    [notifications, unreadCount, addNotification, markAllAsRead, markAsRead, removeNotification]
+    [notifications, unreadCount, addNotification, markAllAsRead, markAsRead, removeNotification, clearNotifications]
   );
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;

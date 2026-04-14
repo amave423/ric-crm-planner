@@ -208,7 +208,12 @@ async function mapEventToUi(data: unknown): Promise<Event> {
     startDate: event.startDate ?? event.start_date,
     endDate: event.endDate ?? event.end_date,
     applyDeadline: event.applyDeadline ?? event.end_app_date,
-    leader: typeof event.leader !== "undefined" ? String(event.leader) : undefined,
+    leader:
+      typeof event.leader !== "undefined"
+        ? String(event.leader)
+        : typeof event.organizer !== "undefined"
+          ? String(event.organizer)
+          : undefined,
     specializations: normalizeSpecList(event, specs),
     status: isEnrollmentClosed ? "Набор завершен" : computeStatus(event.endDate ?? event.end_date),
     organizer: await resolveOrganizer(event),

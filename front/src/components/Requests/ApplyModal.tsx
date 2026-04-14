@@ -238,10 +238,10 @@ export default function ApplyModal({
         </div>
 
         <div className="apply-actions">
-          <AppButton type="button" className="btn-cancel" onClick={onClose}>
+          <AppButton type="button" className="apply-btn-cancel" onClick={onClose}>
             Отмена
           </AppButton>
-          <AppButton type="button" className="btn-send" onClick={handleSend}>
+          <AppButton type="button" className="apply-btn-send" onClick={handleSend}>
             Отправить
           </AppButton>
         </div>

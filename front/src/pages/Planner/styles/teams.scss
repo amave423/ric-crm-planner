@@ -391,14 +391,16 @@
 .info-icon-btn {
   width: 30px;
   height: 30px;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
+  border-radius: 8px;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #64748b;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+  transition: color 0.12s ease, transform 0.12s ease;
 }
 
 .info-icon-btn .anticon {
@@ -407,8 +409,7 @@
 }
 
 .info-icon-btn:hover {
-  border-color: #93c5fd;
-  background: #eff6ff;
+  color: #2563eb;
   transform: translateY(-1px);
 }
 

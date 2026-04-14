@@ -175,8 +175,8 @@
 
 .wizard-actions .primary {
   border: 1px solid var(--wizard-accent) !important;
-  background: var(--wizard-accent) !important;
-  color: #fff !important;
+  background: #fff !important;
+  color: var(--wizard-accent) !important;
   border-radius: 10px;
   padding: 10px 16px;
   cursor: pointer;
@@ -185,8 +185,8 @@
 
 .wizard-actions .primary:hover,
 .wizard-actions .primary:focus {
-  background: #fff !important;
-  color: var(--wizard-accent) !important;
+  background: var(--wizard-accent) !important;
+  color: #fff !important;
   border-color: var(--wizard-accent) !important;
 }
 
@@ -421,25 +421,26 @@ select:focus {
 
 .wizard-inline-add-button.primary {
   border: 1px solid var(--wizard-accent) !important;
-  background: var(--wizard-accent) !important;
-  color: #fff !important;
+  background: #fff !important;
+  color: var(--wizard-accent) !important;
 }
 
 .wizard-inline-add-button.primary:hover,
 .wizard-inline-add-button.primary:focus {
-  background: #fff !important;
-  color: var(--wizard-accent) !important;
+  background: var(--wizard-accent) !important;
+  color: #fff !important;
   border-color: var(--wizard-accent) !important;
 }
 
 .wizard-inline-add-button--secondary {
   border-color: #3557b7 !important;
-  background: #3557b7 !important;
+  background: #fff !important;
+  color: #3557b7 !important;
 }
 
 .wizard-inline-add-button--secondary:hover {
-  background: #fff !important;
-  color: #3557b7 !important;
+  background: #3557b7 !important;
+  color: #fff !important;
   border-color: #3557b7 !important;
 }
 
@@ -480,8 +481,8 @@ select:focus {
 
 .danger-outline:hover,
 .danger-outline:focus {
-  background: rgba(229, 57, 53, 0.14) !important;
-  color: #111 !important;
+  background: #e53935 !important;
+  color: #fff !important;
   border-color: #e53935 !important;
 }
 

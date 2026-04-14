@@ -215,8 +215,8 @@
 
 .primary {
   border: 1px solid #2563eb !important;
-  background: #2563eb !important;
-  color: #fff !important;
+  background: #fff !important;
+  color: #2563eb !important;
 }
 
 .planner-card .app-select.ant-select .ant-select-selection-search-input,
@@ -282,9 +282,9 @@
 
 .primary:hover,
 .primary:focus {
-  background: #fff !important;
+  background: #2563eb !important;
   border-color: #2563eb !important;
-  color: #2563eb !important;
+  color: #fff !important;
   transform: translateY(-1px);
   box-shadow: 0 8px 16px rgba(37, 99, 235, 0.2);
 }
@@ -297,8 +297,8 @@
 
 .danger-outline:hover,
 .danger-outline:focus {
-  background: rgba(239, 68, 68, 0.14) !important;
-  color: #111 !important;
+  background: #ef4444 !important;
+  color: #fff !important;
   border-color: #ef4444 !important;
   transform: translateY(-1px);
 }
@@ -306,15 +306,17 @@
 .link-btn {
   border: 1px solid #d1d5db;
   background: #fff;
+  color: #374151;
   border-radius: 8px;
   padding: 6px 10px;
   cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
 .link-btn:hover {
-  background: #f8fafc;
-  border-color: #9ca3af;
+  background: #374151 !important;
+  border-color: #374151 !important;
+  color: #fff !important;
 }
 
 .link-btn.danger {
@@ -324,9 +326,9 @@
 
 .link-btn.danger:hover,
 .link-btn.danger:focus {
-  background: rgba(239, 68, 68, 0.14) !important;
+  background: #ef4444 !important;
   border-color: #ef4444 !important;
-  color: #111 !important;
+  color: #fff !important;
 }
 
 .planner-error {

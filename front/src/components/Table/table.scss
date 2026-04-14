@@ -128,21 +128,33 @@
   color: #777;
 }
 
-.edit-btn-icon {
+.edit-btn-icon,
+.edit-btn-icon.ant-btn {
   width: 34px;
   height: 34px;
+  min-width: 34px;
+  padding: 0 !important;
   border-radius: 8px;
-  border: none;
-  background: transparent;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #8b95a1 !important;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: color 0.15s ease;
 
   .anticon {
     font-size: 18px;
     opacity: 0.7;
     transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+
+  &:hover,
+  &:focus {
+    background: transparent !important;
+    color: #1f2937 !important;
   }
 
   &:hover .anticon {
@@ -151,18 +163,34 @@
   }
 }
 
-.info-btn {
-  border: none;
-  background: transparent;
+.info-btn,
+.info-btn.ant-btn {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #8b95a1 !important;
   cursor: pointer;
   flex-shrink: 0;
-  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
 }
 
 .info-btn .anticon {
   font-size: 22px;
   line-height: 1;
   transition: transform 0.15s ease;
+}
+
+.info-btn:hover,
+.info-btn:focus {
+  background: transparent !important;
+  color: #1f2937 !important;
 }
 
 .info-btn:hover .anticon {
@@ -198,15 +226,17 @@
   min-width: 156px;
   padding: 10px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(100, 149, 237, 0.28);
-  background: linear-gradient(135deg, rgba(100, 149, 237, 0.12), rgba(100, 149, 237, 0.04));
+  border: 1px solid var(--event-color, #6495ed) !important;
+  background: #fff !important;
   color: #2f5fd1;
   font-size: 14px;
   font-weight: 600;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease, background 0.16s ease, color 0.16s ease;
 }
 
 .event-apply-pill:hover:not(:disabled) {
+  background: var(--event-color, #6495ed) !important;
+  color: #fff !important;
   transform: translateY(-1px);
   box-shadow: 0 10px 18px rgba(100, 149, 237, 0.16);
 }
@@ -348,12 +378,12 @@
   .page--projects .row-box.table-grid .edit-btn-icon,
   .page--directions .row-box.table-grid .info-btn,
   .page--projects .row-box.table-grid .info-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    border: 1px solid rgba(17, 24, 39, 0.08);
-    background: rgba(255, 255, 255, 0.92);
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   .page--directions .row-box.table-grid .info-btn,

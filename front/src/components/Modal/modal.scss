@@ -50,8 +50,8 @@
 
 .close-btn {
   padding: 8px 14px;
-  background: $primary;
-  color: white;
+  background: #fff;
+  color: $primary;
   border: 1px solid $primary;
   border-radius: 8px;
   cursor: pointer;
@@ -60,8 +60,8 @@
 
 .close-btn:hover,
 .close-btn:focus {
-  background: #fff;
-  color: $primary;
+  background: $primary;
+  color: #fff;
   border-color: $primary;
 }
 
@@ -100,6 +100,40 @@
   gap: 8px;
 }
 
+.apply-btn-cancel,
+.apply-btn-send {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.apply-btn-cancel {
+  border: 1px solid #ef4444 !important;
+  color: #b91c1c !important;
+}
+
+.apply-btn-cancel:hover,
+.apply-btn-cancel:focus {
+  background: #ef4444 !important;
+  color: #fff !important;
+  border-color: #ef4444 !important;
+}
+
+.apply-btn-send {
+  border: 1px solid var(--event-color, #6495ed) !important;
+  color: var(--event-color, #6495ed) !important;
+}
+
+.apply-btn-send:hover,
+.apply-btn-send:focus {
+  background: var(--event-color, #6495ed) !important;
+  color: #fff !important;
+  border-color: var(--event-color, #6495ed) !important;
+}
+
 .confirm-body {
   background: #fff;
   padding: 16px;
@@ -117,6 +151,40 @@
   gap: 8px;
 }
 
+.confirm-btn-primary,
+.confirm-btn-danger {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.confirm-btn-primary {
+  border: 1px solid var(--event-color, #6495ed) !important;
+  color: var(--event-color, #6495ed) !important;
+}
+
+.confirm-btn-primary:hover,
+.confirm-btn-primary:focus {
+  background: var(--event-color, #6495ed) !important;
+  color: #fff !important;
+  border-color: var(--event-color, #6495ed) !important;
+}
+
+.confirm-btn-danger {
+  border: 1px solid #ef4444 !important;
+  color: #b91c1c !important;
+}
+
+.confirm-btn-danger:hover,
+.confirm-btn-danger:focus {
+  background: #ef4444 !important;
+  color: #fff !important;
+  border-color: #ef4444 !important;
+}
+
 .btn-cancel {
   padding: 10px 16px;
   border-radius: 10px;
@@ -130,8 +198,8 @@
 
 .btn-cancel:hover,
 .btn-cancel:focus {
-  background: rgba(229, 57, 53, 0.14);
-  color: #111;
+  background: #e53935;
+  color: #fff;
   border-color: #e53935;
 }
 
@@ -143,9 +211,9 @@
 .btn-send {
   padding: 10px 16px;
   border-radius: 10px;
-  background: #7b4bdc;
-  color: white;
-  border: 1px solid #7b4bdc;
+  background: #fff;
+  color: var(--event-color, #6495ed);
+  border: 1px solid var(--event-color, #6495ed);
   cursor: pointer;
   font-weight: 600;
   transition: background .12s ease, color .12s ease, border-color .12s ease;
@@ -153,9 +221,9 @@
 
 .btn-send:hover,
 .btn-send:focus {
-  background: #fff;
-  color: #7b4bdc;
-  border-color: #7b4bdc;
+  background: var(--event-color, #6495ed);
+  color: #fff;
+  border-color: var(--event-color, #6495ed);
 }
 
 .btn-send:disabled {

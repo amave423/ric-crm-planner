@@ -26,6 +26,19 @@ interface TestingImportMetaEnv {
 const TESTING_BASE_URL =
   ((import.meta as ImportMeta & { env?: TestingImportMetaEnv }).env?.VITE_TESTING_URL || "").trim() || "https://example.com/testing";
 
+const EVENT_TEXT = {
+  newRequestTitle: "\u041d\u043e\u0432\u0430\u044f \u0437\u0430\u044f\u0432\u043a\u0430",
+  studentFallback: "\u0421\u0442\u0443\u0434\u0435\u043d\u0442",
+  eventFallback: "\u043c\u0435\u0440\u043e\u043f\u0440\u0438\u044f\u0442\u0438\u0435",
+  submittedToEvent:
+    "\u043f\u043e\u0434\u0430\u043b(\u0430) \u0437\u0430\u044f\u0432\u043a\u0443 \u043d\u0430 \u043c\u0435\u0440\u043e\u043f\u0440\u0438\u044f\u0442\u0438\u0435",
+} as const;
+
+function toPositiveNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
 function buildTestingUrl(req: RequestType) {
   try {
     const url = new URL(TESTING_BASE_URL, window.location.origin);
@@ -281,6 +294,20 @@ export default function EventsPage() {
               eventId: selectedEvent.id,
               eventTitle: selectedEvent.title,
             });
+            const organizerUserId = toPositiveNumber(selectedEvent.leader);
+
+            if (organizerUserId) {
+              const studentName = created.studentName || request.studentName || EVENT_TEXT.studentFallback;
+              const eventTitle = selectedEvent.title || created.eventTitle || EVENT_TEXT.eventFallback;
+
+              addNotification({
+                userId: organizerUserId,
+                title: EVENT_TEXT.newRequestTitle,
+                message: `${studentName} ${EVENT_TEXT.submittedToEvent} "${eventTitle}".`,
+                link: "/requests",
+              });
+            }
+
             setPendingRequest(created);
             setTestingPromptStep("ask");
             setTestingPromptOpen(true);
@@ -301,10 +328,10 @@ export default function EventsPage() {
           <div className="confirm-body">
             <div className="confirm-text">Перейти к прохождению теста?</div>
             <div className="confirm-actions">
-              <AppButton className="close-btn" onClick={startDirectScenario}>
+              <AppButton className="confirm-btn-danger" onClick={startDirectScenario}>
                 Нет
               </AppButton>
-              <AppButton className="btn-send" onClick={startTestingScenario}>
+              <AppButton className="confirm-btn-primary" onClick={startTestingScenario}>
                 Да
               </AppButton>
             </div>
@@ -313,7 +340,7 @@ export default function EventsPage() {
           <div className="confirm-body">
             <div className="confirm-text">Ссылка для прохождения находится в центре уведомлений</div>
             <div className="confirm-actions">
-              <AppButton className="close-btn" onClick={closeTestingPrompt}>
+              <AppButton className="confirm-btn-primary" onClick={closeTestingPrompt}>
                 Понятно
               </AppButton>
             </div>
