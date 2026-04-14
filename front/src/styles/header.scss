@@ -195,6 +195,29 @@
   color: #444;
 }
 
+.head-btn--planner {
+  border-color: var(--event-color) !important;
+  background: #fff !important;
+  color: var(--event-color) !important;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.head-btn--planner .anticon {
+  color: var(--event-color);
+}
+
+.head-btn--planner:hover,
+.head-btn--planner:focus {
+  background: var(--event-color) !important;
+  color: #fff !important;
+  border-color: var(--event-color) !important;
+}
+
+.head-btn--planner:hover .anticon,
+.head-btn--planner:focus .anticon {
+  color: #fff;
+}
+
 .head-btn--danger {
   border-color: #ff3d3d !important;
   background: #fff !important;

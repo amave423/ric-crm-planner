@@ -1,191 +1,138 @@
-.ui-date-field {
+.app-date-field,
+.app-date-range-field {
+  --app-date-accent: #6495ed;
+  --app-date-focus: rgba(100, 149, 237, 0.16);
+  --app-date-hover: #6495ed;
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.ui-date-input {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.ui-date-input input {
   width: 100%;
-  padding-right: 52px;
-  margin-bottom: 0;
-  border-color: #d6dfec;
+}
+
+.app-date-picker.ant-picker {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #d6dfec !important;
+  border-radius: 14px !important;
+  background: #fff !important;
+  box-shadow: none !important;
   transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
 }
 
-.ui-date-input:focus-within input {
-  border-color: var(--wizard-accent, #6495ed) !important;
-  background: #fff;
-  box-shadow: 0 0 0 4px var(--wizard-focus-shadow, rgba(100, 149, 237, 0.16)) !important;
+.app-date-picker.ant-picker:hover {
+  border-color: var(--app-date-hover) !important;
+  background: #fff !important;
 }
 
-.ui-date-input:hover input:not(:disabled) {
-  border-color: var(--wizard-accent, #6495ed) !important;
-  background: #fff;
+.app-date-picker.ant-picker.ant-picker-focused,
+.app-date-picker.ant-picker:focus-within {
+  border-color: var(--app-date-accent) !important;
+  background: #fff !important;
+  box-shadow: 0 0 0 4px var(--app-date-focus) !important;
 }
 
-.ui-calendar-btn {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: #fff;
-  padding: 0;
-  cursor: pointer;
+.app-date-picker.ant-picker .ant-picker-input > input {
+  font-size: 14px;
+  color: #111827;
+}
+
+.app-date-picker.ant-picker .ant-picker-input > input::placeholder {
+  color: #8b96a8;
+}
+
+.app-date-picker.ant-picker .ant-picker-input {
+  min-width: 0;
+}
+
+.app-date-picker.ant-picker .ant-picker-input > input {
+  width: 100% !important;
+  height: 40px;
+  line-height: 40px;
+}
+
+.app-date-picker.ant-picker .ant-picker-suffix,
+.app-date-picker.ant-picker .ant-picker-clear {
+  color: #94a3b8;
+}
+
+.app-date-picker.ant-picker--range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 18px;
+  column-gap: 8px;
+  align-items: center;
+}
+
+.app-date-picker.ant-picker--range .ant-picker-range-separator {
+  width: 24px;
+  min-width: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
-}
-
-.ui-calendar-btn.ant-btn {
-  min-width: 32px;
+  justify-self: center;
+  align-self: center;
+  margin: 0;
   padding: 0;
 }
 
-.ui-calendar-btn img {
-  width: 18px;
-  height: 18px;
-  display: block;
-  opacity: 0.62;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+.app-date-picker.ant-picker--range .ant-picker-separator,
+.app-date-range-separator {
+  color: #94a3b8;
+  font-size: 15px;
 }
 
-.ui-calendar-btn:hover {
-  border-color: var(--wizard-accent, #6495ed);
-  background: var(--wizard-soft-bg, #f8fbff);
-}
-
-.ui-calendar-btn:hover img {
-  opacity: 1;
-}
-
-.ui-calendar-btn:disabled {
-  cursor: default;
-}
-
-.ui-calendar-btn:disabled img {
-  opacity: 0.35;
-}
-
-.ui-calendar-card {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 30;
-  width: 360px;
-  max-width: calc(100vw - 24px);
-  border: 1px solid var(--wizard-soft-border, #dbe5f3);
-  border-radius: 16px;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14);
-  overflow: hidden;
-}
-
-.ui-calendar-card .ant-picker-calendar {
-  padding: 0 12px 12px;
-}
-
-.ui-calendar-card .ant-picker-calendar-header {
-  display: none;
-}
-
-.ui-calendar-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 10px 8px;
-  border-bottom: 1px solid var(--wizard-soft-border, #edf2f7);
-  background: var(--wizard-select-bg, #fff);
-}
-
-.ui-calendar-select.app-select.ant-select {
-  width: auto !important;
-  min-height: 32px;
-  height: 32px;
-  flex: 0 0 auto;
-}
-
-.ui-calendar-select.app-select.ant-select .ant-select-selector {
-  min-height: 32px !important;
-  height: 32px !important;
-  border-radius: 9px !important;
-  padding: 0 28px 0 9px !important;
-}
-
-.ui-calendar-select.app-select.ant-select-single .ant-select-selector .ant-select-selection-item {
-  min-height: 30px;
-  line-height: 30px !important;
-  font-size: 14px;
-}
-
-.ui-calendar-select.app-select.ant-select .ant-select-arrow {
-  right: 9px;
-}
-
-.ui-calendar-select--year.app-select.ant-select {
-  width: 86px !important;
-}
-
-.ui-calendar-select--month.app-select.ant-select {
-  width: 112px !important;
-}
-
-.ui-calendar-mode {
+.app-date-picker.ant-picker--range .ant-picker-separator {
   display: inline-flex;
   align-items: center;
-  height: 32px;
-  margin-left: auto;
-  border: 1px solid var(--wizard-soft-border, #dbe5f3);
-  border-radius: 9px;
-  overflow: hidden;
+  justify-content: center;
+  width: 100%;
+  margin: 0;
+  line-height: 1;
+}
+
+.app-date-picker.ant-picker--range .ant-picker-input,
+.app-date-picker.ant-picker--range .ant-picker-input-start,
+.app-date-picker.ant-picker--range .ant-picker-input-end {
+  min-width: 0;
+  width: 100%;
+}
+
+.app-date-picker.ant-picker--range .ant-picker-suffix {
+  justify-self: end;
+}
+
+.app-date-picker.ant-picker.ant-picker-disabled {
+  border-color: #e5e7eb !important;
+  background: #f5f7fb !important;
+}
+
+.app-date-range-field--compact {
+  width: auto;
+}
+
+.app-date-range-field--compact .app-date-picker.ant-picker--range {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 18px;
+  column-gap: 0;
+}
+
+.app-date-range-field--compact .app-date-picker.ant-picker--range .ant-picker-input-start {
+  padding-right: 18px;
+}
+
+.app-date-range-field--compact .app-date-picker.ant-picker--range .ant-picker-input-end {
+  padding-left: 18px;
+}
+
+.app-date-range-field--compact .app-date-picker.ant-picker--range .ant-picker-range-separator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  width: 24px;
+  min-width: 24px;
   background: #fff;
-}
-
-.ui-calendar-mode-btn {
-  height: 30px;
-  min-width: 50px;
-  padding: 0 8px;
-  border: none;
-  background: transparent;
-  color: #374151;
-  font-size: 14px;
-  line-height: 30px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.ui-calendar-mode-btn.ant-btn {
-  height: 30px;
-  padding: 0 8px;
-  border-radius: 0;
-}
-
-.ui-calendar-mode-btn.is-active {
-  background: var(--wizard-accent, #6495ed);
-  color: #fff;
-}
-
-.ui-calendar-mode-btn:not(.is-active):hover {
-  background: var(--wizard-soft-bg, #f8fbff);
-  color: var(--wizard-accent, #2563eb);
-}
-
-.ui-calendar-card .ant-picker-calendar-date {
-  border-radius: 9px;
-}
-
-.ui-calendar-card .ant-picker-calendar-date-today {
-  border-color: var(--wizard-accent, #6495ed);
-}
-
-.ui-calendar-card .ant-picker-cell-selected .ant-picker-calendar-date {
-  background: var(--wizard-accent, #6495ed);
 }

@@ -146,7 +146,7 @@ export default function Header() {
               <span>{user.role === "student" ? "Мои заявки" : "Заявки"}</span>
             </AppButton>
 
-            <AppButton className="head-btn head-btn--muted" onClick={() => navigate("/planner")}>
+            <AppButton className="head-btn head-btn--planner" onClick={() => navigate("/planner")}>
               <TeamOutlined />
               <span>Планировщик</span>
             </AppButton>

@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import DateField from "../../../../components/UI/DateField";
+import { DateRangeField } from "../../../../components/UI/DateField";
 import type { PlannerParentTask, PlannerSubtask } from "../../../../types/planner";
 import type { ParentEditDraft, SubtaskEditDraft } from "../../planner.types";
 import AppButton from "../../../../components/UI/Button";
@@ -145,14 +145,16 @@ export default function BacklogTab({
               Название
               <AppInput value={parentTitle} onChange={(event) => onParentTitleChange(event.target.value)} placeholder="Например: Сделать MVP" />
             </label>
-            <label className="planner-label">
-              Дата начала
-              <DateField value={parentStart} onChange={onParentStartChange} />
-            </label>
-            <label className="planner-label">
-              Дата окончания
-              <DateField value={parentEnd} onChange={onParentEndChange} />
-            </label>
+            <DateRangeField
+              className="planner-label"
+              label={"Срок большой задачи"}
+              startValue={parentStart}
+              endValue={parentEnd}
+              onChange={(startDate, endDate) => {
+                onParentStartChange(startDate);
+                onParentEndChange(endDate);
+              }}
+            />
             <AppButton className="primary backlog-add-parent" type="button" onClick={onAddParentTask}>
               Добавить большую задачу
             </AppButton>
@@ -181,19 +183,14 @@ export default function BacklogTab({
                           setEditingParentDraft((prev) => (prev ? { ...prev, title: event.target.value } : prev))
                         }
                       />
-                      <div className="planner-inline-edit-row">
-                        <div onClick={(event) => event.stopPropagation()}>
-                          <DateField
-                            value={editingParentDraft.startDate}
-                            onChange={(date) => setEditingParentDraft((prev) => (prev ? { ...prev, startDate: date } : prev))}
-                          />
-                        </div>
-                        <div onClick={(event) => event.stopPropagation()}>
-                          <DateField
-                            value={editingParentDraft.endDate}
-                            onChange={(date) => setEditingParentDraft((prev) => (prev ? { ...prev, endDate: date } : prev))}
-                          />
-                        </div>
+                      <div className="planner-inline-edit-row planner-inline-edit-row--date" onClick={(event) => event.stopPropagation()}>
+                        <DateRangeField
+                          startValue={editingParentDraft.startDate}
+                          endValue={editingParentDraft.endDate}
+                          onChange={(startDate, endDate) =>
+                            setEditingParentDraft((prev) => (prev ? { ...prev, startDate, endDate } : prev))
+                          }
+                        />
                       </div>
                     </div>
                   ) : (
@@ -291,16 +288,16 @@ export default function BacklogTab({
                 Подзадача
                 <AppInput value={subTitle} onChange={(event) => onSubTitleChange(event.target.value)} placeholder="Что нужно сделать" />
               </label>
-
-              <label className="planner-label">
-                Дата начала
-                <DateField value={subStart} onChange={onSubStartChange} />
-              </label>
-
-              <label className="planner-label">
-                Дата окончания
-                <DateField value={subEnd} onChange={onSubEndChange} />
-              </label>
+              <DateRangeField
+                className="planner-label backlog-subtask-date-range"
+                label={"Срок подзадачи"}
+                startValue={subStart}
+                endValue={subEnd}
+                onChange={(startDate, endDate) => {
+                  onSubStartChange(startDate);
+                  onSubEndChange(endDate);
+                }}
+              />
 
               <label className="planner-check backlog-sprint-toggle">
                 <span>В спринт</span>
@@ -353,14 +350,13 @@ export default function BacklogTab({
                         />
                       </div>
 
-                      <div className="planner-inline-edit-row">
-                        <DateField
-                          value={editingSubtaskDraft.startDate}
-                          onChange={(date) => setEditingSubtaskDraft((prev) => (prev ? { ...prev, startDate: date } : prev))}
-                        />
-                        <DateField
-                          value={editingSubtaskDraft.endDate}
-                          onChange={(date) => setEditingSubtaskDraft((prev) => (prev ? { ...prev, endDate: date } : prev))}
+                      <div className="planner-inline-edit-row planner-inline-edit-row--date">
+                        <DateRangeField
+                          startValue={editingSubtaskDraft.startDate}
+                          endValue={editingSubtaskDraft.endDate}
+                          onChange={(startDate, endDate) =>
+                            setEditingSubtaskDraft((prev) => (prev ? { ...prev, startDate, endDate } : prev))
+                          }
                         />
                       </div>
 

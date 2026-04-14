@@ -7,7 +7,7 @@ import type { Event } from "../../../types/event";
 import type { User } from "../../../types/user";
 import Modal from "../../Modal/Modal";
 import { useToast } from "../../Toast/ToastProvider";
-import DateField from "../../UI/DateField";
+import DateField, { DateRangeField } from "../../UI/DateField";
 import { useWizard } from "../EventWizardModal";
 import AppButton from "../../UI/Button";
 import AppInput, { AppTextArea } from "../../UI/Input";
@@ -203,18 +203,24 @@ export default function EventForm() {
         Описание
         <AppTextArea value={description} onChange={(event) => setDescription(event.target.value)} />
       </label>
-
       <div className="date-row">
-        <FieldWrap name="startDate" errors={errors}>
-          <DateField label="Дата начала" value={startDate} onChange={setStartDate} />
-        </FieldWrap>
-
-        <FieldWrap name="endDate" errors={errors}>
-          <DateField label="Дата завершения" value={endDate} onChange={setEndDate} />
-        </FieldWrap>
+        <div className={`field-wrap ${errors.startDate || errors.endDate ? "error" : ""}`}>
+          <DateRangeField
+            className="app-date-range-field--compact"
+            label={"Дата начала и завершения"}
+            startValue={startDate}
+            endValue={endDate}
+            placeholders={["Дата начала", "Дата завершения"]}
+            onChange={(nextStartDate, nextEndDate) => {
+              setStartDate(nextStartDate);
+              setEndDate(nextEndDate);
+            }}
+          />
+          {(errors.startDate || errors.endDate) && <div className="field-error">{errors.startDate || errors.endDate}</div>}
+        </div>
 
         <FieldWrap name="applyDeadline" errors={errors}>
-          <DateField label="Срок приёма заявок" value={applyDeadline} onChange={setApplyDeadline} />
+          <DateField label={"Срок приёма заявок"} value={applyDeadline} onChange={setApplyDeadline} placeholder="Срок приёма" />
         </FieldWrap>
       </div>
 

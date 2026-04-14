@@ -101,7 +101,7 @@
 }
 
 .backlog-parent-create {
-  grid-template-columns: minmax(260px, 1fr) minmax(150px, 180px) minmax(150px, 180px) auto;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 360px) auto;
 }
 
 .backlog-panel--parents .backlog-parent-create {
@@ -119,8 +119,12 @@
 }
 
 .backlog-subtask-create {
-  grid-template-columns: minmax(190px, 240px) minmax(260px, 1fr) minmax(150px, 180px) minmax(150px, 180px);
+  grid-template-columns: minmax(190px, 240px) minmax(260px, 1fr) minmax(260px, 360px) auto;
   align-items: end;
+}
+
+.backlog-subtask-create > * {
+  min-width: 0;
 }
 
 .backlog-subtask-title-field {
@@ -128,7 +132,7 @@
 }
 
 .backlog-sprint-toggle {
-  min-height: 38px;
+  min-height: 42px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -155,8 +159,14 @@
 .backlog-add-parent,
 .backlog-add-subtask {
   align-self: end;
-  min-height: 38px;
+  min-height: 42px;
   white-space: nowrap;
+}
+
+.backlog-add-subtask {
+  grid-column: 1 / -1;
+  width: 100%;
+  justify-self: stretch;
 }
 
 .backlog-list,
@@ -375,6 +385,44 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.planner-inline-edit-row--date {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 1700px) {
+  .backlog-parent-create {
+    grid-template-columns: minmax(240px, 1fr) minmax(260px, 360px);
+  }
+
+  .backlog-add-parent {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .backlog-subtask-create {
+    grid-template-columns: minmax(180px, 220px) minmax(220px, 1fr) minmax(260px, 340px) auto;
+  }
+}
+
+@media (max-width: 1500px) {
+  .backlog-subtask-create {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .backlog-subtask-date-range {
+    grid-column: 1 / -1;
+  }
+
+  .backlog-sprint-toggle {
+    width: 100%;
+  }
+
+  .backlog-add-subtask {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
 }
 
 .subtask-item .planner-inline-edit-row:last-of-type {

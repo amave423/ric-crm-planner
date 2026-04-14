@@ -91,7 +91,9 @@
   padding: 30px;
   overflow-y: auto;
 
-  input:not(.ant-select-selection-search-input):not(.ant-input), textarea:not(.ant-input), select {
+  input:not(.ant-select-selection-search-input):not(.ant-input),
+  textarea:not(.ant-input),
+  select {
     width: 100%;
     padding: 10px;
     border-radius: 10px;
@@ -103,6 +105,15 @@
   .row { display: flex; gap: 10px; }
 }
 
+.wizard-content .ant-picker .ant-picker-input > input {
+  width: auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 .wizard-form {
   display: flex;
   flex-direction: column;
@@ -110,18 +121,25 @@
 }
 
 .wizard-form .app-input,
-.wizard-form .app-textarea,
-.wizard-form .ui-date-input input {
+.wizard-form .app-textarea {
   --app-input-accent: var(--wizard-accent);
   --app-input-focus: var(--wizard-focus-shadow);
   --app-input-hover: var(--wizard-accent);
+}
+
+.wizard-form .app-date-field,
+.wizard-form .app-date-range-field {
+  --app-date-accent: var(--wizard-accent);
+  --app-date-focus: var(--wizard-focus-shadow);
+  --app-date-hover: var(--wizard-accent);
 }
 
 .wizard-form .app-input.ant-input:focus,
 .wizard-form .app-input.ant-input-affix-wrapper-focused,
 .wizard-form .app-input.ant-input-affix-wrapper:focus-within,
 .wizard-form .app-textarea.ant-input:focus,
-.wizard-form .ui-date-input:focus-within input {
+.wizard-form .app-date-picker.ant-picker.ant-picker-focused,
+.wizard-form .app-date-picker.ant-picker:focus-within {
   border-color: var(--wizard-accent) !important;
   box-shadow: 0 0 0 4px var(--wizard-focus-shadow) !important;
 }
@@ -247,8 +265,22 @@ select:focus {
 
 .date-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: minmax(380px, 470px) minmax(220px, 280px);
   gap: 14px;
+  align-items: end;
+  justify-content: start;
+}
+
+.date-row > * {
+  min-width: 0;
+}
+
+.date-row .app-date-range-field {
+  max-width: 470px;
+}
+
+.date-row .app-date-field {
+  max-width: 280px;
 }
 
 .date-field {
@@ -423,7 +455,7 @@ select:focus {
   box-shadow: 0 0 0 4px rgba(239,68,68,0.06);
 }
 
-.field-wrap.error .ui-date-input input {
+.field-wrap.error .app-date-picker.ant-picker {
   border-color: #ef4444;
   box-shadow: 0 0 0 4px rgba(239,68,68,0.06);
 }

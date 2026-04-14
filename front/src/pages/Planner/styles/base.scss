@@ -155,6 +155,16 @@
   line-height: 1.25;
 }
 
+.planner-card .ant-picker .ant-picker-input > input,
+.planner-head .ant-picker .ant-picker-input > input {
+  width: 100% !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 .planner-card select {
   appearance: none;
   background-image: linear-gradient(45deg, transparent 50%, #6b7280 50%), linear-gradient(135deg, #6b7280 50%, transparent 50%);
@@ -230,14 +240,14 @@
 }
 
 .planner-page .app-select.ant-select {
-  min-height: 35px;
+  min-height: 42px;
 }
 
 .planner-page .app-select.ant-select .ant-select-selector {
-  min-height: 35px !important;
-  height: 35px !important;
-  padding-top: 4px !important;
-  padding-bottom: 4px !important;
+  min-height: 40px !important;
+  height: 40px !important;
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
 }
 
 .planner-page .app-select.ant-select .ant-select-selection-search {
@@ -256,6 +266,18 @@
   min-width: 0 !important;
   opacity: 1 !important;
   color: #111827 !important;
+}
+
+.planner-page .app-date-field,
+.planner-page .app-date-range-field {
+  --app-date-accent: #6495ed;
+  --app-date-focus: rgba(100, 149, 237, 0.16);
+  --app-date-hover: #6495ed;
+}
+
+.planner-page .app-date-picker.ant-picker {
+  min-height: 42px;
+  border-radius: 10px !important;
 }
 
 .primary:hover,
