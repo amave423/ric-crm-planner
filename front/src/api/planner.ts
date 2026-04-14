@@ -12,6 +12,8 @@ type BackendPlanner = {
   enrollment_closed?: boolean;
   closedEventIds?: Array<number | string>;
   closed_event_ids?: Array<number | string>;
+  hiddenEventIds?: Array<number | string>;
+  hidden_event_ids?: Array<number | string>;
   participants?: Array<{ id?: number | string; fullName?: string; full_name?: string }>;
   teams?: PlannerState["teams"];
   parentTasks?: PlannerState["parentTasks"];
@@ -34,7 +36,7 @@ export function hasStartedWork(status?: string) {
 }
 
 function mapBackendPlanner(raw: unknown): PlannerState {
-  const fallback = readPlannerState();
+  const fallback = readPlannerState(false);
   if (!raw || typeof raw !== "object") return fallback;
 
   const planner = raw as BackendPlanner;
@@ -60,10 +62,16 @@ function mapBackendPlanner(raw: unknown): PlannerState {
         .map((id) => toNumber(id))
         .filter((id): id is number => typeof id === "number" && Number.isFinite(id) && id > 0)
     : fallback.closedEventIds;
+  const hiddenEventIds = Array.isArray(planner.hiddenEventIds ?? planner.hidden_event_ids)
+    ? (planner.hiddenEventIds ?? planner.hidden_event_ids ?? [])
+        .map((id) => toNumber(id))
+        .filter((id): id is number => typeof id === "number" && Number.isFinite(id) && id > 0)
+    : fallback.hiddenEventIds;
 
   return {
     enrollmentClosed: closedEventIds.length > 0 || Boolean(planner.enrollmentClosed ?? planner.enrollment_closed ?? false),
     closedEventIds,
+    hiddenEventIds,
     participants: Array.isArray(planner.participants)
       ? planner.participants
           .map((participant) => ({
@@ -87,6 +95,7 @@ function toBackendPlanner(state: PlannerState) {
   return {
     enrollment_closed: state.closedEventIds.length > 0,
     closed_event_ids: state.closedEventIds,
+    hidden_event_ids: state.hiddenEventIds,
     participants: state.participants.map((participant) => ({
       id: participant.id,
       full_name: participant.fullName,
@@ -99,14 +108,14 @@ function toBackendPlanner(state: PlannerState) {
 }
 
 export async function getPlannerState(): Promise<PlannerState> {
-  if (USE_MOCK) return readPlannerState();
+  if (USE_MOCK) return readPlannerState(true);
   try {
     const raw = await client.get<unknown>("/api/users/planner/");
     const mapped = mapBackendPlanner(raw);
     writePlannerState(mapped);
     return mapped;
   } catch {
-    return readPlannerState();
+    return readPlannerState(false);
   }
 }
 

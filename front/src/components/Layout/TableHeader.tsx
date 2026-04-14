@@ -2,8 +2,9 @@ import "../../styles/table-header.scss";
 import plusIcon from "../../assets/icons/plus.svg";
 import { useContext } from "react";
 import { AuthContext } from "../../context/AuthContext";
-import searchIcon from "../../assets/icons/search.svg";
 import AppButton from "../UI/Button";
+import { AppSearch } from "../UI/Input";
+import searchIcon from "../../assets/icons/search.svg";
 
 interface Props {
   title: React.ReactNode;
@@ -35,14 +36,13 @@ export default function TableHeader({
 
       {search !== undefined && (
         <div className="right-side">
-          <div className="search-box">
-            <input
-              placeholder="Поиск..."
-              value={search}
-              onChange={(e) => onSearch?.(e.target.value)}
-            />
-            <img src={searchIcon} alt="search" />
-          </div>
+          <AppSearch
+            className="search-box"
+            placeholder="Поиск..."
+            value={search}
+            onChange={(e) => onSearch?.(e.target.value)}
+            suffixIcon={<img className="search-box__icon" src={searchIcon} alt="" />}
+          />
         </div>
       )}
     </div>

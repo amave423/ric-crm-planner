@@ -1,13 +1,12 @@
 ﻿import client from "../api/client";
 import seedRequests from "../mock-data/requests.json";
+import { CURRENT_MOCK_SEED_VERSION, LS_MOCK_SEED_VERSION } from "./mockSeed";
 import type { Request as ReqType } from "../types/request";
 
 const USE_MOCK = client.USE_MOCK;
 
 export const LS_KEY = "ric_mock_requests";
 const LS_BACKEND_CACHE = "ric_backend_my_requests";
-const LS_SEED_VERSION = "ric_mock_seed_version";
-const CURRENT_SEED_VERSION = "v3";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -35,10 +34,10 @@ function nextId(items: Array<{ id?: number }>) {
 }
 
 function ensureMockSeeded() {
-  const storedVersion = localStorage.getItem(LS_SEED_VERSION);
-  if (storedVersion !== CURRENT_SEED_VERSION) {
+  const storedVersion = localStorage.getItem(LS_MOCK_SEED_VERSION);
+  if (storedVersion !== CURRENT_MOCK_SEED_VERSION) {
     writeLS(LS_KEY, seedRequests as UnknownRecord[]);
-    localStorage.setItem(LS_SEED_VERSION, CURRENT_SEED_VERSION);
+    localStorage.setItem(LS_MOCK_SEED_VERSION, CURRENT_MOCK_SEED_VERSION);
     return;
   }
 

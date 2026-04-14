@@ -1,6 +1,7 @@
 import Modal from "../../../../components/Modal/Modal";
 import type { PlannerTeam } from "../../../../types/planner";
 import AppButton from "../../../../components/UI/Button";
+import AppSwitch from "../../../../components/UI/Switch";
 
 type TeamEditModalProps = {
   isOpen: boolean;
@@ -38,7 +39,7 @@ export default function TeamEditModal({
               <div className="planner-team-edit-list">
                 {candidateIds.map((id) => (
                   <label key={`team-edit-${team.id}-${id}`} className="planner-check planner-applicant-row">
-                    <input type="checkbox" checked={teamEditMembers.includes(id)} onChange={() => onToggleMember(id)} />
+                    <AppSwitch checked={teamEditMembers.includes(id)} onChange={() => onToggleMember(id)} compact />
                     <span>{displayAssigneeLabel(id)}</span>
                   </label>
                 ))}

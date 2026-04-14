@@ -40,6 +40,7 @@ export interface PlannerSubtask {
 export interface PlannerState {
   enrollmentClosed: boolean;
   closedEventIds: number[];
+  hiddenEventIds: number[];
   participants: PlannerParticipant[];
   teams: PlannerTeam[];
   parentTasks: PlannerParentTask[];

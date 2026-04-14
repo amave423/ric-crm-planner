@@ -59,6 +59,7 @@ export default function PlannerPage() {
   const [state, setState] = useState<PlannerState>({
     enrollmentClosed: false,
     closedEventIds: [],
+    hiddenEventIds: [],
     participants: [],
     teams: [],
     parentTasks: [],
@@ -323,12 +324,16 @@ export default function PlannerPage() {
     });
     return map;
   }, [requests]);
+  const hiddenEventIdSet = useMemo(
+    () => new Set(state.hiddenEventIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)),
+    [state.hiddenEventIds]
+  );
   const memberTeamIdsAll = useMemo(() => state.teams.filter((t) => t.memberIds.includes(userId)).map((t) => t.id), [state.teams, userId]);
   const curatorTeamIds = useMemo(() => state.teams.filter((t) => Number(t.curatorId) === userId).map((t) => t.id), [state.teams, userId]);
   const canViewTeam = (teamId: number) => isOrganizer || isCurator || (isStudent && memberTeamIdsAll.includes(teamId));
   const canEditTeam = (teamId: number) => isOrganizer || (isCurator && curatorTeamIds.includes(teamId)) || (isStudent && memberTeamIdsAll.includes(teamId));
 
-  const visibleTeams = state.teams.filter((t) => canViewTeam(t.id));
+  const visibleTeams = state.teams.filter((t) => canViewTeam(t.id) && !hiddenEventIdSet.has(Number(t.eventId)));
   const activeTeamId = teamFilter ? Number(teamFilter) : null;
   const activeTeam = activeTeamId != null ? visibleTeams.find((team) => Number(team.id) === Number(activeTeamId)) ?? null : null;
   useEffect(() => {
@@ -589,6 +594,7 @@ export default function PlannerPage() {
         key: string;
         eventId?: number;
         eventClosed: boolean;
+        eventHidden: boolean;
         title: string;
         directionsMap: Map<string, { key: string; title: string; projects: ProjectApplicantsGroup[] }>;
       }
@@ -602,6 +608,7 @@ export default function PlannerPage() {
           title: group.eventTitle,
           eventId: group.eventId,
           eventClosed: typeof group.eventId === "number" ? state.closedEventIds.includes(group.eventId) : false,
+          eventHidden: typeof group.eventId === "number" ? hiddenEventIdSet.has(group.eventId) : false,
           directionsMap: new Map(),
         });
       }
@@ -620,6 +627,7 @@ export default function PlannerPage() {
         key: eventNode.key,
         eventId: eventNode.eventId,
         eventClosed: eventNode.eventClosed,
+        eventHidden: eventNode.eventHidden,
         title: eventNode.title,
         directions: Array.from(eventNode.directionsMap.values())
           .map((directionNode) => ({
@@ -630,7 +638,7 @@ export default function PlannerPage() {
           .sort((a, b) => a.title.localeCompare(b.title, "ru")),
       }))
       .sort((a, b) => a.title.localeCompare(b.title, "ru"));
-  }, [projectApplicantGroups, state.closedEventIds]);
+  }, [hiddenEventIdSet, projectApplicantGroups, state.closedEventIds]);
 
   const toggleApplicantForGroup = (groupKey: string, ownerId: number) => {
     setSelectedApplicantsByGroup((prev) => {
@@ -641,7 +649,7 @@ export default function PlannerPage() {
     });
   };
 
-  const createTeamFromGroup = (group: ProjectApplicantsGroup) => {
+  const createTeamFromGroup = (group: ProjectApplicantsGroup, teamNameOverride?: string) => {
     const selectedOwnerIds = Array.from(new Set(selectedApplicantsByGroup[group.key] || []));
     const availableIds = new Set(group.applicants.map((a) => a.ownerId));
     const memberIds = selectedOwnerIds.filter((id) => availableIds.has(id));
@@ -650,7 +658,7 @@ export default function PlannerPage() {
       return;
     }
 
-    const rawName = (teamNameByGroup[group.key] || "").trim();
+    const rawName = (teamNameOverride ?? teamNameByGroup[group.key] ?? "").trim();
     if (!rawName) {
       notifyError("Введите название команды");
       return;
@@ -894,6 +902,19 @@ export default function PlannerPage() {
     notifySuccess(`Набор по мероприятию «${closeEnrollmentTarget.eventTitle}» завершён`);
   };
 
+  const toggleEventVisibility = (eventId: number, enabled: boolean) => {
+    if (!Number.isFinite(eventId) || eventId <= 0) return;
+    setState((prev) => {
+      const hiddenSet = new Set(prev.hiddenEventIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0));
+      if (enabled) {
+        hiddenSet.delete(eventId);
+      } else {
+        hiddenSet.add(eventId);
+      }
+      return { ...prev, hiddenEventIds: Array.from(hiddenSet).sort((a, b) => a - b) };
+    });
+  };
+
   const moveKanbanSubtask = (subtaskId: number, column: string, position: number) => {
     setState((prev) => {
       const moved = prev.subtasks.find((subtask) => Number(subtask.id) === Number(subtaskId));
@@ -1016,13 +1037,17 @@ export default function PlannerPage() {
           visibleTeams={visibleTeams}
           userNameById={userNameById}
           onOpenConfirmCloseEnrollment={openCloseEnrollment}
+          onToggleEventVisibility={toggleEventVisibility}
           onSyncParticipants={() => setState((prev) => ({ ...prev, participants: snapshotParticipants(prev.closedEventIds) }))}
           onToggleApplicantForGroup={toggleApplicantForGroup}
           onTeamNameChange={(groupKey, value) => setTeamNameByGroup((prev) => ({ ...prev, [groupKey]: value }))}
           onTeamCuratorChange={(groupKey, value) => setTeamCuratorByGroup((prev) => ({ ...prev, [groupKey]: value }))}
           onCreateTeamFromGroup={createTeamFromGroup}
           onRenameTeam={(teamId, value) =>
-            setState((prev) => ({ ...prev, teams: prev.teams.map((team) => (team.id === teamId ? { ...team, name: value } : team)) }))
+            setState((prev) => ({
+              ...prev,
+              teams: prev.teams.map((team) => (team.id === teamId && !team.confirmed ? { ...team, name: value } : team)),
+            }))
           }
           onToggleTeamConfirmed={(teamId) =>
             setState((prev) => ({

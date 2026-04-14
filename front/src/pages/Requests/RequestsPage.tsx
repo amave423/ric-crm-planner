@@ -10,6 +10,7 @@ import { AuthContext } from "../../context/AuthContext";
 import type { Request as RequestType } from "../../types/request";
 import "../../styles/page-colors.scss";
 import AppButton from "../../components/UI/Button";
+import AppSelect from "../../components/UI/Select";
 
 type RequestRecord = RequestType & {
   eventName?: string;
@@ -168,14 +169,15 @@ export default function RequestsPage() {
 
           if (user?.role === "organizer") {
             return (
-              <select className="status-select" value={row.status || ""} onChange={(event) => handleStatusChange(row.id, event.target.value)}>
-                <option value="">-</option>
-                {ORGANIZER_REQUEST_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
+              <AppSelect
+                className="status-select"
+                value={row.status || ""}
+                onChange={(value) => handleStatusChange(row.id, String(value))}
+                options={[
+                  { value: "", label: "-" },
+                  ...ORGANIZER_REQUEST_STATUSES.map((status) => ({ value: status, label: status })),
+                ]}
+              />
             );
           }
 

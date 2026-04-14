@@ -4,6 +4,7 @@ import { useToast } from "../../components/Toast/ToastProvider";
 import { AuthContext } from "../../context/AuthContext";
 import "../../styles/profile.scss";
 import AppButton from "../../components/UI/Button";
+import AppInput, { AppTextArea } from "../../components/UI/Input";
 
 type ProfileResponse = {
   name?: string;
@@ -184,24 +185,24 @@ export default function ProfilePage() {
           </div>
 
           <div className="inputs">
-            <input className="text-regular" disabled={!editing} value={profile.name} onChange={(e) => update("name", e.target.value)} />
-            <input className="text-regular" disabled={!editing} value={profile.surname} onChange={(e) => update("surname", e.target.value)} />
-            <input
+            <AppInput className="text-regular" disabled={!editing} value={profile.name} onChange={(e) => update("name", e.target.value)} />
+            <AppInput className="text-regular" disabled={!editing} value={profile.surname} onChange={(e) => update("surname", e.target.value)} />
+            <AppInput
               className="text-regular"
               disabled={!editing}
               value={profile.university}
               onChange={(e) => update("university", e.target.value)}
               placeholder="Учебное заведение"
             />
-            <input className="text-regular" disabled={!editing} value={profile.course} onChange={(e) => update("course", e.target.value)} placeholder="Курс" />
-            <input
+            <AppInput className="text-regular" disabled={!editing} value={profile.course} onChange={(e) => update("course", e.target.value)} placeholder="Курс" />
+            <AppInput
               className="text-regular"
               disabled={!editing}
               value={profile.specialty}
               onChange={(e) => update("specialty", e.target.value)}
               placeholder="Специальность"
             />
-            <textarea className="text-regular" disabled={!editing} value={profile.about} onChange={(e) => update("about", e.target.value)} placeholder="О себе" />
+            <AppTextArea className="text-regular" disabled={!editing} value={profile.about} onChange={(e) => update("about", e.target.value)} placeholder="О себе" />
           </div>
         </div>
 
@@ -209,9 +210,9 @@ export default function ProfilePage() {
           <h4 className="h4">Контакты</h4>
 
           <div className="inputs">
-            <input className="text-regular" disabled={!editing} value={profile.telegram} onChange={(e) => update("telegram", e.target.value)} placeholder="Telegram" />
-            <input className="text-regular" disabled={!editing} value={profile.vk} onChange={(e) => update("vk", e.target.value)} placeholder="ВКонтакте" />
-            <input className="text-regular" disabled value={profile.email} />
+            <AppInput className="text-regular" disabled={!editing} value={profile.telegram} onChange={(e) => update("telegram", e.target.value)} placeholder="Telegram" />
+            <AppInput className="text-regular" disabled={!editing} value={profile.vk} onChange={(e) => update("vk", e.target.value)} placeholder="ВКонтакте" />
+            <AppInput className="text-regular" disabled value={profile.email} />
           </div>
         </div>
       </div>

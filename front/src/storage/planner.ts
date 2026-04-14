@@ -1,12 +1,16 @@
-﻿import type { PlannerParentTask, PlannerState, PlannerSubtask, PlannerTeam } from "../types/planner";
+﻿import seedPlannerState from "../mock-data/planner-state.json";
+import type { PlannerParentTask, PlannerState, PlannerSubtask, PlannerTeam } from "../types/planner";
 
 const LS_PLANNER = "ric_planner_state_v1";
+const LS_PLANNER_SEED_VERSION = "ric_mock_planner_seed_version";
+const CURRENT_PLANNER_SEED_VERSION = "v1_practice_2025";
 
 export const DEFAULT_KANBAN_COLUMNS = ["Запланировано", "В работе", "На проверке", "Готово"];
 
 const EMPTY_STATE: PlannerState = {
   enrollmentClosed: false,
   closedEventIds: [],
+  hiddenEventIds: [],
   participants: [],
   teams: [],
   parentTasks: [],
@@ -18,7 +22,21 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
 
-export function readPlannerState(): PlannerState {
+function ensurePlannerSeeded() {
+  const storedVersion = localStorage.getItem(LS_PLANNER_SEED_VERSION);
+  if (storedVersion !== CURRENT_PLANNER_SEED_VERSION) {
+    localStorage.setItem(LS_PLANNER, JSON.stringify(seedPlannerState));
+    localStorage.setItem(LS_PLANNER_SEED_VERSION, CURRENT_PLANNER_SEED_VERSION);
+    return;
+  }
+
+  if (!localStorage.getItem(LS_PLANNER)) {
+    localStorage.setItem(LS_PLANNER, JSON.stringify(seedPlannerState));
+  }
+}
+
+export function readPlannerState(seed = true): PlannerState {
+  if (seed) ensurePlannerSeeded();
   const raw = localStorage.getItem(LS_PLANNER);
   if (!raw) return clone(EMPTY_STATE);
 
@@ -39,10 +57,14 @@ export function readPlannerState(): PlannerState {
     const closedEventIds = Array.isArray(parsed.closedEventIds)
       ? parsed.closedEventIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
       : [];
+    const hiddenEventIds = Array.isArray(parsed.hiddenEventIds)
+      ? parsed.hiddenEventIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
+      : [];
 
     return {
       enrollmentClosed: closedEventIds.length > 0 || Boolean(parsed.enrollmentClosed),
       closedEventIds,
+      hiddenEventIds,
       participants: Array.isArray(parsed.participants) ? parsed.participants : [],
       teams: Array.isArray(parsed.teams) ? parsed.teams : [],
       parentTasks: Array.isArray(parsed.parentTasks) ? parsed.parentTasks : [],

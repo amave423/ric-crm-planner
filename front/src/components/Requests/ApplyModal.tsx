@@ -6,6 +6,8 @@ import type { Request } from "../../types/request";
 import Modal from "../Modal/Modal";
 import { useToast } from "../Toast/ToastProvider";
 import AppButton from "../UI/Button";
+import AppInput, { AppTextArea } from "../UI/Input";
+import AppSelect from "../UI/Select";
 
 type ProfileResponse = {
   telegram?: string;
@@ -137,7 +139,7 @@ export default function ApplyModal({
         <div className="form-body">
           <div className="form-field">
             <label className="text-small">ФИО</label>
-            <input
+            <AppInput
               className="text-regular"
               value={studentName}
               onChange={(event) => {
@@ -154,8 +156,8 @@ export default function ApplyModal({
           </div>
 
           <div className="form-field">
-            <label className="text-small">Аккаунт в Telegram</label>
-            <input
+            <label className="text-small">Аккаунт в VK, Telegram</label>
+            <AppInput
               className="text-regular"
               value={telegram}
               onChange={(event) => {
@@ -173,7 +175,7 @@ export default function ApplyModal({
 
           <div className="form-field">
             <label className="text-small">Университет</label>
-            <input
+            <AppInput
               className="text-regular"
               value={university}
               onChange={(event) => {
@@ -191,7 +193,7 @@ export default function ApplyModal({
 
           <div className="form-field">
             <label className="text-small">Курс</label>
-            <input
+            <AppInput
               className="text-regular"
               value={course}
               onChange={(event) => {
@@ -209,11 +211,11 @@ export default function ApplyModal({
 
           <div className="form-field">
             <label className="text-small">Специализация</label>
-            <select
+            <AppSelect
               className="text-regular"
               value={specialization}
-              onChange={(event) => {
-                setSpecialization(event.target.value);
+              onChange={(value) => {
+                setSpecialization(String(value));
                 setErrors((prev) => {
                   const next = { ...prev };
                   delete next.specialization;
@@ -221,20 +223,17 @@ export default function ApplyModal({
                 });
               }}
               aria-invalid={!!errors.specialization}
-            >
-              <option value="">-</option>
-              {specializations.map((item) => (
-                <option key={item.id} value={item.title}>
-                  {item.title}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "", label: "-" },
+                ...specializations.map((item) => ({ value: item.title, label: item.title })),
+              ]}
+            />
             {errors.specialization && <div className="field-error">{errors.specialization}</div>}
           </div>
 
           <div className="form-field">
             <label className="text-small">О себе (необязательно)</label>
-            <textarea value={about} onChange={(event) => setAbout(event.target.value)} />
+            <AppTextArea value={about} onChange={(event) => setAbout(event.target.value)} />
           </div>
         </div>
 

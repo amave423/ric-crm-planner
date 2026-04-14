@@ -2,14 +2,26 @@
 
 .wizard-tab--event {
   --wizard-accent: var(--event-color, #6495ed);
+  --wizard-soft-bg: rgba(100, 149, 237, 0.045);
+  --wizard-soft-border: rgba(100, 149, 237, 0.18);
+  --wizard-focus-shadow: rgba(100, 149, 237, 0.16);
+  --wizard-select-bg: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
 }
 
 .wizard-tab--directions {
-  --wizard-accent: var(--directions-color, #83d34a);
+  --wizard-accent: var(--directions-color, #6fbf73);
+  --wizard-soft-bg: rgba(111, 191, 115, 0.055);
+  --wizard-soft-border: rgba(111, 191, 115, 0.22);
+  --wizard-focus-shadow: rgba(111, 191, 115, 0.18);
+  --wizard-select-bg: linear-gradient(180deg, #ffffff 0%, #fbfff8 100%);
 }
 
 .wizard-tab--projects {
   --wizard-accent: var(--projects-color, #b77bdc);
+  --wizard-soft-bg: rgba(183, 123, 220, 0.055);
+  --wizard-soft-border: rgba(183, 123, 220, 0.22);
+  --wizard-focus-shadow: rgba(183, 123, 220, 0.18);
+  --wizard-select-bg: linear-gradient(180deg, #ffffff 0%, #fdf7ff 100%);
 }
 
 .wizard-overlay {
@@ -27,7 +39,10 @@
   position: relative;
   width: 80%;
   height: 80%;
-  background: #fff;
+  background:
+    radial-gradient(circle at 100% 0%, var(--wizard-soft-bg), transparent 34%),
+    #fff;
+  border: 1px solid var(--wizard-soft-border);
   border-radius: 20px;
   display: flex;
   overflow: hidden;
@@ -76,7 +91,7 @@
   padding: 30px;
   overflow-y: auto;
 
-  input, textarea, select {
+  input:not(.ant-select-selection-search-input):not(.ant-input), textarea:not(.ant-input), select {
     width: 100%;
     padding: 10px;
     border-radius: 10px;
@@ -92,6 +107,41 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.wizard-form .app-input,
+.wizard-form .app-textarea,
+.wizard-form .ui-date-input input {
+  --app-input-accent: var(--wizard-accent);
+  --app-input-focus: var(--wizard-focus-shadow);
+  --app-input-hover: var(--wizard-accent);
+}
+
+.wizard-form .app-input.ant-input:focus,
+.wizard-form .app-input.ant-input-affix-wrapper-focused,
+.wizard-form .app-input.ant-input-affix-wrapper:focus-within,
+.wizard-form .app-textarea.ant-input:focus,
+.wizard-form .ui-date-input:focus-within input {
+  border-color: var(--wizard-accent) !important;
+  box-shadow: 0 0 0 4px var(--wizard-focus-shadow) !important;
+}
+
+.wizard-form .app-select.ant-select {
+  --app-select-hover: var(--wizard-accent);
+}
+
+.wizard-form .app-select.ant-select .ant-select-selection-search,
+.wizard-form .app-select.ant-select input,
+.wizard-form .app-select.ant-select .ant-select-selection-search-input,
+.wizard-form .app-select.ant-select input.ant-select-selection-search-input,
+.field-wrap.error .app-select.ant-select .ant-select-selection-search-input {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 .wizard-form > .text-small {
@@ -130,28 +180,46 @@
   cursor: pointer;
 }
 
-.wizard-close {
+.wizard-close.app-button.ant-btn {
   position: absolute;
   right: 16px;
   top: 12px;
-  width: 36px;
-  height: 36px;
-  border: none;
-  background: transparent;
-  font-size: 22px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  font-size: 0;
   line-height: 1;
   cursor: pointer;
-  color: #666;
-  border-radius: 8px;
+  color: #4b5563 !important;
+  border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: none !important;
   z-index: 5;
+  transition: background 0.14s ease, color 0.14s ease;
 }
 
-.wizard-close:hover {
-  background: rgba(0,0,0,0.04);
-  color: #111;
+.wizard-close.app-button.ant-btn > span {
+  display: none;
+}
+
+.wizard-close.app-button.ant-btn::before {
+  content: "×";
+  display: block;
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.wizard-close.app-button.ant-btn:hover,
+.wizard-close.app-button.ant-btn:focus {
+  background: rgba(15, 23, 42, 0.07) !important;
+  color: #111827 !important;
 }
 
 .tags { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
@@ -170,10 +238,11 @@ select {
     box-shadow 0.2s ease;
 }
 
-input:focus,
+input:not(.ant-select-selection-search-input):not(.ant-input):focus,
 textarea:focus,
 select:focus {
-  border-color: var(--row-border-color);
+  border-color: var(--wizard-accent);
+  box-shadow: 0 0 0 4px var(--wizard-focus-shadow);
 }
 
 .date-row {
@@ -225,42 +294,74 @@ select:focus {
 
 .tag {
   border-radius: 10px;
-  padding: 6px 10px;
+  padding: 6px 6px 6px 10px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
   min-width: 0;
   text-align: left;
+  line-height: 1.2;
 }
 
-.tag button {
-  border: none;
-  background: transparent;
-  cursor: pointer;
+.tag .tag-edit.app-button.ant-btn {
+  width: auto;
+  min-width: 0;
+  height: auto;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  color: inherit !important;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  box-shadow: none !important;
+}
+
+.tag .tag-edit.app-button.ant-btn:hover,
+.tag .tag-edit.app-button.ant-btn:focus {
+  background: transparent !important;
+  color: inherit !important;
+  transform: none !important;
+}
+
+.tag .tag-remove.app-button.ant-btn {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  color: inherit !important;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: none !important;
+  border-radius: 7px;
+  flex: 0 0 22px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.tag .tag-remove.app-button.ant-btn > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 0;
+  line-height: 1;
+}
+
+.tag .tag-remove.app-button.ant-btn > span::before {
+  content: "×";
   font-size: 16px;
   line-height: 1;
 }
 
-.tag .app-button.ant-btn {
-  width: auto;
-  height: auto;
-  min-width: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  white-space: normal;
-  box-shadow: none;
-}
-
-.tag .app-button.ant-btn > span {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 2px;
-  line-height: 1.2;
+.tag .tag-remove.app-button.ant-btn:hover,
+.tag .tag-remove.app-button.ant-btn:focus {
+  background: rgba(17, 24, 39, 0.08) !important;
+  color: #111827 !important;
+  transform: none !important;
 }
 
 .wizard-inline-add-row {

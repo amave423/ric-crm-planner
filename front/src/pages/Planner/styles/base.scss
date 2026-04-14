@@ -141,7 +141,7 @@
   color: #374151;
 }
 
-.planner-card input:not([type="checkbox"]):not([type="radio"]),
+.planner-card input:not([type="checkbox"]):not([type="radio"]):not(.ant-select-selection-search-input),
 .planner-card select,
 .planner-card textarea,
 .planner-head .planner-label select {
@@ -173,7 +173,7 @@
   padding-right: 28px;
 }
 
-.planner-card input:not([type="checkbox"]):not([type="radio"]):focus,
+.planner-card input:not([type="checkbox"]):not([type="radio"]):not(.ant-select-selection-search-input):focus,
 .planner-card select:focus,
 .planner-card textarea:focus,
 .planner-head .planner-label select:focus {
@@ -207,6 +207,55 @@
   border: 1px solid #2563eb !important;
   background: #2563eb !important;
   color: #fff !important;
+}
+
+.planner-card .app-select.ant-select .ant-select-selection-search-input,
+.planner-head .app-select.ant-select .ant-select-selection-search-input,
+.planner-page .app-select.ant-select input {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.planner-page .app-select.ant-select .ant-select-selector {
+  display: flex !important;
+  align-items: center !important;
+}
+
+.planner-page .app-select.ant-select {
+  min-height: 35px;
+}
+
+.planner-page .app-select.ant-select .ant-select-selector {
+  min-height: 35px !important;
+  height: 35px !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+.planner-page .app-select.ant-select .ant-select-selection-search {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.planner-page .app-select.ant-select .ant-select-selection-item,
+.planner-page .app-select.ant-select .ant-select-selection-placeholder {
+  display: flex !important;
+  align-items: center !important;
+  min-width: 0 !important;
+  opacity: 1 !important;
+  color: #111827 !important;
 }
 
 .primary:hover,
@@ -289,7 +338,11 @@
 .planner-check {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
+}
+
+.planner-check .app-switch.ant-switch {
+  flex: 0 0 auto;
 }
 
 .planner-check--inline {

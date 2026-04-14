@@ -5,6 +5,7 @@ import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import calendarIcon from "../../assets/icons/calendar.svg";
+import AppSelect from "./Select";
 import "./date-field.scss";
 
 dayjs.extend(customParseFormat);
@@ -69,31 +70,23 @@ const renderCalendarHeader: CalendarProps<Dayjs>["headerRender"] = ({
 
   return (
     <div className="ui-calendar-header" onMouseDown={(event) => event.stopPropagation()}>
-      <select
+      <AppSelect
         className="ui-calendar-select ui-calendar-select--year"
         aria-label="Год"
         value={currentYear}
-        onChange={(event) => onChange(value.year(Number(event.target.value)))}
-      >
-        {YEAR_OPTIONS.map((year) => (
-          <option key={year} value={year}>
-            {year}
-          </option>
-        ))}
-      </select>
+        onChange={(nextYear) => onChange(value.year(Number(nextYear)))}
+        popupMatchSelectWidth={false}
+        options={YEAR_OPTIONS.map((year) => ({ value: year, label: year }))}
+      />
 
-      <select
+      <AppSelect
         className="ui-calendar-select ui-calendar-select--month"
         aria-label="Месяц"
         value={currentMonth}
-        onChange={(event) => onChange(value.month(Number(event.target.value)))}
-      >
-        {MONTH_NAMES.map((month, index) => (
-          <option key={month} value={index}>
-            {month}
-          </option>
-        ))}
-      </select>
+        onChange={(nextMonth) => onChange(value.month(Number(nextMonth)))}
+        popupMatchSelectWidth={false}
+        options={MONTH_NAMES.map((month, index) => ({ value: index, label: month }))}
+      />
 
       <div className="ui-calendar-mode" aria-label="Режим календаря">
         <AntButton

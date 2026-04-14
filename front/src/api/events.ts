@@ -197,7 +197,7 @@ async function resolveOrganizer(e: BackendEvent): Promise<string | undefined> {
 async function mapEventToUi(data: unknown): Promise<Event> {
   const event = normalizeBackendEvent(data);
   const specs = await getSpecializations();
-  const plannerState = readPlannerState();
+  const plannerState = readPlannerState(USE_MOCK);
   const eventId = Number(event.id ?? 0);
   const isEnrollmentClosed = plannerState.closedEventIds.includes(eventId);
 
@@ -289,6 +289,7 @@ export async function removeEvent(id: number): Promise<unknown> {
   if (USE_MOCK) return _removeEvent(id);
   return client.del(`/api/users/events/${id}/`);
 }
+
 
 
 

@@ -4,6 +4,7 @@ import { useToast } from "../../components/Toast/ToastProvider";
 import { AuthContext } from "../../context/AuthContext";
 import "../../styles/auth.scss";
 import AppButton from "../../components/UI/Button";
+import AppInput, { AppPassword } from "../../components/UI/Input";
 
 export default function Login() {
   const { login } = useContext(AuthContext);
@@ -29,7 +30,7 @@ export default function Login() {
 
       <form onSubmit={handleSubmit} className="auth-form">
         <label className="text-small">Email</label>
-        <input
+        <AppInput
           type="email"
           placeholder="email@mail.ru"
           value={email}
@@ -39,8 +40,7 @@ export default function Login() {
         />
 
         <label className="text-small">Пароль</label>
-        <input
-          type="password"
+        <AppPassword
           placeholder="Пароль"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

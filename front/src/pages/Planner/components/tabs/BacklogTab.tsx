@@ -3,6 +3,9 @@ import DateField from "../../../../components/UI/DateField";
 import type { PlannerParentTask, PlannerSubtask } from "../../../../types/planner";
 import type { ParentEditDraft, SubtaskEditDraft } from "../../planner.types";
 import AppButton from "../../../../components/UI/Button";
+import AppInput from "../../../../components/UI/Input";
+import AppSelect from "../../../../components/UI/Select";
+import AppSwitch from "../../../../components/UI/Switch";
 
 type BacklogTabProps = {
   activeTeamName: string;
@@ -140,7 +143,7 @@ export default function BacklogTab({
           <div className="planner-grid planner-grid--parent-create backlog-parent-create">
             <label className="planner-label">
               Название
-              <input value={parentTitle} onChange={(event) => onParentTitleChange(event.target.value)} placeholder="Например: Сделать MVP" />
+              <AppInput value={parentTitle} onChange={(event) => onParentTitleChange(event.target.value)} placeholder="Например: Сделать MVP" />
             </label>
             <label className="planner-label">
               Дата начала
@@ -171,7 +174,7 @@ export default function BacklogTab({
                 <div className="backlog-parent-main" onClick={() => (editingParentId !== parent.id ? onSelectParent(parent.id) : undefined)}>
                   {editingParentId === parent.id && editingParentDraft ? (
                     <div className="planner-inline-edit backlog-edit-form">
-                      <input
+                      <AppInput
                         value={editingParentDraft.title}
                         onClick={(event) => event.stopPropagation()}
                         onChange={(event) =>
@@ -270,21 +273,23 @@ export default function BacklogTab({
             <div className="planner-grid planner-grid--4 backlog-subtask-create">
               <label className="planner-label">
                 Ответственный
-                <select value={subAssigneeId} onChange={(event) => onSubAssigneeChange(event.target.value)} disabled={selectedTeamMembers.length === 0}>
-                  <option value="" disabled>
-                    Ответственный
-                  </option>
-                  {selectedTeamMembers.map((id) => (
-                    <option key={`assignee-${id}`} value={String(id)}>
-                      {displayAssigneeLabel(Number(id))}
-                    </option>
-                  ))}
-                </select>
+                <AppSelect
+                  value={subAssigneeId || ""}
+                  onChange={(value) => onSubAssigneeChange(String(value))}
+                  disabled={selectedTeamMembers.length === 0}
+                  options={[
+                    { value: "", label: "Ответственный", disabled: true },
+                    ...selectedTeamMembers.map((id) => ({
+                      value: String(id),
+                      label: displayAssigneeLabel(Number(id)),
+                    })),
+                  ]}
+                />
               </label>
 
               <label className="planner-label backlog-subtask-title-field">
                 Подзадача
-                <input value={subTitle} onChange={(event) => onSubTitleChange(event.target.value)} placeholder="Что нужно сделать" />
+                <AppInput value={subTitle} onChange={(event) => onSubTitleChange(event.target.value)} placeholder="Что нужно сделать" />
               </label>
 
               <label className="planner-label">
@@ -298,8 +303,8 @@ export default function BacklogTab({
               </label>
 
               <label className="planner-check backlog-sprint-toggle">
-                <input type="checkbox" checked={subInSprint} onChange={(event) => onSubInSprintChange(event.target.checked)} />
                 <span>В спринт</span>
+                <AppSwitch checked={subInSprint} onChange={onSubInSprintChange} compact />
               </label>
 
               <AppButton className="primary backlog-add-subtask" type="button" onClick={onAddSubtask}>
@@ -325,23 +330,21 @@ export default function BacklogTab({
                   {editingSubtaskId === subtask.id && editingSubtaskDraft ? (
                     <div className="planner-inline-edit backlog-edit-form">
                       <div className="planner-inline-edit-row">
-                        <select
-                          value={editingSubtaskDraft.assigneeId ?? ""}
-                          onChange={(event) =>
-                            setEditingSubtaskDraft((prev) => (prev ? { ...prev, assigneeId: Number(event.target.value) } : prev))
+                        <AppSelect
+                          value={editingSubtaskDraft.assigneeId != null ? String(editingSubtaskDraft.assigneeId) : ""}
+                          onChange={(value) =>
+                            setEditingSubtaskDraft((prev) => (prev ? { ...prev, assigneeId: Number(value) } : prev))
                           }
-                        >
-                          <option value="" disabled>
-                            Ответственный
-                          </option>
-                          {getTeamMemberIds(subtask.teamId).map((id) => (
-                            <option key={`edit-assignee-${subtask.id}-${id}`} value={String(id)}>
-                              {displayAssigneeLabel(Number(id))}
-                            </option>
-                          ))}
-                        </select>
+                          options={[
+                            { value: "", label: "Ответственный", disabled: true },
+                            ...getTeamMemberIds(subtask.teamId).map((id) => ({
+                              value: String(id),
+                              label: displayAssigneeLabel(Number(id)),
+                            })),
+                          ]}
+                        />
 
-                        <input
+                        <AppInput
                           value={editingSubtaskDraft.title}
                           onChange={(event) =>
                             setEditingSubtaskDraft((prev) => (prev ? { ...prev, title: event.target.value } : prev))
@@ -362,14 +365,14 @@ export default function BacklogTab({
                       </div>
 
                       <label className="planner-check">
-                        <input
-                          type="checkbox"
-                          checked={editingSubtaskDraft.inSprint}
-                          onChange={(event) =>
-                            setEditingSubtaskDraft((prev) => (prev ? { ...prev, inSprint: event.target.checked } : prev))
-                          }
-                        />
                         <span>В спринт</span>
+                        <AppSwitch
+                          checked={editingSubtaskDraft.inSprint}
+                          onChange={(checked) =>
+                            setEditingSubtaskDraft((prev) => (prev ? { ...prev, inSprint: checked } : prev))
+                          }
+                          compact
+                        />
                       </label>
                     </div>
                   ) : (

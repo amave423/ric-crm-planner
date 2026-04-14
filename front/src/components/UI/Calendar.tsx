@@ -2,6 +2,7 @@ import { Button as AntButton, Calendar as AntCalendar, Card } from "antd";
 import type { CalendarProps } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
+import AppSelect from "./Select";
 import "./calendar.scss";
 
 interface Props {
@@ -39,31 +40,23 @@ const renderCalendarHeader: CalendarProps<Dayjs>["headerRender"] = ({
   onTypeChange,
 }) => (
   <div className="ui-calendar-header" onMouseDown={(event) => event.stopPropagation()}>
-    <select
+    <AppSelect
       className="ui-calendar-select ui-calendar-select--year"
       aria-label="Год"
       value={value.year()}
-      onChange={(event) => onChange(value.year(Number(event.target.value)))}
-    >
-      {YEAR_OPTIONS.map((year) => (
-        <option key={year} value={year}>
-          {year}
-        </option>
-      ))}
-    </select>
+      onChange={(nextYear) => onChange(value.year(Number(nextYear)))}
+      popupMatchSelectWidth={false}
+      options={YEAR_OPTIONS.map((year) => ({ value: year, label: year }))}
+    />
 
-    <select
+    <AppSelect
       className="ui-calendar-select ui-calendar-select--month"
       aria-label="Месяц"
       value={value.month()}
-      onChange={(event) => onChange(value.month(Number(event.target.value)))}
-    >
-      {MONTH_NAMES.map((month, index) => (
-        <option key={month} value={index}>
-          {month}
-        </option>
-      ))}
-    </select>
+      onChange={(nextMonth) => onChange(value.month(Number(nextMonth)))}
+      popupMatchSelectWidth={false}
+      options={MONTH_NAMES.map((month, index) => ({ value: index, label: month }))}
+    />
 
     <div className="ui-calendar-mode" aria-label="Режим календаря">
       <AntButton

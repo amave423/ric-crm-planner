@@ -1,6 +1,7 @@
-import { createContext, useState, useEffect, type ReactNode } from "react";
+﻿import { createContext, useState, useEffect, type ReactNode } from "react";
 import client from "../api/client";
 import baseUsers from "../mock-data/users.json";
+import { CURRENT_MOCK_SEED_VERSION, LS_MOCK_SEED_VERSION } from "../storage/mockSeed";
 
 interface User {
   id: number;
@@ -36,6 +37,8 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 const USE_MOCK = client.USE_MOCK;
+const LS_USERS = "users";
+const LS_CURRENT_USER = "currentUser";
 
 function mapBackendUser(data: unknown): User | null {
   if (!data || typeof data !== "object") return null;
@@ -47,8 +50,8 @@ function mapBackendUser(data: unknown): User | null {
     typeof idRaw === "number"
       ? idRaw
       : typeof idRaw === "string" && !Number.isNaN(Number(idRaw))
-      ? Number(idRaw)
-      : null;
+        ? Number(idRaw)
+        : null;
   const email = String(obj.email ?? profile.email ?? "");
   const name = String(obj.firstName ?? obj.first_name ?? obj.name ?? profile.name ?? "");
   const surname = String(obj.lastName ?? obj.last_name ?? obj.surname ?? profile.surname ?? "");
@@ -78,9 +81,35 @@ function mapBackendUser(data: unknown): User | null {
   };
 }
 
+function ensureMockAuthSeeded() {
+  const storedVersion = localStorage.getItem(LS_MOCK_SEED_VERSION);
+  if (storedVersion !== CURRENT_MOCK_SEED_VERSION) {
+    localStorage.setItem(LS_USERS, "[]");
+    localStorage.removeItem(LS_CURRENT_USER);
+  }
+}
+
+function readStoredMockUsers() {
+  return JSON.parse(localStorage.getItem(LS_USERS) || "[]") as MockUser[];
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem("currentUser");
+    if (USE_MOCK) {
+      ensureMockAuthSeeded();
+      const saved = localStorage.getItem(LS_CURRENT_USER);
+      if (!saved) return null;
+      try {
+        const parsed = JSON.parse(saved) as MockUser;
+        const allUsers = [...(baseUsers as MockUser[]), ...readStoredMockUsers()];
+        return allUsers.find((item) => Number(item.id) === Number(parsed.id) && item.email === parsed.email) || null;
+      } catch {
+        localStorage.removeItem(LS_CURRENT_USER);
+        return null;
+      }
+    }
+
+    const saved = localStorage.getItem(LS_CURRENT_USER);
     return saved ? JSON.parse(saved) : null;
   });
 
@@ -91,8 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const info = await client.get("/api/users/user-info/");
         const mapped = mapBackendUser(info);
         setUser(mapped);
-        if (mapped) localStorage.setItem("currentUser", JSON.stringify(mapped));
-        else localStorage.removeItem("currentUser");
+        if (mapped) localStorage.setItem(LS_CURRENT_USER, JSON.stringify(mapped));
+        else localStorage.removeItem(LS_CURRENT_USER);
       } catch {
         try {
           const ok = await client.doRefresh();
@@ -100,22 +129,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const info = await client.get("/api/users/user-info/");
             const mapped = mapBackendUser(info);
             setUser(mapped);
-            if (mapped) localStorage.setItem("currentUser", JSON.stringify(mapped));
-            else localStorage.removeItem("currentUser");
+            if (mapped) localStorage.setItem(LS_CURRENT_USER, JSON.stringify(mapped));
+            else localStorage.removeItem(LS_CURRENT_USER);
           } else {
             setUser(null);
-            localStorage.removeItem("currentUser");
+            localStorage.removeItem(LS_CURRENT_USER);
           }
         } catch {
           setUser(null);
-          localStorage.removeItem("currentUser");
+          localStorage.removeItem(LS_CURRENT_USER);
         }
       }
     })();
   }, []);
 
   const getAllUsersMock = () => {
-    const stored = JSON.parse(localStorage.getItem("users") || "[]") as MockUser[];
+    ensureMockAuthSeeded();
+    const stored = readStoredMockUsers();
     return [...(baseUsers as MockUser[]), ...stored];
   };
 
@@ -124,35 +154,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const found = users.find((u) => u.email === email && u.password === password);
     if (!found) return false;
     setUser(found);
-    localStorage.setItem("currentUser", JSON.stringify(found));
+    localStorage.setItem(LS_CURRENT_USER, JSON.stringify(found));
     return true;
   };
 
   const registerMock = async (u: Omit<User, "id"> & { confirm?: string }) => {
+    ensureMockAuthSeeded();
     const newUser: MockUser = { ...u, id: Date.now() };
-    const stored = JSON.parse(localStorage.getItem("users") || "[]") as MockUser[];
+    const stored = readStoredMockUsers();
     stored.push(newUser);
-    localStorage.setItem("users", JSON.stringify(stored));
-    localStorage.setItem("currentUser", JSON.stringify(newUser));
+    localStorage.setItem(LS_USERS, JSON.stringify(stored));
+    localStorage.setItem(LS_CURRENT_USER, JSON.stringify(newUser));
     setUser(newUser);
     return true;
   };
 
   const updateProfileMock = async (u: ProfileUpdate) => {
     if (!user) return;
+    ensureMockAuthSeeded();
     const updated: MockUser = { ...user, ...u };
     setUser(updated);
-    localStorage.setItem("currentUser", JSON.stringify(updated));
-    const stored = JSON.parse(localStorage.getItem("users") || "[]") as MockUser[];
+    localStorage.setItem(LS_CURRENT_USER, JSON.stringify(updated));
+    const stored = readStoredMockUsers();
     const idx = stored.findIndex((s) => s.id === updated.id);
     if (idx >= 0) stored[idx] = updated;
     else stored.push(updated);
-    localStorage.setItem("users", JSON.stringify(stored));
+    localStorage.setItem(LS_USERS, JSON.stringify(stored));
   };
 
   const logoutMock = async () => {
     setUser(null);
-    localStorage.removeItem("currentUser");
+    localStorage.removeItem(LS_CURRENT_USER);
   };
 
   const loginBackend = async (email: string, password: string) => {
@@ -160,8 +192,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const info = await client.login(email, password);
       const mapped = mapBackendUser(info);
       setUser(mapped);
-      if (mapped) localStorage.setItem("currentUser", JSON.stringify(mapped));
-      else localStorage.removeItem("currentUser");
+      if (mapped) localStorage.setItem(LS_CURRENT_USER, JSON.stringify(mapped));
+      else localStorage.removeItem(LS_CURRENT_USER);
       return true;
     } catch {
       return false;
@@ -211,12 +243,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const info = await client.get("/api/users/user-info/");
         const mapped = mapBackendUser(info);
         setUser(mapped);
-        if (mapped) localStorage.setItem("currentUser", JSON.stringify(mapped));
-        else localStorage.removeItem("currentUser");
+        if (mapped) localStorage.setItem(LS_CURRENT_USER, JSON.stringify(mapped));
+        else localStorage.removeItem(LS_CURRENT_USER);
       } catch {
         const partial = { ...user, ...(payload.name ? { name: payload.name } : {}), ...(payload.surname ? { surname: payload.surname } : {}) };
         setUser(partial as User);
-        if (partial) localStorage.setItem("currentUser", JSON.stringify(partial));
+        if (partial) localStorage.setItem(LS_CURRENT_USER, JSON.stringify(partial));
       }
     } catch {
     }
@@ -228,7 +260,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
     } finally {
       setUser(null);
-      localStorage.removeItem("currentUser");
+      localStorage.removeItem(LS_CURRENT_USER);
     }
   };
 

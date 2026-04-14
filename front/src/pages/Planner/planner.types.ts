@@ -30,6 +30,7 @@ export type ApplicantsTreeNode = {
   key: string;
   eventId?: number;
   eventClosed?: boolean;
+  eventHidden?: boolean;
   title: string;
   directions: Array<{
     key: string;

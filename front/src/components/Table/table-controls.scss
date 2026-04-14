@@ -5,10 +5,12 @@
   display: flex;
   gap: 12px;
 
-  input, select {
-    padding: 10px;
-    border: 1px solid $gray;
-    border-radius: 8px;
+  .app-search {
+    width: 260px;
+  }
+
+  .app-select.ant-select {
+    width: 220px;
   }
 
   .create-btn {

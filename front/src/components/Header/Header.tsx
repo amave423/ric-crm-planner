@@ -1,5 +1,7 @@
-import { useContext, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useContext, useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Dropdown } from "antd";
+import type { MenuProps } from "antd";
 import "../../styles/header.scss";
 import requestsIcon from "../../assets/icons/list.svg";
 import plannerIcon from "../../assets/icons/table.svg";
@@ -14,34 +16,12 @@ import AppButton from "../UI/Button";
 
 export default function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useContext(AuthContext);
   const { notifications, unreadCount, markAllAsRead, markAsRead, removeNotification } = useNotifications();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const mobileMenuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!mobileMenuOpen) return;
-
-    const onOutside = (e: MouseEvent) => {
-      if (!mobileMenuRef.current) return;
-      if (!mobileMenuRef.current.contains(e.target as Node)) {
-        setMobileMenuOpen(false);
-      }
-    };
-
-    const onEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMobileMenuOpen(false);
-    };
-
-    document.addEventListener("mousedown", onOutside);
-    document.addEventListener("keydown", onEscape);
-    return () => {
-      document.removeEventListener("mousedown", onOutside);
-      document.removeEventListener("keydown", onEscape);
-    };
-  }, [mobileMenuOpen]);
 
   useEffect(() => {
     if (!notificationsOpen) return;
@@ -52,6 +32,51 @@ export default function Header() {
     setMobileMenuOpen(false);
     navigate(path);
   };
+
+  const mobileMenuItems: MenuProps["items"] = user
+    ? [
+        {
+          key: "/requests",
+          label: (
+            <span className="mobile-menu-entry">
+              <span className="mobile-menu-entry__icon">
+                <img src={requestsIcon} alt="" />
+              </span>
+              <span>{user.role === "student" ? "Мои заявки" : "Заявки"}</span>
+            </span>
+          ),
+        },
+        {
+          key: "/planner",
+          label: (
+            <span className="mobile-menu-entry">
+              <span className="mobile-menu-entry__icon">
+                <img src={plannerIcon} alt="" />
+              </span>
+              <span>Планировщик</span>
+            </span>
+          ),
+        },
+        {
+          key: "/profile",
+          label: (
+            <span className="mobile-menu-entry">
+              <span className="mobile-menu-entry__icon">
+                <img src={userIcon} alt="" />
+              </span>
+              <span>Профиль</span>
+            </span>
+          ),
+        },
+      ]
+    : [];
+
+  const onMobileMenuClick: MenuProps["onClick"] = ({ key }) => {
+    goTo(String(key));
+  };
+
+  const activeMobileMenuKey =
+    ["/requests", "/planner", "/profile"].find((path) => location.pathname.startsWith(path)) ?? "";
 
   const openNotifications = () => {
     setMobileMenuOpen(false);
@@ -88,25 +113,23 @@ export default function Header() {
   return (
     <header className={`app-header ${user ? "app-header--auth" : "app-header--guest"}`}>
       {user ? (
-        <div className={`mobile-menu ${mobileMenuOpen ? "open" : ""}`} ref={mobileMenuRef}>
-          <AppButton className="mobile-menu-btn" aria-label="Открыть меню" onClick={() => setMobileMenuOpen((prev) => !prev)}>
-            <img src={menuIcon} alt="menu" />
-          </AppButton>
-
-          <div className="mobile-menu-panel">
-            <AppButton className="mobile-menu-item" onClick={() => goTo("/requests")}>
-              <img src={requestsIcon} alt="requests" />
-              <span>{user?.role === "student" ? "Мои заявки" : "Заявки"}</span>
+        <div className={`mobile-menu ${mobileMenuOpen ? "open" : ""}`}>
+          <Dropdown
+            open={mobileMenuOpen}
+            onOpenChange={setMobileMenuOpen}
+            trigger={["click"]}
+            placement="bottomLeft"
+            classNames={{ root: "mobile-menu-dropdown" }}
+            menu={{
+              items: mobileMenuItems,
+              selectedKeys: activeMobileMenuKey ? [activeMobileMenuKey] : [],
+              onClick: onMobileMenuClick,
+            }}
+          >
+            <AppButton className="mobile-menu-btn" aria-label={mobileMenuOpen ? "Закрыть меню" : "Открыть меню"}>
+              <img src={menuIcon} alt="menu" />
             </AppButton>
-            <AppButton className="mobile-menu-item" onClick={() => goTo("/planner")}>
-              <img src={plannerIcon} alt="planner" />
-              <span>Планировщик</span>
-            </AppButton>
-            <AppButton className="mobile-menu-item" onClick={() => goTo("/profile")}>
-              <img src={userIcon} alt="profile" />
-              <span>Профиль</span>
-            </AppButton>
-          </div>
+          </Dropdown>
         </div>
       ) : (
         <div className="mobile-menu-spacer" aria-hidden />
@@ -117,7 +140,7 @@ export default function Header() {
           <>
             <AppButton className="head-btn head-btn--muted" onClick={() => navigate("/requests")}>
               <img src={requestsIcon} alt="requests" />
-              <span>{user?.role === "student" ? "Мои заявки" : "Заявки"}</span>
+              <span>{user.role === "student" ? "Мои заявки" : "Заявки"}</span>
             </AppButton>
 
             <AppButton className="head-btn head-btn--muted" onClick={() => navigate("/planner")}>
@@ -130,7 +153,7 @@ export default function Header() {
 
       <div className="header-center">
         <AppButton className="header-logo" onClick={() => goTo("/")}>
-          <img src="/src/assets/LogoIcon.png" alt="logo" className="header-logo" />
+          <img src="/src/assets/LogoIcon.png" alt="logo" className="header-logo-img" />
         </AppButton>
       </div>
 
@@ -140,8 +163,8 @@ export default function Header() {
             <div className="profile-box" onClick={() => navigate("/profile")}>
               <img src={userIcon} alt="user" className="profile-icon" />
               <div className="profile-text">
-                <div className="role">{user?.role === "organizer" ? "Организатор" : "Проектант"}</div>
-                <div className="name">{user?.name ? `${user.name} ${user.surname || ""}` : "Гость"}</div>
+                <div className="role">{user.role === "organizer" ? "Организатор" : "Проектант"}</div>
+                <div className="name">{user.name ? `${user.name} ${user.surname || ""}` : "Гость"}</div>
               </div>
             </div>
 
@@ -200,4 +223,3 @@ export default function Header() {
     </header>
   );
 }
-

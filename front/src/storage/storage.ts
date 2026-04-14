@@ -4,6 +4,7 @@ import seedEvents from "../mock-data/events.json";
 import seedProfile from "../mock-data/profile.json";
 import seedProjects from "../mock-data/projects.json";
 import seedUsers from "../mock-data/users.json";
+import { CURRENT_MOCK_SEED_VERSION, LS_MOCK_SEED_VERSION } from "./mockSeed";
 import type { Direction } from "../types/direction";
 import type { Event } from "../types/event";
 import type { Project } from "../types/project";
@@ -18,8 +19,6 @@ const LS_DIRECTIONS = "ric_mock_directions";
 const LS_PROJECTS = "ric_mock_projects";
 const LS_PROFILES = "ric_mock_profiles";
 const LS_USERS = "users";
-const LS_SEED_VERSION = "ric_mock_seed_version";
-const CURRENT_SEED_VERSION = "v3";
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
@@ -45,13 +44,15 @@ function nextId(items: Array<{ id?: number }>): number {
 }
 
 function ensureMockSeeded() {
-  const storedVersion = localStorage.getItem(LS_SEED_VERSION);
-  if (storedVersion !== CURRENT_SEED_VERSION) {
+  const storedVersion = localStorage.getItem(LS_MOCK_SEED_VERSION);
+  if (storedVersion !== CURRENT_MOCK_SEED_VERSION) {
     writeLS(LS_EVENTS, seedEvents);
     writeLS(LS_DIRECTIONS, seedDirections);
     writeLS(LS_PROJECTS, seedProjects);
     writeLS(LS_PROFILES, seedProfile || {});
-    localStorage.setItem(LS_SEED_VERSION, CURRENT_SEED_VERSION);
+    writeLS(LS_USERS, []);
+    localStorage.removeItem("currentUser");
+    localStorage.setItem(LS_MOCK_SEED_VERSION, CURRENT_MOCK_SEED_VERSION);
     return;
   }
 

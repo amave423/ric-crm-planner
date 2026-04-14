@@ -9,6 +9,8 @@ import type { User } from "../../../types/user";
 import { getAllUsers } from "../../../storage/storage";
 import { useToast } from "../../Toast/ToastProvider";
 import AppButton from "../../UI/Button";
+import AppInput, { AppTextArea } from "../../UI/Input";
+import AppSelect from "../../UI/Select";
 
 function normalizeUser(user: User | Record<string, unknown>): User {
   const raw = user as User & Record<string, unknown>;
@@ -255,7 +257,7 @@ export default function DirectionForm() {
         <label className="text-small">
           Название направления
           <div className="wizard-inline-add-row wizard-inline-add-row--entity">
-            <input
+            <AppInput
               placeholder="Введите название направления"
               value={input}
               onChange={(event) => {
@@ -283,30 +285,31 @@ export default function DirectionForm() {
 
       <label className="text-small">
         Описание
-        <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
+        <AppTextArea value={description} onChange={(event) => setDescription(event.target.value)} />
       </label>
 
       <div className={`field-wrap ${errors.selectedOrganizer ? "error" : ""}`}>
         <label className="text-small">
           Организатор направления
-          <select
+          <AppSelect
+            tone="directions"
             value={selectedOrganizer}
-            onChange={(event) => {
-              setSelectedOrganizer(event.target.value);
+            onChange={(value) => {
+              setSelectedOrganizer(String(value));
               setErrors((prev) => {
                 const next = { ...prev };
                 delete next.selectedOrganizer;
                 return next;
               });
             }}
-          >
-            <option value="">Выберите организатора</option>
-            {organizers.map((organizer) => (
-              <option key={organizer.id} value={`${organizer.surname} ${organizer.name}`.trim()}>
-                {organizer.surname} {organizer.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "Выберите организатора" },
+              ...organizers.map((organizer) => {
+                const name = `${organizer.surname} ${organizer.name}`.trim();
+                return { value: name, label: name };
+              }),
+            ]}
+          />
         </label>
         {errors.selectedOrganizer && <div className="field-error">{errors.selectedOrganizer}</div>}
       </div>
@@ -322,6 +325,7 @@ export default function DirectionForm() {
               style={Number(editingDirectionId) === Number(direction.id) ? { outline: "2px solid var(--wizard-accent)" } : undefined}
             >
               <AppButton
+                className="tag-edit"
                 type="button"
                 style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", display: "flex", flexDirection: "column", gap: 2 }}
                 onClick={() => fillForm(direction)}
@@ -330,7 +334,7 @@ export default function DirectionForm() {
                 {direction.description && <span className="text-small" style={{ opacity: 0.8 }}>{direction.description}</span>}
                 {direction.organizer && <span className="text-small" style={{ opacity: 0.8 }}>Организатор: {direction.organizer}</span>}
               </AppButton>
-              <AppButton type="button" onClick={() => removeDirection(Number(direction.id))} aria-label="Удалить направление">
+              <AppButton className="tag-remove" type="button" onClick={() => removeDirection(Number(direction.id))} aria-label="Удалить направление">
                 x
               </AppButton>
             </div>

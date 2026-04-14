@@ -224,12 +224,16 @@
   outline: 2px solid rgba(183, 123, 220, 0.12);
 }
 
-.status-select {
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid $gray;
-  background: white;
-  font-size: 14px;
+.status-select.app-select.ant-select {
+  width: min(260px, 100%);
+  min-height: 38px;
+}
+
+.status-select.app-select.ant-select .ant-select-selector {
+  min-height: 38px !important;
+  border-radius: 12px !important;
+  padding-top: 3px !important;
+  padding-bottom: 3px !important;
 }
 
 .event-card-mobile {

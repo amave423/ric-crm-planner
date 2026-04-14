@@ -22,12 +22,8 @@
   }
 
   body .mobile-menu-btn {
-    width: 40px;
-    height: 40px;
-  }
-
-  body .mobile-menu-panel {
-    min-width: 220px;
+    width: 42px;
+    height: 42px;
   }
 
   body .header-left {
@@ -48,7 +44,12 @@
     pointer-events: auto;
   }
 
-  body .header-logo {
+  body .header-logo.ant-btn {
+    width: 62px;
+    height: 42px;
+  }
+
+  body .header-logo-img {
     width: 62px;
     height: 42px;
   }
@@ -111,7 +112,7 @@
     min-width: 104px;
   }
 
-  body .mobile-menu-panel {
-    min-width: 200px;
+  body .mobile-menu-dropdown .ant-dropdown-menu {
+    min-width: 210px;
   }
 }

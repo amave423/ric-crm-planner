@@ -1,6 +1,7 @@
 import "./form.scss";
 import { useState } from "react";
 import AppButton from "../UI/Button";
+import AppInput, { AppTextArea } from "../UI/Input";
 
 export type Field = {
   key: string;
@@ -32,12 +33,12 @@ export default function CreateForm({ fields, onCreate }: Props) {
           <label className="text-small">{f.label}</label>
 
           {f.type === "textarea" ? (
-            <textarea
+            <AppTextArea
               className="text-regular"
               onChange={(e) => update(f.key, e.target.value)}
             />
           ) : (
-            <input
+            <AppInput
               type={f.type === "date" ? "date" : "text"}
               className="text-regular"
               onChange={(e) => update(f.key, e.target.value)}

@@ -88,16 +88,9 @@
   gap: 12px;
 }
 
-.form-field input,
-.form-field textarea,
-.form-field select {
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid $gray;
-  background: #fafafa;
+.form-field .app-input,
+.form-field .app-select {
   width: 100%;
-  font-size: 14px;
-  resize: vertical;
 }
 
 .apply-actions {
@@ -170,27 +163,45 @@
   cursor: not-allowed;
 }
 
-.modal-close {
+.modal-close.app-button.ant-btn {
   position: absolute;
   right: 12px;
   top: 12px;
-  width: 36px;
-  height: 36px;
-  border: none;
-  background: transparent;
-  font-size: 24px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  font-size: 0;
   line-height: 1;
   cursor: pointer;
-  color: #666;
-  border-radius: 8px;
+  color: #4b5563 !important;
+  border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: none !important;
+  transition: background 0.14s ease, color 0.14s ease;
 }
 
-.modal-close:hover {
-  background: rgba(0,0,0,0.04);
-  color: #111;
+.modal-close.app-button.ant-btn > span {
+  display: none;
+}
+
+.modal-close.app-button.ant-btn::before {
+  content: "×";
+  display: block;
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.modal-close.app-button.ant-btn:hover,
+.modal-close.app-button.ant-btn:focus {
+  background: rgba(15, 23, 42, 0.07) !important;
+  color: #111827 !important;
 }
 
 .form-field .field-error {

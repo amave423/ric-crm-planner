@@ -16,23 +16,12 @@
     color: #666;
   }
 
-  input, textarea {
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid $gray;
-    background: #fafafa;
-    font-size: 14px;
-
-    &:focus {
-      border-color: $primary;
-      outline: none;
-      background: white;
-    }
+  .app-input {
+    width: 100%;
   }
 
-  textarea {
+  .app-textarea {
     min-height: 80px;
-    resize: none;
   }
 }
 

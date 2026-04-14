@@ -3,6 +3,7 @@ import { Kanban, type BoardData, type BoardItem } from "react-kanban-kit";
 import type { PlannerSubtask } from "../../../../types/planner";
 import { isDoneKanbanStatus } from "../../planner.utils";
 import AppButton from "../../../../components/UI/Button";
+import AppInput from "../../../../components/UI/Input";
 
 const ROOT_ID = "root";
 const COLUMN_PREFIX = "column:";
@@ -248,7 +249,7 @@ export default function KanbanTab({
     <div className="planner-stack">
       <div className="planner-card">
         <div className="planner-inline-form">
-          <input value={newColumn} onChange={(event) => onNewColumnChange(event.target.value)} placeholder="Кастомный статус" />
+          <AppInput value={newColumn} onChange={(event) => onNewColumnChange(event.target.value)} placeholder="Кастомный статус" />
           <AppButton className="primary" onClick={onAddColumn}>
             Добавить
           </AppButton>

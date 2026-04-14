@@ -1,4 +1,5 @@
 ﻿import type { PlannerTeam } from "../../../types/planner";
+import AppSelect from "../../../components/UI/Select";
 
 type PlannerHeaderProps = {
   visibleTeams: PlannerTeam[];
@@ -12,14 +13,16 @@ export default function PlannerHeader({ visibleTeams, teamFilter, onTeamFilterCh
       <h1 className="h1">Планировщик</h1>
       <label className="planner-label">
         Команда
-        <select value={teamFilter} onChange={(event) => onTeamFilterChange(event.target.value)} disabled={visibleTeams.length === 0}>
-          {visibleTeams.length === 0 && <option value="">Нет команд</option>}
-          {visibleTeams.map((team) => (
-            <option key={team.id} value={String(team.id)}>
-              {team.name}
-            </option>
-          ))}
-        </select>
+        <AppSelect
+          value={teamFilter || ""}
+          onChange={(value) => onTeamFilterChange(String(value))}
+          disabled={visibleTeams.length === 0}
+          options={
+            visibleTeams.length === 0
+              ? [{ value: "", label: "Нет команд" }]
+              : visibleTeams.map((team) => ({ value: String(team.id), label: team.name }))
+          }
+        />
       </label>
     </div>
   );

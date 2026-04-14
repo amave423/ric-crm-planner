@@ -6,6 +6,8 @@ import { useToast } from "../../Toast/ToastProvider";
 import { useWizard } from "../EventWizardModal";
 import type { DirectionModel, ProjectModel } from "../types";
 import AppButton from "../../UI/Button";
+import AppInput, { AppTextArea } from "../../UI/Input";
+import AppSelect from "../../UI/Select";
 
 type LocalProject = ProjectModel & { directionId?: string };
 
@@ -217,29 +219,28 @@ export default function ProjectForm() {
       <div className={`field-wrap ${errors.directionId ? "error" : ""}`}>
         <label className="text-small">
           Выберите направление
-          <select
+          <AppSelect
+            tone="projects"
             value={directionId}
             disabled={mode === "edit" && Boolean(ctxDirectionId)}
-            onChange={(event) => {
-              setDirectionId(String(event.target.value));
+            onChange={(value) => {
+              setDirectionId(String(value));
               setErrors((prev) => {
                 const next = { ...prev };
                 delete next.directionId;
                 return next;
               });
             }}
-          >
-            <option value="">Выберите направление</option>
-            {loadingDirections ? (
-              <option>Загрузка...</option>
-            ) : (
-              directions.map((direction) => (
-                <option key={direction.id} value={direction.id}>
-                  {direction.title}
-                </option>
-              ))
-            )}
-          </select>
+            options={[
+              { value: "", label: "Выберите направление" },
+              ...(loadingDirections
+                ? [{ value: "__loading", label: "Загрузка...", disabled: true }]
+                : directions.map((direction) => ({
+                    value: String(direction.id),
+                    label: direction.title,
+                  }))),
+            ]}
+          />
         </label>
         {errors.directionId && <div className="field-error">{errors.directionId}</div>}
       </div>
@@ -248,7 +249,7 @@ export default function ProjectForm() {
         <label className="text-small">
           Название проекта
           <div className="wizard-inline-add-row wizard-inline-add-row--entity">
-            <input
+            <AppInput
               placeholder="Введите название проекта"
               value={title}
               onChange={(event) => {
@@ -276,7 +277,7 @@ export default function ProjectForm() {
 
       <label className="text-small">
         Описание
-        <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Краткое описание проекта" />
+        <AppTextArea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Краткое описание проекта" />
       </label>
 
       <div className="tags" style={{ marginTop: 12 }}>
@@ -290,6 +291,7 @@ export default function ProjectForm() {
               style={Number(editingProjectId) === Number(project.id) ? { outline: "2px solid var(--wizard-accent)" } : undefined}
             >
               <AppButton
+                className="tag-edit"
                 type="button"
                 style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", display: "flex", flexDirection: "column", gap: 2 }}
                 onClick={() => fillForm(project)}
@@ -297,7 +299,7 @@ export default function ProjectForm() {
                 <strong style={{ lineHeight: 1 }}>{project.title}</strong>
                 {project.description && <span className="text-small" style={{ opacity: 0.8 }}>{project.description}</span>}
               </AppButton>
-              <AppButton type="button" onClick={() => removeProject(Number(project.id))} aria-label="Удалить проект">
+              <AppButton className="tag-remove" type="button" onClick={() => removeProject(Number(project.id))} aria-label="Удалить проект">
                 x
               </AppButton>
             </div>

@@ -13,6 +13,18 @@ type TaskCardModalProps = {
   onClose: () => void;
 };
 
+function formatPlannerDate(value?: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return "—";
+
+  const [year, month, day] = raw.split("-");
+  if (year?.length === 4 && month?.length === 2 && day?.length === 2) {
+    return `${day}.${month}.${year}`;
+  }
+
+  return raw;
+}
+
 export default function TaskCardModal({
   isOpen,
   taskCardParent,
@@ -57,8 +69,8 @@ export default function TaskCardModal({
               <div className="planner-task-label">Сроки</div>
               <div className="planner-task-value">
                 {taskCardSubtask
-                  ? `${taskCardSubtask.startDate} — ${taskCardSubtask.endDate}`
-                  : `${taskCardParent?.startDate} — ${taskCardParent?.endDate}`}
+                  ? `${formatPlannerDate(taskCardSubtask.startDate)} — ${formatPlannerDate(taskCardSubtask.endDate)}`
+                  : `${formatPlannerDate(taskCardParent?.startDate)} — ${formatPlannerDate(taskCardParent?.endDate)}`}
               </div>
             </div>
 

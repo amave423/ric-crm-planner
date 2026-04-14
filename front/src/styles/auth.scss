@@ -23,21 +23,26 @@
       color: #555;
     }
 
-    input.text-regular {
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid #e6e6e6;
-      background: #fafafa;
+    .app-input {
+      width: 100%;
     }
 
-    .auth-submit {
+    .auth-submit.ant-btn {
       margin-top: 6px;
-      padding: 12px;
+      padding: 12px !important;
       border-radius: 10px;
-      border: none;
-      background: $primary;
-      color: white;
+      border: 1px solid $primary !important;
+      background: $primary !important;
+      color: white !important;
       cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .auth-submit.ant-btn:hover,
+    .auth-submit.ant-btn:focus {
+      background: #fff !important;
+      color: $primary !important;
+      border-color: $primary !important;
     }
   }
 

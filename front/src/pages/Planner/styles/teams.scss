@@ -97,6 +97,11 @@
   background: #f8fbff;
 }
 
+.planner-source-node--disabled {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
 .planner-source-node--direction {
   margin: 2px 0;
   border-color: #e2e8f0;
@@ -120,6 +125,10 @@
   font-weight: 600;
 }
 
+.planner-source-summary--static {
+  cursor: default;
+}
+
 .planner-source-summary-main {
   display: flex;
   align-items: center;
@@ -132,6 +141,29 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 0 0 auto;
+}
+
+.planner-source-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid #dbe5f3;
+  border-radius: 999px;
+  background: #fff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.planner-source-switch span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.planner-source-switch .app-switch.ant-switch {
   flex: 0 0 auto;
 }
 
@@ -153,6 +185,11 @@
   font-size: 22px;
   line-height: 1;
   transition: background 0.12s ease, transform 0.12s ease;
+}
+
+.planner-source-summary--static::before {
+  content: "•";
+  font-size: 18px;
 }
 
 .planner-source-node[open] > .planner-source-summary::before {
@@ -183,6 +220,12 @@
   color: #8b5e00;
   border-color: rgba(234, 179, 8, 0.3);
   background: rgba(250, 204, 21, 0.12);
+}
+
+.planner-source-meta--muted {
+  color: #64748b;
+  border-color: #dbe5f3;
+  background: #fff;
 }
 
 .planner-source-close-btn {
@@ -221,6 +264,19 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.planner-source-node--disabled .planner-source-summary {
+  color: #64748b;
+}
+
+.planner-source-node--disabled .planner-source-summary::before {
+  background: #edf2f7;
+  color: #94a3b8;
+}
+
+.planner-source-node--disabled .planner-source-summary-main {
+  color: #475569;
 }
 
 .team-item {
@@ -420,9 +476,9 @@
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #f8fafc;
-  gap: 10px;
+  gap: 12px;
   justify-content: flex-start;
-  align-items: flex-start;
+  align-items: center;
   transition: border-color 0.12s ease, background 0.12s ease;
 }
 
@@ -431,46 +487,8 @@
   background: #fff;
 }
 
-.planner-applicant-row input {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  border: 1.5px solid #94a3b8;
-  border-radius: 5px;
-  background: #fff;
-  position: relative;
-  cursor: pointer;
+.planner-applicant-row .app-switch.ant-switch {
   flex: 0 0 auto;
-  transform: translateY(2px);
-  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
-}
-
-.planner-applicant-row input:hover {
-  border-color: #3b82f6;
-}
-
-.planner-applicant-row input:checked {
-  background: #2563eb;
-  border-color: #2563eb;
-}
-
-.planner-applicant-row input:checked::after {
-  content: "";
-  position: absolute;
-  left: 5px;
-  top: 1px;
-  width: 4px;
-  height: 9px;
-  border: solid #fff;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-
-.planner-applicant-row input:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22);
 }
 
 .planner-applicant-row span {
@@ -486,6 +504,37 @@
   border: 1px dashed #bfdbfe;
   border-radius: 12px;
   background: #f8fbff;
+  align-items: center;
+}
+
+.planner-grid--team-from-project .team-name-draft-input.app-input.ant-input,
+.planner-grid--team-from-project .app-select.ant-select,
+.planner-grid--team-from-project .primary.ant-btn {
+  height: 42px !important;
+  min-height: 42px !important;
+}
+
+.planner-grid--team-from-project .team-name-draft-input.app-input.ant-input {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.planner-grid--team-from-project .app-select.ant-select .ant-select-selector {
+  height: 40px !important;
+  min-height: 40px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.planner-grid--team-from-project .app-select.ant-select-single .ant-select-selector .ant-select-selection-item,
+.planner-grid--team-from-project .app-select.ant-select-single .ant-select-selector .ant-select-selection-placeholder {
+  min-height: 40px;
+  line-height: 40px !important;
+}
+
+.planner-grid--team-from-project .primary.ant-btn {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 @media (max-width: 1180px) {

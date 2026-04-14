@@ -82,21 +82,15 @@
 }
 
 .search-box { 
-  width: 243px;
-  height: 40px; 
-  border: 1px solid #e6e6e6; 
-  border-radius: 8px; 
-  padding: 0 12px; 
-  display: flex; 
-  align-items: center; 
-  justify-content: space-between; 
+  width: 265px;
+  min-width: 0;
 }
 
-.search-box input { 
-  border: none; 
-  outline: none; 
-  width: 100%; 
-  background: transparent; 
+.search-box__icon {
+  width: 20px;
+  height: 20px;
+  opacity: 0.78;
+  pointer-events: none;
 }
 
 .tabs { 

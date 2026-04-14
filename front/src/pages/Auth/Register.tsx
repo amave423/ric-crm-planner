@@ -4,6 +4,7 @@ import { useToast } from "../../components/Toast/ToastProvider";
 import { AuthContext } from "../../context/AuthContext";
 import "../../styles/auth.scss";
 import AppButton from "../../components/UI/Button";
+import AppInput, { AppPassword } from "../../components/UI/Input";
 
 export default function Register() {
   const { register } = useContext(AuthContext);
@@ -50,19 +51,19 @@ export default function Register() {
 
       <form onSubmit={handleSubmit} className="auth-form">
         <label className="text-small">Email</label>
-        <input type="email" required value={form.email} onChange={(e) => update("email", e.target.value)} className="text-regular" />
+        <AppInput type="email" required value={form.email} onChange={(e) => update("email", e.target.value)} className="text-regular" />
 
         <label className="text-small">Имя</label>
-        <input type="text" required value={form.name} onChange={(e) => update("name", e.target.value)} className="text-regular" />
+        <AppInput required value={form.name} onChange={(e) => update("name", e.target.value)} className="text-regular" />
 
         <label className="text-small">Фамилия</label>
-        <input type="text" required value={form.surname} onChange={(e) => update("surname", e.target.value)} className="text-regular" />
+        <AppInput required value={form.surname} onChange={(e) => update("surname", e.target.value)} className="text-regular" />
 
         <label className="text-small">Пароль</label>
-        <input type="password" required value={form.password} onChange={(e) => update("password", e.target.value)} className="text-regular" />
+        <AppPassword required value={form.password} onChange={(e) => update("password", e.target.value)} className="text-regular" />
 
         <label className="text-small">Подтвердите пароль</label>
-        <input type="password" required value={form.confirm} onChange={(e) => update("confirm", e.target.value)} className="text-regular" />
+        <AppPassword required value={form.confirm} onChange={(e) => update("confirm", e.target.value)} className="text-regular" />
 
         <AppButton type="submit" className="auth-submit text-regular">
           Зарегистрироваться

@@ -248,7 +248,8 @@
     width: 100%;
   }
 
-  body .request-card-mobile__status-body .status-select {
+  body .request-card-mobile__status-body .status-select,
+  body .request-card-mobile__status-body .status-select.app-select.ant-select {
     width: 100%;
   }
 
@@ -268,7 +269,8 @@
     height: 30px;
   }
 
-  body .status-select {
+  body .status-select,
+  body .status-select.app-select.ant-select {
     width: 100%;
   }
 
@@ -299,7 +301,8 @@
     font-size: 12px;
   }
 
-  body .status-select {
+  body .status-select,
+  body .status-select.app-select.ant-select {
     font-size: 13px;
   }
 

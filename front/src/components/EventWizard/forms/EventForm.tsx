@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { getEventById, removeEvent as apiRemoveEvent, saveEvent as persistEvent } from "../../../api/events";
 import { SPECIALIZATION_OPTIONS } from "../../../constants/specializations";
@@ -10,16 +10,26 @@ import { useToast } from "../../Toast/ToastProvider";
 import DateField from "../../UI/DateField";
 import { useWizard } from "../EventWizardModal";
 import AppButton from "../../UI/Button";
+import AppInput, { AppTextArea } from "../../UI/Input";
+import AppSelect from "../../UI/Select";
 
 interface Specialization {
   id: number;
   title: string;
 }
 
+function FieldWrap({ name, errors, children }: { name: string; errors: Record<string, string>; children: ReactNode }) {
+  return (
+    <div className={`field-wrap ${errors[name] ? "error" : ""}`}>
+      {children}
+      {errors[name] && <div className="field-error">{errors[name]}</div>}
+    </div>
+  );
+}
+
 export default function EventForm() {
   const { mode, saveEvent, savedEvent, eventId } = useWizard();
   const seededEvent = savedEvent as Event | undefined;
-  const titleRef = useRef<HTMLInputElement | null>(null);
   const { showToast } = useToast();
 
   const [description, setDescription] = useState(seededEvent?.description ?? "");
@@ -66,7 +76,6 @@ export default function EventForm() {
     let mounted = true;
 
     const fillState = (event: Event) => {
-      if (titleRef.current) titleRef.current.value = event.title || "";
       setTitle(event.title || "");
       setDescription(event.description || "");
       setStartDate(event.startDate || "");
@@ -95,7 +104,6 @@ export default function EventForm() {
       }
 
       if (mode === "create") {
-        if (titleRef.current) titleRef.current.value = "";
         setTitle("");
         setDescription("");
         setStartDate("");
@@ -175,22 +183,14 @@ export default function EventForm() {
     }
   };
 
-  const FieldWrap = ({ name, children }: { name: string; children: ReactNode }) => (
-    <div className={`field-wrap ${errors[name] ? "error" : ""}`}>
-      {children}
-      {errors[name] && <div className="field-error">{errors[name]}</div>}
-    </div>
-  );
-
   return (
     <div className="wizard-form">
       <h2 className="h2">{mode === "create" ? "Добавление мероприятия" : "Редактирование мероприятия"}</h2>
 
-      <FieldWrap name="title">
+      <FieldWrap name="title" errors={errors}>
         <label className="text-small">
           Название мероприятия
-          <input
-            ref={titleRef}
+          <AppInput
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             autoComplete="off"
@@ -201,49 +201,57 @@ export default function EventForm() {
 
       <label className="text-small">
         Описание
-        <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
+        <AppTextArea value={description} onChange={(event) => setDescription(event.target.value)} />
       </label>
 
       <div className="date-row">
-        <FieldWrap name="startDate">
+        <FieldWrap name="startDate" errors={errors}>
           <DateField label="Дата начала" value={startDate} onChange={setStartDate} />
         </FieldWrap>
 
-        <FieldWrap name="endDate">
+        <FieldWrap name="endDate" errors={errors}>
           <DateField label="Дата завершения" value={endDate} onChange={setEndDate} />
         </FieldWrap>
 
-        <FieldWrap name="applyDeadline">
+        <FieldWrap name="applyDeadline" errors={errors}>
           <DateField label="Срок приёма заявок" value={applyDeadline} onChange={setApplyDeadline} />
         </FieldWrap>
       </div>
 
-      <FieldWrap name="leader">
+      <FieldWrap name="leader" errors={errors}>
         <label className="text-small">
           Руководитель мероприятия
-          <select value={leader} onChange={(event) => setLeader(event.target.value)}>
-            <option value="">Выберите руководителя</option>
-            {organizers.map((organizer) => (
-              <option key={organizer.id} value={organizer.id}>
-                {organizer.surname} {organizer.name}
-              </option>
-            ))}
-          </select>
+          <AppSelect
+            tone="event"
+            value={leader}
+            onChange={(value) => setLeader(String(value))}
+            options={[
+              { value: "", label: "Выберите руководителя" },
+              ...organizers.map((organizer) => ({
+                value: String(organizer.id),
+                label: `${organizer.surname} ${organizer.name}`.trim(),
+              })),
+            ]}
+          />
         </label>
       </FieldWrap>
 
-      <FieldWrap name="specializations">
+      <FieldWrap name="specializations" errors={errors}>
         <label className="text-small">
           Специализации
           <div className="wizard-inline-add-row wizard-inline-add-row--specializations">
-            <select value={selectedSpecializationId} onChange={(event) => setSelectedSpecializationId(event.target.value)}>
-              <option value="">Выберите специализацию</option>
-              {SPECIALIZATION_OPTIONS.map((specialization) => (
-                <option key={specialization.id} value={String(specialization.id)}>
-                  {specialization.title}
-                </option>
-              ))}
-            </select>
+            <AppSelect
+              tone="event"
+              value={selectedSpecializationId}
+              onChange={(value) => setSelectedSpecializationId(String(value))}
+              options={[
+                { value: "", label: "Выберите специализацию" },
+                ...SPECIALIZATION_OPTIONS.map((specialization) => ({
+                  value: String(specialization.id),
+                  label: specialization.title,
+                })),
+              ]}
+            />
             <AppButton className="primary wizard-inline-add-button wizard-inline-add-button--event" type="button" onClick={addSpecialization}>
               Добавить
             </AppButton>
@@ -255,7 +263,7 @@ export default function EventForm() {
         {specializations.map((specialization) => (
           <div key={specialization.id} className="tag">
             {specialization.title}
-            <AppButton type="button" onClick={() => removeSpecialization(specialization.id)} aria-label="Удалить специализацию">
+            <AppButton className="tag-remove" type="button" onClick={() => removeSpecialization(specialization.id)} aria-label="Удалить специализацию">
               x
             </AppButton>
           </div>
