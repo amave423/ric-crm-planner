@@ -27,10 +27,9 @@
 
   cursor: pointer;
 
-  img {
-    width: 22px;
-    height: 22px;
-    filter: none;
+  .anticon {
+    font-size: 18px;
+    line-height: 1;
   }
 
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
@@ -54,7 +53,7 @@
 }
 
 .create-btn.ant-btn:hover,
-.create-btn.ant-btn:focus {
+.create-btn.ant-btn:focus-visible {
   background: var(--row-border-color, var(--event-color, #6495ed)) !important;
   color: #fff !important;
   border-color: var(--row-border-color, var(--event-color, #6495ed)) !important;
@@ -69,9 +68,8 @@
   line-height: 0;
 }
 
-.create-btn.ant-btn:hover img,
-.create-btn.ant-btn:focus img {
-  filter: brightness(0) invert(1);
+.create-btn.ant-btn:focus:not(:focus-visible) {
+  box-shadow: none !important;
 }
 
 
