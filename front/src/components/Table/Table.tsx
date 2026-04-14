@@ -1,6 +1,5 @@
 import React, { useContext } from "react";
-import editIcon from "../../assets/icons/edit.svg";
-import infoIcon from "../../assets/icons/info.svg";
+import { FormOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { AuthContext } from "../../context/AuthContext";
 import "./table.scss";
 import AppButton from "../UI/Button";
@@ -97,7 +96,7 @@ export default function Table<T>({
                     onEdit(row);
                   }}
                 >
-                  <img src={editIcon} alt="edit" />
+                  <FormOutlined />
                 </AppButton>
               ) : !isOrganizer && onInfoClick ? (
                 <AppButton
@@ -108,7 +107,7 @@ export default function Table<T>({
                   }}
                   aria-label="Информация"
                 >
-                  <img src={infoIcon} alt="info" />
+                  <InfoCircleOutlined />
                 </AppButton>
               ) : null;
 

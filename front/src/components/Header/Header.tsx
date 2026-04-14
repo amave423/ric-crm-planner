@@ -2,13 +2,16 @@ import { useContext, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Dropdown } from "antd";
 import type { MenuProps } from "antd";
+import {
+  BarsOutlined,
+  BellOutlined,
+  LoginOutlined,
+  LogoutOutlined,
+  TeamOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
 import "../../styles/header.scss";
-import requestsIcon from "../../assets/icons/list.svg";
-import plannerIcon from "../../assets/icons/table.svg";
-import userIcon from "../../assets/icons/user.svg";
-import exitIcon from "../../assets/icons/exit.svg";
 import menuIcon from "../../assets/icons/menu.svg";
-import notificationIcon from "../../assets/icons/notification.svg";
 import { AuthContext } from "../../context/AuthContext";
 import { useNotifications } from "../../context/NotificationsContext";
 import Modal from "../Modal/Modal";
@@ -40,7 +43,7 @@ export default function Header() {
           label: (
             <span className="mobile-menu-entry">
               <span className="mobile-menu-entry__icon">
-                <img src={requestsIcon} alt="" />
+                <BarsOutlined />
               </span>
               <span>{user.role === "student" ? "Мои заявки" : "Заявки"}</span>
             </span>
@@ -51,7 +54,7 @@ export default function Header() {
           label: (
             <span className="mobile-menu-entry">
               <span className="mobile-menu-entry__icon">
-                <img src={plannerIcon} alt="" />
+                <TeamOutlined />
               </span>
               <span>Планировщик</span>
             </span>
@@ -62,7 +65,7 @@ export default function Header() {
           label: (
             <span className="mobile-menu-entry">
               <span className="mobile-menu-entry__icon">
-                <img src={userIcon} alt="" />
+                <UserOutlined />
               </span>
               <span>Профиль</span>
             </span>
@@ -139,12 +142,12 @@ export default function Header() {
         {user && (
           <>
             <AppButton className="head-btn head-btn--muted" onClick={() => navigate("/requests")}>
-              <img src={requestsIcon} alt="requests" />
+              <BarsOutlined />
               <span>{user.role === "student" ? "Мои заявки" : "Заявки"}</span>
             </AppButton>
 
             <AppButton className="head-btn head-btn--muted" onClick={() => navigate("/planner")}>
-              <img src={plannerIcon} alt="planner" />
+              <TeamOutlined />
               <span>Планировщик</span>
             </AppButton>
           </>
@@ -161,7 +164,7 @@ export default function Header() {
         {user ? (
           <>
             <div className="profile-box" onClick={() => navigate("/profile")}>
-              <img src={userIcon} alt="user" className="profile-icon" />
+              <UserOutlined className="profile-icon" />
               <div className="profile-text">
                 <div className="role">{user.role === "organizer" ? "Организатор" : "Проектант"}</div>
                 <div className="name">{user.name ? `${user.name} ${user.surname || ""}` : "Гость"}</div>
@@ -169,7 +172,7 @@ export default function Header() {
             </div>
 
             <AppButton className="head-btn head-btn--notify" onClick={openNotifications} aria-label="Центр уведомлений">
-              <img src={notificationIcon} alt="notifications" />
+              <BellOutlined />
               <span>Уведомления</span>
               {unreadCount > 0 && <span className="notify-dot" />}
             </AppButton>
@@ -182,12 +185,13 @@ export default function Header() {
                 navigate("/login");
               }}
             >
-              <img src={exitIcon} alt="exit" />
+              <LogoutOutlined />
               <span>Выйти</span>
             </AppButton>
           </>
         ) : (
           <AppButton className="head-btn head-btn--login" onClick={() => navigate("/login")}>
+            <LoginOutlined />
             <span>Войти</span>
           </AppButton>
         )}

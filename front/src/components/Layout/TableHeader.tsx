@@ -4,7 +4,6 @@ import { useContext } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import AppButton from "../UI/Button";
 import { AppSearch } from "../UI/Input";
-import searchIcon from "../../assets/icons/search.svg";
 
 interface Props {
   title: React.ReactNode;
@@ -41,7 +40,6 @@ export default function TableHeader({
             placeholder="Поиск..."
             value={search}
             onChange={(e) => onSearch?.(e.target.value)}
-            suffixIcon={<img className="search-box__icon" src={searchIcon} alt="" />}
           />
         </div>
       )}

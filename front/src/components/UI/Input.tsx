@@ -17,12 +17,8 @@ export function AppPassword({ className = "", variant = "filled", ...props }: Ap
   return <AntInput.Password {...props} variant={variant} className={`app-input app-input-password ${className}`.trim()} />;
 }
 
-export function AppSearch({ className = "", variant = "filled", allowClear = true, suffixIcon, ...props }: AppSearchProps) {
-  if (suffixIcon) {
-    return <AntInput {...props} allowClear={allowClear} suffix={suffixIcon} variant={variant} className={`app-input app-search ${className}`.trim()} />;
-  }
-
-  return <AntInput.Search {...props} allowClear={allowClear} variant={variant} className={`app-search ${className}`.trim()} />;
+export function AppSearch({ className = "", variant = "outlined", allowClear = true, suffixIcon: _suffixIcon, enterButton = true, ...props }: AppSearchProps) {
+  return <AntInput.Search {...props} allowClear={allowClear} enterButton={enterButton} variant={variant} className={`app-search ${className}`.trim()} />;
 }
 
 export function AppTextArea({ className = "", variant = "filled", ...props }: AppTextAreaProps) {

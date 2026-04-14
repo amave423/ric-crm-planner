@@ -1,4 +1,4 @@
-import chevron from "../../assets/icons/chevron-right.svg";
+import { ArrowLeftOutlined } from "@ant-design/icons";
 import "./back-button.scss";
 import AppButton from "./Button";
 
@@ -9,7 +9,7 @@ interface Props {
 export default function BackButton({ onClick }: Props) {
   return (
     <AppButton className="back-btn--icon" onClick={onClick}>
-      <img src={chevron} alt="back" />
+      <ArrowLeftOutlined />
     </AppButton>
   );
 }

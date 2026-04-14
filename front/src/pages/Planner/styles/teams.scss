@@ -401,9 +401,9 @@
   transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
 }
 
-.info-icon-btn img {
-  width: 26px;
-  height: 26px;
+.info-icon-btn .anticon {
+  font-size: 18px;
+  line-height: 1;
 }
 
 .info-icon-btn:hover {

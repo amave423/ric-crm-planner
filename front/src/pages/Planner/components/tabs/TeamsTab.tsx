@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { SyntheticEvent } from "react";
-import infoIcon from "../../../../assets/icons/info.svg";
+import { InfoCircleOutlined } from "@ant-design/icons";
 import type { PlannerState, PlannerTeam } from "../../../../types/planner";
 import type { User } from "../../../../types/user";
 import type { ApplicantsTreeNode, ProjectApplicantsGroup } from "../../planner.types";
@@ -288,7 +288,7 @@ export default function TeamsTab({
                   <div className="team-badge-stack">
                     <div className={`team-badge ${team.confirmed ? "ok" : "draft"}`}>{team.confirmed ? "Подтверждена" : "Черновик"}</div>
                     <AppButton className="info-icon-btn" type="button" onClick={() => onOpenTeamInfo(team.id)} aria-label="Информация о команде">
-                      <img src={infoIcon} alt="info" />
+                      <InfoCircleOutlined />
                     </AppButton>
                   </div>
                 )}

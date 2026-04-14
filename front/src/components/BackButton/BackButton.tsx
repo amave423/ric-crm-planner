@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
+import { ArrowLeftOutlined } from "@ant-design/icons";
 import "./back-btn.scss";
-import arrow from "../../assets/icons/chevron-right.svg";
 import AppButton from "../UI/Button";
 
 interface Props {
@@ -13,7 +13,7 @@ export default function BackButton({ to, label }: Props) {
 
   return (
     <AppButton className="back-btn back-btn--text" onClick={() => navigate(to)}>
-      <img src={arrow} alt="back" className="icon" />
+      <ArrowLeftOutlined className="icon" />
       <span>{label}</span>
     </AppButton>
   );
