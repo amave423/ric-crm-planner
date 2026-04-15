@@ -7,21 +7,13 @@ import { AuthProvider } from "./context/AuthContext";
 import "./styles/global.scss";
 import { ToastProvider } from "./components/Toast/ToastProvider";
 import { NotificationsProvider } from "./context/NotificationsContext";
+import { antdTheme } from "./theme/antdTheme";
 
 dayjs.locale("ru");
 
 export default function App() {
   return (
-    <ConfigProvider
-      locale={ruRU}
-      theme={{
-        token: {
-          colorPrimary: "#6495ed",
-          borderRadius: 10,
-          fontFamily: "Inter, sans-serif",
-        },
-      }}
-    >
+    <ConfigProvider locale={ruRU} theme={antdTheme}>
       <AuthProvider>
         <NotificationsProvider>
           <ToastProvider>
