@@ -7,11 +7,11 @@ import {
   BellOutlined,
   LoginOutlined,
   LogoutOutlined,
+  MenuOutlined,
   TeamOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import "../../styles/header.scss";
-import menuIcon from "../../assets/icons/menu.svg";
 import { AuthContext } from "../../context/AuthContext";
 import { useNotifications } from "../../context/NotificationsContext";
 import Modal from "../Modal/Modal";
@@ -135,7 +135,7 @@ export default function Header() {
             }}
           >
             <AppButton className="mobile-menu-btn" aria-label={mobileMenuOpen ? "Закрыть меню" : "Открыть меню"}>
-              <img src={menuIcon} alt="menu" />
+	              <MenuOutlined />
             </AppButton>
           </Dropdown>
         </div>

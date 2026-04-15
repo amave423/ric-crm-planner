@@ -240,15 +240,16 @@ export default function EventsPage() {
           const alreadyApplied = hasRequestForEvent(eventId);
           const isEnrollmentClosed = String(event.status || "").trim().toLowerCase() === "набор завершен";
 
-          if (isEnrollmentClosed) {
-            return <span className="event-apply-placeholder" />;
-          }
+	          if (isEnrollmentClosed) {
+	            return null;
+	          }
 
           return (
             <AppButton
-              type="button"
-              className={`event-apply-pill${alreadyApplied ? " is-disabled" : ""}`}
-              disabled={alreadyApplied}
+	              type="button"
+	              variant={alreadyApplied ? "dashed" : undefined}
+	              className={`event-apply-pill${alreadyApplied ? " event-apply-pill--submitted is-disabled" : ""}`}
+	              disabled={alreadyApplied}
               onClick={(clickEvent) => {
                 clickEvent.stopPropagation();
                 if (alreadyApplied) return;

@@ -1,4 +1,4 @@
-@import "../../styles/variables.scss";
+@use "../../styles/variables.scss" as *;
 
 .wizard-tab--event {
   --wizard-accent: var(--event-color, #6495ed);

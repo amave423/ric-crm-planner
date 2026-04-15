@@ -1,6 +1,6 @@
-@import "./variables.scss";
-@import "./typography.scss";
-@import "./responsive/index.scss";
+@use "./variables.scss" as *;
+@use "./typography.scss";
+@use "./responsive/index.scss";
 
 * {
   margin: 0;

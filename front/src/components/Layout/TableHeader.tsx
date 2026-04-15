@@ -1,6 +1,6 @@
 import "../../styles/table-header.scss";
-import plusIcon from "../../assets/icons/plus.svg";
 import { useContext } from "react";
+import { PlusOutlined } from "@ant-design/icons";
 import { AuthContext } from "../../context/AuthContext";
 import AppButton from "../UI/Button";
 import { AppSearch } from "../UI/Input";
@@ -30,7 +30,7 @@ export default function TableHeader({
 
         {isOrganizer && onCreate && (
           <AppButton className="create-btn" onClick={onCreate}>
-            <img src={plusIcon} alt="add" />
+            <PlusOutlined />
           </AppButton>
         )}
       </div>

@@ -1,29 +1,46 @@
 @media (max-width: 768px) {
   body .app-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
-    position: relative;
-    gap: 8px;
+    gap: 10px;
     margin: 8px;
     padding: 10px;
-    border-radius: 12px;
+    border-radius: 16px;
   }
 
   body .mobile-menu {
     display: block;
+    grid-column: 1;
+    justify-self: start;
   }
 
   body .mobile-menu-spacer {
     display: block;
-    width: 40px;
-    height: 40px;
-    flex: 0 0 40px;
+    grid-column: 1;
+    width: 46px;
+    height: 46px;
   }
 
   body .mobile-menu-btn {
-    width: 42px;
-    height: 42px;
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  body .mobile-menu-btn .anticon {
+    font-size: 22px;
+  }
+
+  body .mobile-menu-btn:hover,
+  body .mobile-menu-btn:focus-visible,
+  body .mobile-menu.open .mobile-menu-btn {
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   body .header-left {
@@ -31,10 +48,11 @@
   }
 
   body .header-center {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
+    grid-column: 2;
+    position: static;
+    transform: none;
     width: auto;
+    min-width: 0;
     justify-content: center;
     pointer-events: none;
     z-index: 1;
@@ -55,10 +73,11 @@
   }
 
   body .header-right {
+    grid-column: 3;
     width: auto;
     margin-left: 0;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 7px;
     flex-wrap: nowrap;
     z-index: 2;
   }
@@ -69,18 +88,42 @@
 
   body .head-btn {
     white-space: nowrap;
-    border-radius: 10px;
-    min-height: 40px;
+    border-radius: 14px;
+    min-height: 46px;
     padding: 8px 10px;
   }
 
-  body .head-btn span {
+  body .head-btn > span:not(.anticon):not(.ant-badge):not(.notification-badge) {
     font-size: 13px;
   }
 
-  body .head-btn--notify {
-    min-width: 40px;
+  body .head-btn--notify,
+  body .head-btn--danger {
+    width: 46px;
+    min-width: 46px;
+    height: 46px;
+    padding: 0 !important;
     justify-content: center;
+  }
+
+  body .head-btn--notify > span:not(.anticon):not(.ant-badge):not(.notification-badge),
+  body .head-btn--danger > span:not(.anticon):not(.ant-badge):not(.notification-badge) {
+    display: none;
+  }
+
+  body .head-btn--notify .anticon,
+  body .head-btn--danger .anticon {
+    font-size: 20px;
+  }
+
+  body .notification-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  body .notification-badge .anticon {
+    display: inline-flex;
   }
 
   body .app-header--guest .head-btn--login {
@@ -96,15 +139,15 @@
     padding: 8px;
   }
 
-  body .header-right .head-btn span {
+  body .header-right .head-btn > span:not(.anticon):not(.ant-badge):not(.notification-badge) {
     display: none;
   }
 
-  body .header-right .head-btn--notify span {
+  body .header-right .head-btn--notify > span:not(.anticon):not(.ant-badge):not(.notification-badge) {
     display: none;
   }
 
-  body .header-right .head-btn--login span {
+  body .header-right .head-btn--login > span:not(.anticon) {
     display: inline;
   }
 

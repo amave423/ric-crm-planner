@@ -58,8 +58,9 @@ export default function Table<T>({
   const columnKeys = columns.map((column) => column.key);
   const isEventMobileLayout = ["title", "startDate", "endDate", "organizer", "status"].every((key) => columnKeys.includes(key));
   const isDirectionMobileLayout = ["title", "organizer"].every((key) => columnKeys.includes(key)) && !isEventMobileLayout;
-  const isProjectMobileLayout = ["title", "curator"].every((key) => columnKeys.includes(key)) && !isEventMobileLayout;
-  const isRequestMobileLayout = ["studentName", "event", "specialization", "status"].every((key) => columnKeys.includes(key));
+	  const isProjectMobileLayout = ["title", "curator"].every((key) => columnKeys.includes(key)) && !isEventMobileLayout;
+	  const isRequestMobileLayout = ["studentName", "event", "specialization", "status"].every((key) => columnKeys.includes(key));
+	  const hasApplyColumn = columnKeys.includes("apply");
 
   const template = buildGridTemplate(columns, hasActionColumn, gridColumns);
   const gridStyle = { "--table-grid": template } as React.CSSProperties;
@@ -114,7 +115,7 @@ export default function Table<T>({
             const isActiveStatus = normalizedStatus === "активно";
             const isClosedEnrollmentStatus = normalizedStatus === "набор завершен";
             const statusCustom = renderCell?.(row, "status");
-            const eventApplyCustom = renderCell?.(row, "apply");
+	            const eventApplyCustom = hasApplyColumn ? renderCell?.(row, "apply") : undefined;
 
             const actionButton =
               isOrganizer && onEdit ? (
@@ -200,8 +201,8 @@ export default function Table<T>({
                   </div>
                 )}
 
-                {isEventMobileLayout && (
-                  <div className="event-card-mobile">
+	                {isEventMobileLayout && (
+	                  <div className={`event-card-mobile${eventApplyCustom === undefined && actionButton ? " event-card-mobile--has-icon-action" : ""}`}>
                     <div className="event-card-mobile__main">
                       <div className="event-card-mobile__title">{toDisplay(rowRecord.title)}</div>
 
@@ -228,17 +229,17 @@ export default function Table<T>({
                       </div>
                     </div>
 
-                    {(eventApplyCustom !== undefined || actionButton) && (
-                      <div className="event-card-mobile__action">
-                        <div className="event-card-mobile__divider" />
-                        {eventApplyCustom !== undefined ? eventApplyCustom : actionButton}
-                      </div>
-                    )}
-                  </div>
-                )}
+	                    {(eventApplyCustom != null || actionButton) && (
+	                      <div className={`event-card-mobile__action${eventApplyCustom != null ? " event-card-mobile__action--apply" : " event-card-mobile__action--icon"}`}>
+	                        <div className="event-card-mobile__divider" />
+	                        {eventApplyCustom != null ? eventApplyCustom : actionButton}
+	                      </div>
+	                    )}
+	                  </div>
+	                )}
 
-                {isDirectionMobileLayout && (
-                  <div className="event-card-mobile">
+	                {isDirectionMobileLayout && (
+	                  <div className={`event-card-mobile${actionButton ? " event-card-mobile--has-icon-action" : ""}`}>
                     <div className="event-card-mobile__main">
                       <div className="event-card-mobile__title">{toDisplay(rowRecord.title)}</div>
                       <div className="event-card-mobile__row event-card-mobile__row--single">
@@ -249,17 +250,17 @@ export default function Table<T>({
                       </div>
                     </div>
 
-                    {actionButton && (
-                      <div className="event-card-mobile__action">
-                        <div className="event-card-mobile__divider" />
-                        {actionButton}
-                      </div>
+	                    {actionButton && (
+	                      <div className="event-card-mobile__action event-card-mobile__action--icon">
+	                        <div className="event-card-mobile__divider" />
+	                        {actionButton}
+	                      </div>
                     )}
                   </div>
                 )}
 
-                {isProjectMobileLayout && (
-                  <div className="event-card-mobile">
+	                {isProjectMobileLayout && (
+	                  <div className={`event-card-mobile${actionButton ? " event-card-mobile--has-icon-action" : ""}`}>
                     <div className="event-card-mobile__main">
                       <div className="event-card-mobile__title">{toDisplay(rowRecord.title)}</div>
                       <div className="event-card-mobile__row event-card-mobile__row--single">
@@ -270,10 +271,10 @@ export default function Table<T>({
                       </div>
                     </div>
 
-                    {actionButton && (
-                      <div className="event-card-mobile__action">
-                        <div className="event-card-mobile__divider" />
-                        {actionButton}
+	                    {actionButton && (
+	                      <div className="event-card-mobile__action event-card-mobile__action--icon">
+	                        <div className="event-card-mobile__divider" />
+	                        {actionButton}
                       </div>
                     )}
                   </div>

@@ -1,4 +1,4 @@
-@import "./variables.scss";
+@use "./variables.scss" as *;
 
 .ui-button {
   padding: 10px 18px;

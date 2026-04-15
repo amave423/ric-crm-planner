@@ -1,5 +1,5 @@
-@import "./variables.scss";
-@import "./typography.scss";
+@use "./variables.scss" as *;
+@use "./typography.scss";
 
 .profile-page {
   padding: 20px;

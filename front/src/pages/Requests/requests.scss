@@ -294,6 +294,12 @@
     width: 100%;
   }
 
+  .requests-view-toggle.ant-segmented {
+    justify-self: center;
+    width: auto;
+    min-width: 0;
+  }
+
   .requests-toolbar__filters {
     grid-template-columns: 1fr;
   }

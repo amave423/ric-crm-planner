@@ -1,5 +1,5 @@
-@import "./variables.scss";
-@import "./typography.scss";
+@use "./variables.scss" as *;
+@use "./typography.scss";
 
 .auth-container {
   width: 550px;

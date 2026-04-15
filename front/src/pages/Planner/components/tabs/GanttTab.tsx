@@ -29,6 +29,7 @@ const viewModes = [
 ] as const;
 
 const LIST_CELL_WIDTH = 240;
+const MOBILE_LIST_CELL_WIDTH = 148;
 const PRE_STEPS_COUNT = 1;
 
 function parsePlannerDate(value: string): Date {
@@ -254,17 +255,18 @@ export default function GanttTab({ activeTeamName, parents, subtasks, displayAss
   }, [collapsedParents, displayAssigneeLabel, parents, subtasks]);
 
   const ganttTasks = useMemo(() => cloneTasksForGanttView(tasks), [tasks]);
+  const listCellWidth = surfaceWidth > 0 && surfaceWidth <= 640 ? MOBILE_LIST_CELL_WIDTH : LIST_CELL_WIDTH;
 
   const columnWidth = useMemo(() => {
     const baseWidth = getColumnWidth(viewMode);
     if (!surfaceWidth || ganttTasks.length === 0) return baseWidth;
 
-    const timelineWidth = Math.max(surfaceWidth - LIST_CELL_WIDTH, 0);
+    const timelineWidth = Math.max(surfaceWidth - listCellWidth, 0);
     if (!timelineWidth) return baseWidth;
 
     const dateCount = getGanttDateCount(ganttTasks, viewMode, PRE_STEPS_COUNT);
     return Math.max(baseWidth, Math.floor(timelineWidth / dateCount));
-  }, [ganttTasks, surfaceWidth, viewMode]);
+  }, [ganttTasks, listCellWidth, surfaceWidth, viewMode]);
 
   const replaceWeekLabels = useCallback(() => {
     if (viewMode !== ViewMode.Week) return;
@@ -486,7 +488,7 @@ export default function GanttTab({ activeTeamName, parents, subtasks, displayAss
             tasks={ganttTasks}
             viewMode={viewMode}
             locale="ru"
-            listCellWidth={`${LIST_CELL_WIDTH}px`}
+            listCellWidth={`${listCellWidth}px`}
             columnWidth={columnWidth}
             rowHeight={44}
             ganttHeight={420}
