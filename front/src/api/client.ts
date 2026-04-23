@@ -1,10 +1,11 @@
-interface AppImportMetaEnv {
+﻿interface AppImportMetaEnv {
   VITE_API_BASE?: string;
   VITE_USE_MOCK?: string;
 }
 
 type UnknownRecord = Record<string, unknown>;
 type RequestBody = unknown;
+const LS_CURRENT_USER = "currentUser";
 
 const ENV = (import.meta as ImportMeta & { env?: AppImportMetaEnv }).env ?? {};
 const API_BASE = ENV.VITE_API_BASE || "";
@@ -95,6 +96,7 @@ async function parseResponse(res: Response): Promise<unknown> {
 let refreshingPromise: Promise<boolean> | null = null;
 
 async function doRefresh(): Promise<boolean> {
+  if (!localStorage.getItem(LS_CURRENT_USER)) return false;
   if (refreshingPromise) return refreshingPromise;
   refreshingPromise = (async () => {
     try {
@@ -154,7 +156,7 @@ async function request<T = unknown>(path: string, options: RequestOptions = {}):
 
   let res = await fetch(url, init as RequestInit);
 
-  if (res.status === 401) {
+  if (res.status === 401 && localStorage.getItem(LS_CURRENT_USER)) {
     const ok = await doRefresh();
     if (ok) {
       if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
@@ -223,3 +225,6 @@ export default {
   logout,
   doRefresh,
 };
+
+
+

@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { getEventById, removeEvent as apiRemoveEvent, saveEvent as persistEvent } from "../../../api/events";
 import { SPECIALIZATION_OPTIONS } from "../../../constants/specializations";
+import { getEventById, removeEvent as apiRemoveEvent, saveEvent as persistEvent } from "../../../api/events";
 import { getAllUsers } from "../../../storage/storage";
 import type { Event } from "../../../types/event";
 import type { User } from "../../../types/user";
-import Modal from "../../Modal/Modal";
-import { useToast } from "../../Toast/ToastProvider";
-import DateField, { DateRangeField } from "../../UI/DateField";
-import { useWizard } from "../EventWizardModal";
 import AppButton from "../../UI/Button";
+import DateField, { DateRangeField } from "../../UI/DateField";
 import AppInput, { AppTextArea } from "../../UI/Input";
+import Modal from "../../Modal/Modal";
 import AppSelect from "../../UI/Select";
+import { useToast } from "../../Toast/ToastProvider";
+import { useWizard } from "../EventWizardModal";
 
-interface Specialization {
+interface SpecializationOption {
   id: number;
   title: string;
 }
@@ -27,21 +27,49 @@ function FieldWrap({ name, errors, children }: { name: string; errors: Record<st
   );
 }
 
+function normalizeDateFieldValue(value?: string) {
+  if (!value) return "";
+  return value.includes("T") ? value.slice(0, 10) : value;
+}
+
+function extractErrorMessage(error: unknown) {
+  if (typeof error === "string" && error.trim()) return error;
+
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    if (typeof record.message === "string" && record.message.trim()) return record.message;
+
+    const parts = Object.values(record)
+      .flatMap((value) => {
+        if (typeof value === "string") return [value];
+        if (Array.isArray(value)) {
+          return value.filter((item): item is string => typeof item === "string");
+        }
+        return [];
+      })
+      .filter((part) => part.trim());
+
+    if (parts.length > 0) return parts.join(" ");
+  }
+
+  return "Ошибка при сохранении мероприятия";
+}
+
 export default function EventForm() {
   const { mode, saveEvent, savedEvent, eventId } = useWizard();
   const seededEvent = savedEvent as Event | undefined;
   const { showToast } = useToast();
 
+  const [title, setTitle] = useState("");
   const [description, setDescription] = useState(seededEvent?.description ?? "");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [applyDeadline, setApplyDeadline] = useState("");
   const [leader, setLeader] = useState<string>("");
-  const [specializations, setSpecializations] = useState<Specialization[]>([]);
+  const [specializations, setSpecializations] = useState<SpecializationOption[]>([]);
   const [selectedSpecializationId, setSelectedSpecializationId] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [title, setTitle] = useState("");
   const [usersList, setUsersList] = useState<User[]>([]);
 
   useEffect(() => {
@@ -78,11 +106,11 @@ export default function EventForm() {
     const fillState = (event: Event) => {
       setTitle(event.title || "");
       setDescription(event.description || "");
-      setStartDate(event.startDate || "");
-      setEndDate(event.endDate || "");
-      setApplyDeadline(event.applyDeadline || "");
+      setStartDate(normalizeDateFieldValue(event.startDate));
+      setEndDate(normalizeDateFieldValue(event.endDate));
+      setApplyDeadline(normalizeDateFieldValue(event.applyDeadline));
       setLeader(String(event.leader ?? ""));
-      setSpecializations(event.specializations || []);
+      setSpecializations((event.specializations || []).map((item) => ({ id: item.id, title: item.title })));
       setSelectedSpecializationId("");
     };
 
@@ -125,9 +153,15 @@ export default function EventForm() {
     if (!selected) return;
 
     setSpecializations((prev) => {
-      if (prev.some((item) => Number(item.id) === Number(selected.id) || item.title.trim().toLowerCase() === selected.title.trim().toLowerCase())) {
+      if (
+        prev.some(
+          (item) =>
+            Number(item.id) === Number(selected.id) || item.title.trim().toLowerCase() === selected.title.trim().toLowerCase()
+        )
+      ) {
         return prev;
       }
+
       return [...prev, selected];
     });
 
@@ -178,8 +212,8 @@ export default function EventForm() {
       const saved = await persistEvent(payload);
       saveEvent?.(saved);
       showToast("success", "Мероприятие сохранено");
-    } catch {
-      showToast("error", "Ошибка при сохранении мероприятия");
+    } catch (error) {
+      showToast("error", extractErrorMessage(error));
     }
   };
 
@@ -190,12 +224,7 @@ export default function EventForm() {
       <FieldWrap name="title" errors={errors}>
         <label className="text-small">
           Название мероприятия
-          <AppInput
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-          />
+          <AppInput value={title} onChange={(event) => setTitle(event.target.value)} autoComplete="off" spellCheck={false} />
         </label>
       </FieldWrap>
 
@@ -203,11 +232,12 @@ export default function EventForm() {
         Описание
         <AppTextArea value={description} onChange={(event) => setDescription(event.target.value)} />
       </label>
+
       <div className="date-row">
         <div className={`field-wrap ${errors.startDate || errors.endDate ? "error" : ""}`}>
           <DateRangeField
             className="app-date-range-field--compact"
-            label={"Дата начала и завершения"}
+            label="Дата начала и завершения"
             startValue={startDate}
             endValue={endDate}
             placeholders={["Дата начала", "Дата завершения"]}
@@ -220,7 +250,7 @@ export default function EventForm() {
         </div>
 
         <FieldWrap name="applyDeadline" errors={errors}>
-          <DateField label={"Срок приёма заявок"} value={applyDeadline} onChange={setApplyDeadline} placeholder="Срок приёма" />
+          <DateField label="Срок приёма заявок" value={applyDeadline} onChange={setApplyDeadline} placeholder="Срок приёма" />
         </FieldWrap>
       </div>
 
@@ -258,7 +288,12 @@ export default function EventForm() {
                 })),
               ]}
             />
-            <AppButton className="primary wizard-inline-add-button wizard-inline-add-button--event" type="button" onClick={addSpecialization}>
+            <AppButton
+              className="primary wizard-inline-add-button wizard-inline-add-button--event"
+              type="button"
+              onClick={addSpecialization}
+              disabled={!selectedSpecializationId}
+            >
               Добавить
             </AppButton>
           </div>
@@ -269,7 +304,12 @@ export default function EventForm() {
         {specializations.map((specialization) => (
           <div key={specialization.id} className="tag">
             {specialization.title}
-            <AppButton className="tag-remove" type="button" onClick={() => removeSpecialization(specialization.id)} aria-label="Удалить специализацию">
+            <AppButton
+              className="tag-remove"
+              type="button"
+              onClick={() => removeSpecialization(specialization.id)}
+              aria-label="Удалить специализацию"
+            >
               x
             </AppButton>
           </div>
@@ -282,6 +322,7 @@ export default function EventForm() {
             Удалить
           </AppButton>
         )}
+
         <AppButton className="primary" onClick={handleSave} type="button">
           Сохранить мероприятие
         </AppButton>

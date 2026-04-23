@@ -371,8 +371,8 @@ export default function RequestsPage() {
               );
             }
 
-	            if (user?.role === "student" && client.USE_MOCK) {
-	              const canWithdraw = row.status !== REQUEST_STATUS.STARTED;
+		            if (user?.role === "student") {
+		              const canWithdraw = row.status !== REQUEST_STATUS.STARTED;
 
 	              return (
 	                <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>

@@ -1,4 +1,4 @@
-import client from "../api/client";
+﻿import client from "../api/client";
 import seedDirections from "../mock-data/directions.json";
 import seedEvents from "../mock-data/events.json";
 import seedProfile from "../mock-data/profile.json";
@@ -243,6 +243,7 @@ export async function saveProjectsForDirection(directionId: number, projects: Pr
 
 export async function getAllUsers(): Promise<User[]> {
   if (!USE_MOCK) {
+    if (!localStorage.getItem("currentUser")) return [];
     try {
       return await client.get("/api/users/");
     } catch {
@@ -273,6 +274,7 @@ export async function saveUser(user: User): Promise<User> {
 
 export async function getProfile(userId: number): Promise<UnknownRecord | undefined> {
   if (!USE_MOCK) {
+    if (!localStorage.getItem("currentUser")) return undefined;
     try {
       return await client.get("/api/users/profile/");
     } catch {
@@ -292,3 +294,6 @@ export async function saveProfile(userId: number, profile: UnknownRecord) {
   writeLS(LS_PROFILES, profiles);
   return profiles[String(userId)];
 }
+
+
+

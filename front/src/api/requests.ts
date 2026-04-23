@@ -194,8 +194,9 @@ export async function getRequests(options: GetRequestsOptions = {}): Promise<Req
     if (!Array.isArray(raw)) return [];
 
     const mapped = (raw as BackendRequest[]).map((x) => mapBackendRequest(x, statuses));
+    const shouldFilterByOwner = options.role === "student" && typeof options.ownerId !== "undefined";
     const filtered =
-      typeof options.ownerId === "undefined"
+      !shouldFilterByOwner
         ? mapped
         : mapped.filter((r) => Number(r.ownerId) === Number(options.ownerId));
 
@@ -284,4 +285,3 @@ export async function removeRequest(id: number) {
   removeBackendRequestFromCache(id);
   return result;
 }
-

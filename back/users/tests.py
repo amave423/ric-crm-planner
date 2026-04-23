@@ -1,6 +1,4 @@
 from datetime import timedelta
-from unittest.mock import patch
-
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.tokens import default_token_generator
@@ -50,7 +48,7 @@ class SerializerTests(TestCase):
             is_active=True,
         )
 
-    def test_register_user_serializer_creates_inactive_user_and_sends_email(self):
+    def test_register_user_serializer_creates_active_user(self):
         data = {
             "email": "new@example.com",
             "first_name": "New",
@@ -59,14 +57,12 @@ class SerializerTests(TestCase):
             "password_confirmation": self.password,
         }
 
-        with patch("users.serializers.send_mail") as mocked_send_mail:
-            serializer = RegisterUserSerializer(data=data)
-            self.assertTrue(serializer.is_valid(), serializer.errors)
-            user = serializer.save()
+        serializer = RegisterUserSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        user = serializer.save()
 
-        self.assertFalse(user.is_active)
+        self.assertTrue(user.is_active)
         self.assertEqual(user.username, data["email"])
-        mocked_send_mail.assert_called_once()
 
     def test_register_user_serializer_checks_password_confirmation(self):
         serializer = RegisterUserSerializer(
@@ -81,6 +77,20 @@ class SerializerTests(TestCase):
 
         self.assertFalse(serializer.is_valid())
         self.assertIn("password_confirmation", serializer.errors)
+
+    def test_register_user_serializer_rejects_duplicate_email(self):
+        serializer = RegisterUserSerializer(
+            data={
+                "email": self.user.email,
+                "first_name": "Dup",
+                "last_name": "User",
+                "password": self.password,
+                "password_confirmation": self.password,
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("email", serializer.errors)
 
     def test_login_user_serializer_validates_credentials(self):
         serializer = LoginUserSerializer(
@@ -221,6 +231,22 @@ class ViewTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("access_token", response.cookies)
         self.assertIn("refresh_token", response.cookies)
+
+    def test_registration_view_returns_400_for_duplicate_email(self):
+        response = self.client.post(
+            reverse("registration"),
+            {
+                "email": self.projectant.email,
+                "first_name": "Duplicate",
+                "last_name": "User",
+                "password": self.password,
+                "password_confirmation": self.password,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)
 
     def test_cookie_token_refresh_issues_new_access_token(self):
         refresh = RefreshToken.for_user(self.projectant)

@@ -52,6 +52,9 @@ class Profile(models.Model):
     university = models.CharField(max_length=255, blank=True)
     vk = models.CharField(max_length=255, blank=True)
     job = models.CharField(max_length=255, blank=True)
+    workplace = models.CharField(max_length=255, blank=True)
+    specialty = models.CharField(max_length=255, blank=True)
+    about = models.TextField(blank=True)
     password_reset_token = models.CharField(max_length=255, blank=True, null=True)
     password_reset_token_created = models.DateTimeField(blank=True, null=True)
 
@@ -140,6 +143,13 @@ class Event(models.Model):
         null=True,
         blank=True,
         related_name="events",
+    )
+    leader = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lead_events",
     )
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
@@ -304,6 +314,27 @@ class Application(models.Model):
 
     def __str__(self):
         return f"Заявка #{self.id} — {self.user}"
+
+
+class Notification(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="crm_notifications",
+    )
+    title = models.CharField(max_length=255)
+    message = models.TextField(blank=True)
+    link = models.CharField(max_length=500, blank=True)
+    read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "CRM_NOTIFICATION"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"Уведомление #{self.id} для {self.user}"
 
 
 class Test(models.Model):

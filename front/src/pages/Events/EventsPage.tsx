@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../../api/client";
 import { getEvents } from "../../api/events";
@@ -26,19 +26,6 @@ interface TestingImportMetaEnv {
 const TESTING_BASE_URL =
   ((import.meta as ImportMeta & { env?: TestingImportMetaEnv }).env?.VITE_TESTING_URL || "").trim() || "https://example.com/testing";
 
-const EVENT_TEXT = {
-  newRequestTitle: "\u041d\u043e\u0432\u0430\u044f \u0437\u0430\u044f\u0432\u043a\u0430",
-  studentFallback: "\u0421\u0442\u0443\u0434\u0435\u043d\u0442",
-  eventFallback: "\u043c\u0435\u0440\u043e\u043f\u0440\u0438\u044f\u0442\u0438\u0435",
-  submittedToEvent:
-    "\u043f\u043e\u0434\u0430\u043b(\u0430) \u0437\u0430\u044f\u0432\u043a\u0443 \u043d\u0430 \u043c\u0435\u0440\u043e\u043f\u0440\u0438\u044f\u0442\u0438\u0435",
-} as const;
-
-function toPositiveNumber(value: unknown) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
-
 function buildTestingUrl(req: RequestType) {
   try {
     const url = new URL(TESTING_BASE_URL, window.location.origin);
@@ -49,6 +36,47 @@ function buildTestingUrl(req: RequestType) {
   } catch {
     return TESTING_BASE_URL;
   }
+}
+
+function extractErrorMessage(error: unknown): string | undefined {
+  if (!error) return undefined;
+  if (typeof error === "string") return error;
+
+  if (Array.isArray(error)) {
+    const firstText = error.find((item) => typeof item === "string" && item.trim());
+    return typeof firstText === "string" ? firstText : undefined;
+  }
+
+  if (typeof error !== "object") return undefined;
+
+  const record = error as Record<string, unknown>;
+  const preferredKeys = ["detail", "message", "event", "direction", "project", "specialization", "non_field_errors", "nonFieldErrors"];
+
+  for (const key of preferredKeys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value;
+    if (Array.isArray(value)) {
+      const firstText = value.find((item) => typeof item === "string" && item.trim());
+      if (typeof firstText === "string") return firstText;
+    }
+  }
+
+  for (const value of Object.values(record)) {
+    if (typeof value === "string" && value.trim()) return value;
+    if (Array.isArray(value)) {
+      const firstText = value.find((item) => typeof item === "string" && item.trim());
+      if (typeof firstText === "string") return firstText;
+    }
+  }
+
+  return undefined;
+}
+
+function isApplyDeadlineExpired(event?: Event | null): boolean {
+  if (!event?.applyDeadline) return false;
+  const deadline = new Date(event.applyDeadline);
+  if (Number.isNaN(deadline.getTime())) return false;
+  return deadline.getTime() < Date.now();
 }
 
 function filterEventsByQuery(items: Event[], query: string) {
@@ -153,14 +181,12 @@ export default function EventsPage() {
   const startTestingScenario = async () => {
     if (!pendingRequest?.id) return;
 
-    try {
-      if (client.USE_MOCK) {
+      try {
         await updateRequestStatus(Number(pendingRequest.id), REQUEST_STATUS.TESTING);
-      }
 
-      const link = client.USE_MOCK
-        ? buildMockRequestTransitionUrl(Number(pendingRequest.id), REQUEST_STATUS.JOINED_CHAT, "testing")
-        : buildTestingUrl(pendingRequest);
+        const link = client.USE_MOCK
+          ? buildMockRequestTransitionUrl(Number(pendingRequest.id), REQUEST_STATUS.JOINED_CHAT, "testing")
+          : buildTestingUrl(pendingRequest);
 
       addNotification({
         userId: user?.id,
@@ -239,6 +265,7 @@ export default function EventsPage() {
           const eventId = Number(event.id);
           const alreadyApplied = hasRequestForEvent(eventId);
           const isEnrollmentClosed = String(event.status || "").trim().toLowerCase() === "набор завершен";
+          const isApplyClosed = isApplyDeadlineExpired(event);
 
 	          if (isEnrollmentClosed) {
 	            return null;
@@ -247,17 +274,17 @@ export default function EventsPage() {
           return (
             <AppButton
 	              type="button"
-	              variant={alreadyApplied ? "dashed" : undefined}
-	              className={`event-apply-pill${alreadyApplied ? " event-apply-pill--submitted is-disabled" : ""}`}
-	              disabled={alreadyApplied}
+	              variant={alreadyApplied || isApplyClosed ? "dashed" : undefined}
+	              className={`event-apply-pill${alreadyApplied || isApplyClosed ? " event-apply-pill--submitted is-disabled" : ""}`}
+	              disabled={alreadyApplied || isApplyClosed}
               onClick={(clickEvent) => {
                 clickEvent.stopPropagation();
-                if (alreadyApplied) return;
+                if (alreadyApplied || isApplyClosed) return;
                 setSelectedEvent(event);
                 setApplyOpen(true);
               }}
             >
-              {alreadyApplied ? "Заявка отправлена" : "Подать заявку"}
+              {alreadyApplied ? "Заявка отправлена" : isApplyClosed ? "Прием заявок завершен" : "Подать заявку"}
             </AppButton>
           );
         }}
@@ -282,6 +309,10 @@ export default function EventsPage() {
         specializations={selectedEvent?.specializations || []}
         onSubmit={async (request) => {
           if (!user?.id || !selectedEvent?.id) return false;
+          if (isApplyDeadlineExpired(selectedEvent)) {
+            showToast("error", "Прием заявок на это мероприятие уже завершен.");
+            return false;
+          }
 
           if (hasRequestForEvent(Number(selectedEvent.id))) {
             showToast("error", "Вы уже отправляли заявку на это мероприятие");
@@ -295,19 +326,6 @@ export default function EventsPage() {
               eventId: selectedEvent.id,
               eventTitle: selectedEvent.title,
             });
-            const organizerUserId = toPositiveNumber(selectedEvent.leader);
-
-            if (organizerUserId) {
-              const studentName = created.studentName || request.studentName || EVENT_TEXT.studentFallback;
-              const eventTitle = selectedEvent.title || created.eventTitle || EVENT_TEXT.eventFallback;
-
-              addNotification({
-                userId: organizerUserId,
-                title: EVENT_TEXT.newRequestTitle,
-                message: `${studentName} ${EVENT_TEXT.submittedToEvent} "${eventTitle}".`,
-                link: "/requests",
-              });
-            }
 
             setPendingRequest(created);
             setTestingPromptStep("ask");
@@ -315,8 +333,8 @@ export default function EventsPage() {
             showToast("success", "Заявка отправлена");
             await refreshRequests();
             return true;
-          } catch {
-            showToast("error", "Ошибка при отправке заявки");
+          } catch (error) {
+            showToast("error", extractErrorMessage(error) || "Ошибка при отправке заявки");
             return false;
           }
         }}

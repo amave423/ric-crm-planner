@@ -90,7 +90,7 @@ DATABASES = {
         "USER": os.getenv("DB_USER", "crm_user"),
         "PASSWORD": os.getenv("DB_PASSWORD", "strong_password_here"),
         "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "5433"),
+        "PORT": os.getenv("DB_PORT", "5432"),
     }
 }
 
@@ -127,7 +127,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ru'
 
 TIME_ZONE = 'UTC'
 

@@ -18,14 +18,15 @@ from rest_framework.generics import (
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.mixins import CreateModelMixin
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from users.permissions import (
     CuratorOrAdminPermission,
+    PublicReadCuratorAdminWritePermission,
     ProjectantOnlyPermission,
-    ProjectantReadCuratorAdminWritePermission,
 )
 from users.serializers import (
     ApplicationCreateSerializer,
@@ -34,6 +35,8 @@ from users.serializers import (
     EmailConfirmationSerializer,
     EventSerializer,
     LoginUserSerializer,
+    NotificationCreateSerializer,
+    NotificationSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     ProfileSerializer,
@@ -47,6 +50,7 @@ from users.models import (
     Application,
     Direction,
     Event,
+    Notification,
     Profile,
     Project,
     Specialization,
@@ -60,6 +64,7 @@ TAG_EVENTS = "Events"
 TAG_DIRECTIONS = "Directions"
 TAG_PROJECTS = "Projects"
 TAG_APPLICATIONS = "Applications"
+TAG_NOTIFICATIONS = "Уведомления"
 TAG_REFERENCE = "Reference"
 
 MESSAGE_RESPONSE_SCHEMA = openapi.Schema(
@@ -403,6 +408,9 @@ class ProfileView(RetrieveUpdateAPIView):
                 "university": "",
                 "vk": "",
                 "job": "",
+                "workplace": "",
+                "specialty": "",
+                "about": "",
             },
         )
         return profile
@@ -428,9 +436,9 @@ class ProfileView(RetrieveUpdateAPIView):
     ),
 )
 class EventListCreateView(ListCreateAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = EventSerializer
-    queryset = Event.objects.all()
+    queryset = Event.objects.select_related("leader", "specialization")
     lookup_url_kwarg = "event_id"
 
 
@@ -473,9 +481,9 @@ class EventListCreateView(ListCreateAPIView):
     ),
 )
 class EventDetailView(RetrieveUpdateDestroyAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = EventSerializer
-    queryset = Event.objects.all()
+    queryset = Event.objects.select_related("leader", "specialization")
     lookup_url_kwarg = "event_id"
 
 @method_decorator(
@@ -527,12 +535,12 @@ class SpecializationListView(ListAPIView):
     ),
 )
 class DirectionListCreateView(ListCreateAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = DirectionSerializer
 
     def get_queryset(self):
         event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
-        return Direction.objects.filter(event=event)
+        return Direction.objects.filter(event=event).select_related("event", "leader")
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -579,13 +587,13 @@ class DirectionListCreateView(ListCreateAPIView):
     ),
 )
 class DirectionDetailView(RetrieveUpdateDestroyAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = DirectionSerializer
     lookup_url_kwarg = "direction_id"
 
     def get_queryset(self):
         event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
-        return Direction.objects.filter(event=event)
+        return Direction.objects.filter(event=event).select_related("event", "leader")
 
 @method_decorator(
     name="get",
@@ -607,7 +615,7 @@ class DirectionDetailView(RetrieveUpdateDestroyAPIView):
     ),
 )
 class ProjectListCreateView(ListCreateAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = ProjectSerializer
 
     def get_queryset(self):
@@ -615,7 +623,10 @@ class ProjectListCreateView(ListCreateAPIView):
         direction = get_object_or_404(
             Direction, pk=self.kwargs.get("direction_id"), event=event
         )
-        return Project.objects.filter(direction=direction)
+        return Project.objects.filter(direction=direction).select_related(
+            "direction", "curator", "direction__event"
+        )
+        
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -666,7 +677,7 @@ class ProjectListCreateView(ListCreateAPIView):
     ),
 )
 class ProjectDetailView(RetrieveUpdateDestroyAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = ProjectSerializer
     lookup_url_kwarg = "project_id"
     queryset = Project.objects.select_related("direction", "curator", "direction__event")
@@ -691,7 +702,7 @@ class ProjectDetailView(RetrieveUpdateDestroyAPIView):
     ),
 )
 class UserProjectListCreateView(ListCreateAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = ProjectSerializer
     queryset = Project.objects.select_related("direction", "curator", "direction__event")
 
@@ -706,7 +717,7 @@ class UserProjectListCreateView(ListCreateAPIView):
     ),
 )
 class UserDirectionListView(ListAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = DirectionSerializer
     queryset = Direction.objects.select_related("event", "leader")
 
@@ -788,9 +799,17 @@ class ApplicationListView(ListCreateAPIView):
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        output = ApplicationSerializer(instance, context=self.get_serializer_context())
+        headers = self.get_success_headers(output.data)
+        return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
+
     def get_queryset(self):
         queryset = Application.objects.select_related(
-            "user", "direction", "event", "specialization", "status"
+            "user", "direction", "event", "project", "specialization", "status"
         ).order_by("-date_sub")
         
         if not CuratorOrAdminPermission().has_permission(self.request, self):
@@ -824,8 +843,8 @@ class ApplicationListView(ListCreateAPIView):
     def get_serializer_context(self):
         context = super().get_serializer_context()
         if self.request.method.lower() == "post":
-            event_id = self.request.data.get("event")
-            direction_id = self.request.data.get("direction")
+            event_id = self.request.data.get("event") or self.request.data.get("event_id")
+            direction_id = self.request.data.get("direction") or self.request.data.get("direction_id")
 
             if event_id:
                 context["event"] = get_object_or_404(Event, pk=event_id)
@@ -842,8 +861,8 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
     def get_permissions(self):
         if self.request.method.lower() == "get":
             permissions = (IsAuthenticated,)
-        elif self.request.method.lower() in {"patch", "delete"}:
-            permissions = (CuratorOrAdminPermission,)
+        elif self.request.method.lower() in {"put", "patch"}:
+            permissions = (IsAuthenticated,)
         else:
             permissions = (IsAuthenticated,)
         return [permission() for permission in permissions]
@@ -874,17 +893,126 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
         responses={204: "No content", 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
     )
     def delete(self, request, *args, **kwargs):
-        return super().delete(request, *args, **kwargs)
+        application = self.get_object()
+        is_curator_or_admin = CuratorOrAdminPermission().has_permission(request, self)
+        is_owner = application.user_id == request.user.id
+
+        if not (is_curator_or_admin or is_owner):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        self.perform_destroy(application)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_queryset(self):
         queryset = Application.objects.select_related(
-            "user", "direction", "event", "specialization", "status"
+            "user", "direction", "event", "project", "specialization", "status"
         )
 
         if CuratorOrAdminPermission().has_permission(self.request, self):
             return queryset
 
         return queryset.filter(user=self.request.user)
+
+
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_NOTIFICATIONS],
+        operation_summary="Список уведомлений",
+        operation_description="Получение уведомлений текущего пользователя",
+        responses={200: NotificationSerializer(many=True), 401: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="post",
+    decorator=swagger_auto_schema(
+        tags=[TAG_NOTIFICATIONS],
+        operation_summary="Создать уведомление",
+        operation_description="Создание уведомления для текущего пользователя",
+        request_body=NotificationCreateSerializer,
+        responses={201: NotificationSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+class NotificationListCreateView(ListCreateAPIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user).select_related("user")
+
+    def get_serializer_class(self):
+        if self.request.method.lower() == "post":
+            return NotificationCreateSerializer
+        return NotificationSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        output = NotificationSerializer(instance, context=self.get_serializer_context())
+        headers = self.get_success_headers(output.data)
+        return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+@method_decorator(
+    name="patch",
+    decorator=swagger_auto_schema(
+        tags=[TAG_NOTIFICATIONS],
+        operation_summary="Обновить уведомление",
+        operation_description="Обновление уведомления текущего пользователя",
+        request_body=NotificationSerializer,
+        responses={200: NotificationSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="delete",
+    decorator=swagger_auto_schema(
+        tags=[TAG_NOTIFICATIONS],
+        operation_summary="Удалить уведомление",
+        operation_description="Удаление уведомления текущего пользователя",
+        responses={204: "No content", 401: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+class NotificationDetailView(RetrieveUpdateDestroyAPIView):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = NotificationSerializer
+    lookup_url_kwarg = "notification_id"
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user).select_related("user")
+
+
+@method_decorator(
+    name="post",
+    decorator=swagger_auto_schema(
+        tags=[TAG_NOTIFICATIONS],
+        operation_summary="Отметить все как прочитанные",
+        operation_description="Отметить все уведомления текущего пользователя как прочитанные",
+        responses={200: MESSAGE_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+class NotificationMarkAllReadView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request, *args, **kwargs):
+        Notification.objects.filter(user=request.user, read=False).update(read=True)
+        return Response({"message": "Все уведомления отмечены как прочитанные."}, status=status.HTTP_200_OK)
+
+
+@method_decorator(
+    name="delete",
+    decorator=swagger_auto_schema(
+        tags=[TAG_NOTIFICATIONS],
+        operation_summary="Удалить все уведомления",
+        operation_description="Удаление всех уведомлений текущего пользователя",
+        responses={204: "No content", 401: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+class NotificationClearView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def delete(self, request, *args, **kwargs):
+        Notification.objects.filter(user=request.user).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @method_decorator(
@@ -909,3 +1037,11 @@ class DirectionApplicationCreateView(CreateAPIView):
         )
         context.update({"event": event, "direction": direction})
         return context
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        output = ApplicationSerializer(instance, context=self.get_serializer_context())
+        headers = self.get_success_headers(output.data)
+        return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)

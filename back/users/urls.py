@@ -12,6 +12,10 @@ from .views import (
     EventListCreateView,
     LoginView,
     LogoutView,
+    NotificationClearView,
+    NotificationDetailView,
+    NotificationListCreateView,
+    NotificationMarkAllReadView,
     PasswordResetConfirmView,
     PasswordResetRequestView,
     ProjectDetailView,
@@ -71,6 +75,22 @@ urlpatterns = [
         "applications/<int:application_id>/",
         ApplicationDetailView.as_view(),
         name="application-detail",
+    ),
+    path("notifications/", NotificationListCreateView.as_view(), name="notification-list"),
+    path(
+        "notifications/<int:notification_id>/",
+        NotificationDetailView.as_view(),
+        name="notification-detail",
+    ),
+    path(
+        "notifications/mark-all-read/",
+        NotificationMarkAllReadView.as_view(),
+        name="notification-mark-all-read",
+    ),
+    path(
+        "notifications/clear/",
+        NotificationClearView.as_view(),
+        name="notification-clear",
     ),
     path("statuses/", StatusListView.as_view(), name="status-list"),
     path(

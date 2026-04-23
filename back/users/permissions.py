@@ -59,3 +59,13 @@ class ProjectantReadCuratorAdminWritePermission(RolePermission):
 
     safe_roles = (ROLE_PROJECTANT, ROLE_CURATOR, ROLE_ADMIN)
     write_roles = (ROLE_CURATOR, ROLE_ADMIN)
+
+
+class PublicReadCuratorAdminWritePermission(BasePermission):
+    """Allow anonymous read access and curator/admin write access."""
+
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+
+        return CuratorOrAdminPermission().has_permission(request, view)

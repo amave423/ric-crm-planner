@@ -1,4 +1,4 @@
-﻿import client from "../api/client";
+import client from "../api/client";
 import { readPlannerState } from "../storage/planner";
 import {
   getAllUsers,
@@ -35,6 +35,7 @@ type BackendEvent = {
   end_app_date?: string;
   leader?: number | string;
   organizer?: number | string;
+  organizerName?: string;
   stage?: string;
   specializations?: unknown[];
   specialization?: number | string;
@@ -48,7 +49,9 @@ type BackendEventPayload = {
   end_date?: string;
   end_app_date?: string;
   stage: string;
+  leader?: number;
   specialization?: number;
+  specializations?: number[];
 };
 
 let specializationCache: BackendSpecialization[] | null = null;
@@ -97,6 +100,7 @@ function normalizeBackendEvent(data: unknown): BackendEvent {
     end_app_date: toStringValue(obj.end_app_date),
     leader: typeof obj.leader === "number" || typeof obj.leader === "string" ? obj.leader : undefined,
     organizer: typeof obj.organizer === "number" || typeof obj.organizer === "string" ? obj.organizer : undefined,
+    organizerName: toStringValue(obj.organizerName),
     stage: toStringValue(obj.stage),
     specializations: Array.isArray(obj.specializations) ? obj.specializations : undefined,
     specialization:
@@ -173,6 +177,8 @@ function extractUserDisplay(u: User): string {
 }
 
 async function resolveOrganizer(e: BackendEvent): Promise<string | undefined> {
+  if (e.organizerName && e.organizerName.trim()) return e.organizerName.trim();
+
   let id: number | string | undefined = e.leader ?? e.organizer;
   if (typeof id === "undefined" && typeof e.id !== "undefined") {
     try {
@@ -239,26 +245,50 @@ const fmtEndApp = (v?: string) => {
   return d.toISOString();
 };
 
-async function resolveSpecializationId(data: Event): Promise<number | undefined> {
-  const obj = data as Event & UnknownRecord;
-  const fromDirect = toNumber(obj.specialization ?? obj.specializationId);
-  if (typeof fromDirect !== "undefined") return fromDirect;
+async function resolveSpecializationIds(data: Event): Promise<number[]> {
+  const items = Array.isArray(data.specializations) ? data.specializations : [];
+  if (items.length === 0) return [];
 
-  const first = Array.isArray(data.specializations) && data.specializations.length > 0 ? data.specializations[0] : null;
-  if (!first) return undefined;
-
-  const title = String(first.title ?? "").trim();
-  const specs = await getSpecializations();
-  if (title && specs.length > 0) {
-    const found = specs.find((s) => getSpecName(s).toLowerCase() === title.toLowerCase());
-    if (found) return found.id;
+  if (USE_MOCK) {
+    return Array.from(
+      new Set(items.map((item) => toNumber(item.id)).filter((id): id is number => typeof id === "number"))
+    );
   }
 
-  const fromFirstId = toNumber(first.id);
-  if (typeof fromFirstId !== "undefined") return fromFirstId;
-  if (!title) return undefined;
+  const specs = await getSpecializations();
+  const unresolved: string[] = [];
+  const ids = await Promise.all(
+    items.map(async (item) => {
+      const directId = toNumber(item.id);
+      if (typeof directId !== "undefined" && specs.some((spec) => spec.id === directId)) return directId;
 
-  throw new Error(`Специализация "${title}" не найдена на сервере. Выберите специализацию из существующих.`);
+      const title = String(item.title ?? "").trim();
+      if (!title) {
+        if (typeof directId !== "undefined") unresolved.push(String(directId));
+        return undefined;
+      }
+
+      const found = specs.find((spec) => getSpecName(spec).toLowerCase() === title.toLowerCase());
+      if (found) return found.id;
+
+      unresolved.push(title);
+      return undefined;
+    })
+  );
+
+  const resolvedIds = Array.from(new Set(ids.filter((id): id is number => typeof id === "number")));
+
+  if (resolvedIds.length === 0) {
+    throw new Error("На сервере не найдены выбранные специализации. Выберите значения из выпадающего списка.");
+  }
+
+  if (unresolved.length > 0) {
+    throw new Error(
+      `Не удалось сопоставить специализации: ${unresolved.join(", ")}. Обновите страницу и выберите их заново.`
+    );
+  }
+
+  return resolvedIds;
 }
 
 async function toBackendEvent(data: Event): Promise<BackendEventPayload> {
@@ -273,8 +303,14 @@ async function toBackendEvent(data: Event): Promise<BackendEventPayload> {
     stage: stageValue && stageValue.trim() ? stageValue : "-",
   };
 
-  const specializationId = await resolveSpecializationId(data);
-  if (typeof specializationId !== "undefined") payload.specialization = specializationId;
+  const leaderId = toNumber(data.leader);
+  if (typeof leaderId !== "undefined") payload.leader = leaderId;
+
+  const specializationIds = await resolveSpecializationIds(data);
+  if (specializationIds.length > 0) {
+    payload.specializations = specializationIds;
+    payload.specialization = specializationIds[0];
+  }
 
   return payload;
 }
