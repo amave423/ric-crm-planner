@@ -4,6 +4,9 @@ This module centralizes checks for CRM roles and their capability flags so
 endpoints can declare the required role or capability via DRF permissions.
 """
 
+import secrets
+
+from django.conf import settings
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from .models import CRMRole, ROLE_ADMIN, ROLE_CURATOR, ROLE_PROJECTANT
@@ -69,3 +72,27 @@ class PublicReadCuratorAdminWritePermission(BasePermission):
             return True
 
         return CuratorOrAdminPermission().has_permission(request, view)
+
+
+class TestingServicePermission(BasePermission):
+    """Allow access for the external testing service via shared token."""
+
+    message = "Invalid testing service token."
+
+    def has_permission(self, request, view):
+        expected_token = getattr(settings, "TESTING_SERVICE_TOKEN", "") or ""
+        if not expected_token:
+            return False
+
+        header_token = request.headers.get("X-Service-Token", "") or ""
+        auth_header = request.headers.get("Authorization", "") or ""
+
+        bearer_token = ""
+        if auth_header.lower().startswith("bearer "):
+            bearer_token = auth_header[7:].strip()
+
+        provided_token = header_token or bearer_token
+        if not provided_token:
+            return False
+
+        return secrets.compare_digest(provided_token, expected_token)

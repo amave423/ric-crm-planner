@@ -2,6 +2,7 @@ from django.conf import settings
 import secrets
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from rest_framework import status
@@ -27,6 +28,7 @@ from users.permissions import (
     CuratorOrAdminPermission,
     PublicReadCuratorAdminWritePermission,
     ProjectantOnlyPermission,
+    TestingServicePermission,
 )
 from users.serializers import (
     ApplicationCreateSerializer,
@@ -34,6 +36,12 @@ from users.serializers import (
     DirectionSerializer,
     EmailConfirmationSerializer,
     EventSerializer,
+    IntegrationApplicationTestingContextSerializer,
+    IntegrationTestExportSerializer,
+    IntegrationTestResultCallbackSerializer,
+    IntegrationTestResultSerializer,
+    IntegrationTestSessionSerializer,
+    IntegrationTestSessionUpsertSerializer,
     LoginUserSerializer,
     NotificationCreateSerializer,
     NotificationSerializer,
@@ -48,13 +56,19 @@ from users.serializers import (
 )
 from users.models import (
     Application,
+    Answer,
     Direction,
     Event,
     Notification,
     Profile,
     Project,
+    Question,
     Specialization,
     Status,
+    Test,
+    TestResult,
+    TestSession,
+    TrueAnswer,
 )
 
 TAG_AUTH = "Auth"
@@ -66,6 +80,7 @@ TAG_PROJECTS = "Projects"
 TAG_APPLICATIONS = "Applications"
 TAG_NOTIFICATIONS = "Уведомления"
 TAG_REFERENCE = "Reference"
+TAG_INTEGRATION = "Integration"
 
 MESSAGE_RESPONSE_SCHEMA = openapi.Schema(
     type=openapi.TYPE_OBJECT,
@@ -89,6 +104,56 @@ REFRESH_RESPONSE_SCHEMA = openapi.Schema(
         "refresh": openapi.Schema(type=openapi.TYPE_STRING),
     },
 )
+
+INTEGRATION_TOKEN_PARAMETER = openapi.Parameter(
+    "X-Service-Token",
+    openapi.IN_HEADER,
+    description="Shared token for CRM and testing service integration.",
+    type=openapi.TYPE_STRING,
+    required=True,
+)
+
+
+def _get_available_tests_for_application(application: Application):
+    queryset = Test.objects.filter(is_active=True)
+
+    if application.event_id:
+        queryset = queryset.filter(
+            Q(event__isnull=True) | Q(event_id=application.event_id)
+        )
+
+    if application.specialization_id:
+        queryset = queryset.filter(
+            Q(specialization__isnull=True)
+            | Q(specialization_id=application.specialization_id)
+        )
+
+    return queryset.select_related("event", "specialization").order_by("entry", "name")
+
+
+def _get_application_current_session(application: Application):
+    session_queryset = application.test_sessions.select_related("test", "user").order_by(
+        "-created_at"
+    )
+    if application.test_session_id:
+        current_session = session_queryset.filter(
+            session_id=application.test_session_id
+        ).first()
+        if current_session:
+            return current_session
+    return session_queryset.first()
+
+
+def _get_application_latest_result(
+    application: Application, current_session: TestSession | None
+):
+    if current_session and hasattr(current_session, "result"):
+        return current_session.result
+
+    return application.test_results.select_related("test", "user", "session").order_by(
+        "-completed_at",
+        "-id",
+    ).first()
 
 
 @method_decorator(
@@ -912,6 +977,142 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
             return queryset
 
         return queryset.filter(user=self.request.user)
+
+
+class IntegrationApplicationMixin:
+    authentication_classes = ()
+    permission_classes = (TestingServicePermission,)
+
+    def get_application(self):
+        return get_object_or_404(
+            Application.objects.select_related(
+                "user",
+                "event",
+                "direction",
+                "project",
+                "specialization",
+                "status",
+            ),
+            pk=self.kwargs.get("application_id"),
+        )
+
+
+class IntegrationApplicationTestingContextView(IntegrationApplicationMixin, APIView):
+    @swagger_auto_schema(
+        tags=[TAG_INTEGRATION],
+        operation_summary="Get testing context for application",
+        operation_description="Returns CRM context required by the testing backend.",
+        manual_parameters=[INTEGRATION_TOKEN_PARAMETER],
+        responses={
+            200: IntegrationApplicationTestingContextSerializer,
+            403: ERROR_RESPONSE_SCHEMA,
+            404: ERROR_RESPONSE_SCHEMA,
+        },
+    )
+    def get(self, request, *args, **kwargs):
+        application = self.get_application()
+        available_tests = list(_get_available_tests_for_application(application))
+        current_session = _get_application_current_session(application)
+        latest_result = _get_application_latest_result(application, current_session)
+        serializer = IntegrationApplicationTestingContextSerializer(
+            application,
+            context={
+                "request": request,
+                "available_tests": available_tests,
+                "current_session": current_session,
+                "latest_result": latest_result,
+            },
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class IntegrationTestExportView(APIView):
+    authentication_classes = ()
+    permission_classes = (TestingServicePermission,)
+
+    @swagger_auto_schema(
+        tags=[TAG_INTEGRATION],
+        operation_summary="Export test definition",
+        operation_description="Returns full test structure, questions and answers for the testing backend.",
+        manual_parameters=[INTEGRATION_TOKEN_PARAMETER],
+        responses={
+            200: IntegrationTestExportSerializer,
+            403: ERROR_RESPONSE_SCHEMA,
+            404: ERROR_RESPONSE_SCHEMA,
+        },
+    )
+    def get(self, request, *args, **kwargs):
+        test = get_object_or_404(
+            Test.objects.select_related("event", "specialization").prefetch_related(
+                "questions__answers",
+                "questions__true_answers",
+            ),
+            pk=self.kwargs.get("test_id"),
+        )
+        serializer = IntegrationTestExportSerializer(test)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class IntegrationApplicationTestSessionView(IntegrationApplicationMixin, APIView):
+    @swagger_auto_schema(
+        tags=[TAG_INTEGRATION],
+        operation_summary="Assign or sync test session",
+        operation_description="Creates or updates a test session for the given application.",
+        manual_parameters=[INTEGRATION_TOKEN_PARAMETER],
+        request_body=IntegrationTestSessionUpsertSerializer,
+        responses={
+            200: IntegrationTestSessionSerializer,
+            201: IntegrationTestSessionSerializer,
+            400: ERROR_RESPONSE_SCHEMA,
+            403: ERROR_RESPONSE_SCHEMA,
+            404: ERROR_RESPONSE_SCHEMA,
+        },
+    )
+    def post(self, request, *args, **kwargs):
+        application = self.get_application()
+        serializer = IntegrationTestSessionUpsertSerializer(
+            data=request.data,
+            context={"request": request, "application": application},
+        )
+        serializer.is_valid(raise_exception=True)
+        session = serializer.save()
+        response_serializer = IntegrationTestSessionSerializer(session)
+        created = bool(serializer.context.get("created"))
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class IntegrationApplicationTestResultView(IntegrationApplicationMixin, APIView):
+    @swagger_auto_schema(
+        tags=[TAG_INTEGRATION],
+        operation_summary="Submit test result callback",
+        operation_description="Accepts final test result from the testing backend and syncs it into CRM.",
+        manual_parameters=[INTEGRATION_TOKEN_PARAMETER],
+        request_body=IntegrationTestResultCallbackSerializer,
+        responses={
+            200: IntegrationTestResultSerializer,
+            201: IntegrationTestResultSerializer,
+            400: ERROR_RESPONSE_SCHEMA,
+            403: ERROR_RESPONSE_SCHEMA,
+            404: ERROR_RESPONSE_SCHEMA,
+        },
+    )
+    def post(self, request, *args, **kwargs):
+        application = self.get_application()
+        serializer = IntegrationTestResultCallbackSerializer(
+            data=request.data,
+            context={"request": request, "application": application},
+        )
+        serializer.is_valid(raise_exception=True)
+        result = serializer.save()
+        response_serializer = IntegrationTestResultSerializer(result)
+        created = bool(serializer.context.get("created"))
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
 
 @method_decorator(

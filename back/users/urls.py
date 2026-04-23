@@ -10,6 +10,10 @@ from .views import (
     EmailConfirmationView,
     EventDetailView,
     EventListCreateView,
+    IntegrationApplicationTestingContextView,
+    IntegrationApplicationTestResultView,
+    IntegrationApplicationTestSessionView,
+    IntegrationTestExportView,
     LoginView,
     LogoutView,
     NotificationClearView,
@@ -75,6 +79,26 @@ urlpatterns = [
         "applications/<int:application_id>/",
         ApplicationDetailView.as_view(),
         name="application-detail",
+    ),
+    path(
+        "integration/applications/<int:application_id>/testing-context/",
+        IntegrationApplicationTestingContextView.as_view(),
+        name="integration-application-testing-context",
+    ),
+    path(
+        "integration/applications/<int:application_id>/test-sessions/",
+        IntegrationApplicationTestSessionView.as_view(),
+        name="integration-application-test-session",
+    ),
+    path(
+        "integration/applications/<int:application_id>/test-results/",
+        IntegrationApplicationTestResultView.as_view(),
+        name="integration-application-test-result",
+    ),
+    path(
+        "integration/tests/<int:test_id>/export/",
+        IntegrationTestExportView.as_view(),
+        name="integration-test-export",
     ),
     path("notifications/", NotificationListCreateView.as_view(), name="notification-list"),
     path(

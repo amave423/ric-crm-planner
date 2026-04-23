@@ -12,14 +12,22 @@ from rest_framework.test import APIClient, APIRequestFactory
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.models import (
+    Answer,
     Application,
     CRMRole,
     Direction,
     Event,
     Profile,
+    Question,
     ROLE_ADMIN,
     ROLE_CURATOR,
     ROLE_PROJECTANT,
+    Specialization,
+    Status,
+    Test,
+    TestResult,
+    TestSession,
+    TrueAnswer,
 )
 from users.decorators import role_required
 from users.serializers import (
@@ -460,3 +468,257 @@ class RoleDecoratorTests(TestCase):
 
         with self.assertRaises(NotAuthenticated):
             self.decorated_view(request)
+
+
+@override_settings(
+    PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
+    TESTING_SERVICE_TOKEN="integration-secret",
+)
+class IntegrationViewTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user_model = get_user_model()
+        self.password = "StrongPass123"
+        self.integration_headers = {"HTTP_X_SERVICE_TOKEN": "integration-secret"}
+
+        self.projectant = self.user_model.objects.create_user(
+            email="integration-student@example.com",
+            username="integration-student@example.com",
+            password=self.password,
+            first_name="Integration",
+            last_name="Student",
+            is_active=True,
+        )
+        self.curator = self.user_model.objects.create_user(
+            email="integration-curator@example.com",
+            username="integration-curator@example.com",
+            password=self.password,
+            first_name="Integration",
+            last_name="Curator",
+            is_active=True,
+        )
+
+        event_content_type = ContentType.objects.get_for_model(Event)
+        CRMRole.objects.create(
+            user=self.projectant,
+            role_type=ROLE_PROJECTANT,
+            content_type=event_content_type,
+            object_id=0,
+        )
+        CRMRole.objects.create(
+            user=self.curator,
+            role_type=ROLE_CURATOR,
+            content_type=event_content_type,
+            object_id=0,
+        )
+
+        self.specialization, _ = Specialization.objects.get_or_create(
+            name="Backend разработчик",
+            defaults={"description": ""},
+        )
+        self.submitted_status = Status.objects.create(
+            name="Прислал заявку",
+            description="",
+            is_positive=True,
+        )
+        self.testing_status = Status.objects.create(
+            name="Прохождение тестирования",
+            description="",
+            is_positive=True,
+        )
+
+        self.event = Event.objects.create(
+            specialization=self.specialization,
+            leader=self.curator,
+            name="Integration Event",
+            description="CRM integration event",
+            stage="open",
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date() + timedelta(days=14),
+            end_app_date=timezone.now() + timedelta(days=7),
+        )
+        self.direction = Direction.objects.create(
+            name="Backend",
+            description="API integration",
+            event=self.event,
+            leader=self.curator,
+        )
+        self.application = Application.objects.create(
+            user=self.projectant,
+            event=self.event,
+            direction=self.direction,
+            specialization=self.specialization,
+            status=self.submitted_status,
+            message="Ready for testing",
+            date_sub=timezone.now(),
+            date_end=self.event.end_app_date,
+        )
+        self.test = Test.objects.create(
+            name="Backend Basics",
+            description="Integration export test",
+            entry=1,
+            event=self.event,
+            specialization=self.specialization,
+            passing_score=60,
+            time_limit=30,
+            is_active=True,
+            question_count=1,
+            test_type="online",
+        )
+        self.question = Question.objects.create(
+            name="What is HTTP?",
+            count=1,
+            test=self.test,
+            points=100,
+            question_type="single",
+        )
+        Answer.objects.create(
+            answer="A protocol",
+            count=1,
+            question=self.question,
+            user=self.projectant,
+            is_selected=False,
+            answered_at=timezone.now(),
+        )
+        Answer.objects.create(
+            answer="A database",
+            count=2,
+            question=self.question,
+            user=self.projectant,
+            is_selected=False,
+            answered_at=timezone.now(),
+        )
+        TrueAnswer.objects.create(
+            true_answer="A protocol",
+            question=self.question,
+            points=100,
+        )
+
+    def test_integration_requires_service_token(self):
+        response = self.client.get(
+            reverse(
+                "integration-application-testing-context",
+                kwargs={"application_id": self.application.id},
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_service_can_fetch_testing_context_and_export_test(self):
+        context_response = self.client.get(
+            reverse(
+                "integration-application-testing-context",
+                kwargs={"application_id": self.application.id},
+            ),
+            **self.integration_headers,
+        )
+
+        self.assertEqual(context_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(context_response.data["application"]["id"], self.application.id)
+        self.assertEqual(context_response.data["applicant"]["email"], self.projectant.email)
+        self.assertEqual(len(context_response.data["availableTests"]), 1)
+        self.assertEqual(context_response.data["availableTests"][0]["id"], self.test.id)
+
+        export_response = self.client.get(
+            reverse("integration-test-export", kwargs={"test_id": self.test.id}),
+            **self.integration_headers,
+        )
+
+        self.assertEqual(export_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(export_response.data["id"], self.test.id)
+        self.assertEqual(len(export_response.data["questions"]), 1)
+        self.assertEqual(len(export_response.data["questions"][0]["answers"]), 2)
+        self.assertEqual(len(export_response.data["questions"][0]["true_answers"]), 1)
+
+    def test_service_can_assign_test_session(self):
+        expires_at = timezone.now() + timedelta(hours=2)
+        response = self.client.post(
+            reverse(
+                "integration-application-test-session",
+                kwargs={"application_id": self.application.id},
+            ),
+            {
+                "test_id": self.test.id,
+                "session_id": "session-123",
+                "expires_at": expires_at.isoformat(),
+                "status": "assigned",
+            },
+            format="json",
+            **self.integration_headers,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.application.refresh_from_db()
+        session = TestSession.objects.get(session_id="session-123")
+
+        self.assertTrue(self.application.tests_assigned)
+        self.assertEqual(self.application.test_session_id, "session-123")
+        self.assertEqual(self.application.status.name, self.testing_status.name)
+        self.assertEqual(session.application_id, self.application.id)
+        self.assertEqual(session.test_id, self.test.id)
+
+    def test_service_can_sync_result_idempotently(self):
+        session = TestSession.objects.create(
+            session_id="session-456",
+            application=self.application,
+            test=self.test,
+            user=self.projectant,
+            expires_at=timezone.now() + timedelta(hours=2),
+            status="assigned",
+        )
+        self.application.tests_assigned = True
+        self.application.tests_assigned_at = timezone.now()
+        self.application.test_session_id = session.session_id
+        self.application.status = self.testing_status
+        self.application.save(
+            update_fields=[
+                "tests_assigned",
+                "tests_assigned_at",
+                "test_session_id",
+                "status",
+            ]
+        )
+
+        payload = {
+            "session_id": session.session_id,
+            "score": 80,
+            "max_score": 100,
+            "started_at": timezone.now().isoformat(),
+            "completed_at": (timezone.now() + timedelta(minutes=20)).isoformat(),
+            "time_spent_seconds": 1200,
+            "application_status": self.testing_status.name,
+            "detailed_results": {"answers": [{"question_id": self.question.id, "selected": [1]}]},
+        }
+
+        first_response = self.client.post(
+            reverse(
+                "integration-application-test-result",
+                kwargs={"application_id": self.application.id},
+            ),
+            payload,
+            format="json",
+            **self.integration_headers,
+        )
+        second_response = self.client.post(
+            reverse(
+                "integration-application-test-result",
+                kwargs={"application_id": self.application.id},
+            ),
+            payload,
+            format="json",
+            **self.integration_headers,
+        )
+
+        self.assertEqual(first_response.status_code, status.HTTP_201_CREATED, first_response.data)
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK, second_response.data)
+        self.assertEqual(TestResult.objects.count(), 1)
+
+        result = TestResult.objects.get()
+        session.refresh_from_db()
+        self.application.refresh_from_db()
+
+        self.assertEqual(result.session_id, session.id)
+        self.assertTrue(result.is_passed)
+        self.assertEqual(result.result_status, "passed")
+        self.assertEqual(session.status, "completed")
+        self.assertEqual(self.application.status.name, self.testing_status.name)

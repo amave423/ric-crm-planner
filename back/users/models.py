@@ -388,6 +388,13 @@ class TestResult(models.Model):
     completed_at = models.DateTimeField()
     started_at = models.DateTimeField()
     application = models.ForeignKey(Application, on_delete=models.CASCADE, related_name="test_results")
+    session = models.OneToOneField(
+        TestSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="result",
+    )
     test = models.ForeignKey(Test, on_delete=models.CASCADE, related_name="results")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="test_results")
     correct_answers = models.IntegerField()
