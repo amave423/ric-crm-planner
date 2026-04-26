@@ -4,6 +4,7 @@ import { getRequests } from "../../api/requests";
 import { getEventById, getEvents } from "../../api/events";
 import { getDirectionById, getDirectionsByEvent } from "../../api/directions";
 import { getProjectsByDirection } from "../../api/projects";
+import AutomationPanel from "../../components/Automation/AutomationPanel";
 import { useToast } from "../../components/Toast/ToastProvider";
 import { AuthContext } from "../../context/AuthContext";
 import { DEFAULT_KANBAN_COLUMNS, nextPlannerId, removeTeamCascade } from "../../storage/planner";
@@ -50,7 +51,7 @@ export default function PlannerPage() {
 
   const [tab, setTab] = useState<PlannerTab>(() => {
     const raw = localStorage.getItem("planner_tab_v1");
-    if (raw === "teams" || raw === "backlog" || raw === "kanban" || raw === "gantt") return raw;
+    if (raw === "teams" || raw === "backlog" || raw === "kanban" || raw === "gantt" || raw === "robots") return raw;
     return "teams";
   });
   const [loading, setLoading] = useState(false);
@@ -96,6 +97,10 @@ export default function PlannerPage() {
   const [teamEditMembers, setTeamEditMembers] = useState<number[]>([]);
   const [taskCardOpen, setTaskCardOpen] = useState(false);
   const [taskCard, setTaskCard] = useState<TaskCardState>(null);
+
+  useEffect(() => {
+    if (!isOrganizer && tab === "robots") setTab("teams");
+  }, [isOrganizer, tab]);
   const [editingParentId, setEditingParentId] = useState<number | null>(null);
   const [editingParentDraft, setEditingParentDraft] = useState<ParentEditDraft | null>(null);
   const [editingSubtaskId, setEditingSubtaskId] = useState<number | null>(null);
@@ -1023,7 +1028,7 @@ export default function PlannerPage() {
   return (
     <div className="page planner-page">
       <PlannerHeader visibleTeams={visibleTeams} teamFilter={teamFilter} onTeamFilterChange={setTeamFilter} />
-      <PlannerTabs tab={tab} onChange={setTab} />
+      <PlannerTabs tab={tab} onChange={setTab} showRobots={isOrganizer} />
 
       {tab === "teams" && (
         <TeamsTab
@@ -1150,6 +1155,8 @@ export default function PlannerPage() {
           onOpenTaskCard={openTaskCard}
         />
       )}
+
+      {tab === "robots" && isOrganizer && <AutomationPanel scope="tasks" className="planner-automation" />}
 
       <ConfirmCloseEnrollmentModal
         isOpen={Boolean(closeEnrollmentTarget)}

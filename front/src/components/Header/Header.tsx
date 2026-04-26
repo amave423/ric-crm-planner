@@ -8,6 +8,7 @@ import {
   LoginOutlined,
   LogoutOutlined,
   MenuOutlined,
+  SettingOutlined,
   TeamOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -18,18 +19,36 @@ import Modal from "../Modal/Modal";
 import AppButton from "../UI/Button";
 
 const HEADER_TEXT = {
-  deleteAllNotifications:
-    "\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0432\u0441\u0435",
+  automation: "Автоматизация",
+  closeMenu: "Закрыть меню",
+  delete: "Удалить",
+  deleteAllNotifications: "Удалить все",
+  guest: "Гость",
+  login: "Войти",
+  logout: "Выйти",
+  myRequests: "Мои заявки",
+  noNotifications: "Пока нет уведомлений",
+  notificationCenter: "Центр уведомлений",
+  notifications: "Уведомления",
+  openLink: "Открыть ссылку",
+  openMenu: "Открыть меню",
+  organizer: "Организатор",
+  planner: "Планировщик",
+  profile: "Профиль",
+  projectant: "Проектант",
+  requests: "Заявки",
 } as const;
 
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useContext(AuthContext);
-  const { notifications, unreadCount, markAllAsRead, markAsRead, removeNotification, clearNotifications } = useNotifications();
+  const { notifications, unreadCount, markAllAsRead, markAsRead, removeNotification, clearNotifications } =
+    useNotifications();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const canManageAutomation = Boolean(user && user.role !== "student");
 
   useEffect(() => {
     if (!notificationsOpen) return;
@@ -50,10 +69,25 @@ export default function Header() {
               <span className="mobile-menu-entry__icon">
                 <BarsOutlined />
               </span>
-              <span>{user.role === "student" ? "Мои заявки" : "Заявки"}</span>
+              <span>{user.role === "student" ? HEADER_TEXT.myRequests : HEADER_TEXT.requests}</span>
             </span>
           ),
         },
+        ...(canManageAutomation
+          ? [
+              {
+                key: "/automation",
+                label: (
+                  <span className="mobile-menu-entry">
+                    <span className="mobile-menu-entry__icon">
+                      <SettingOutlined />
+                    </span>
+                    <span>{HEADER_TEXT.automation}</span>
+                  </span>
+                ),
+              },
+            ]
+          : []),
         {
           key: "/planner",
           label: (
@@ -61,7 +95,7 @@ export default function Header() {
               <span className="mobile-menu-entry__icon">
                 <TeamOutlined />
               </span>
-              <span>Планировщик</span>
+              <span>{HEADER_TEXT.planner}</span>
             </span>
           ),
         },
@@ -72,7 +106,7 @@ export default function Header() {
               <span className="mobile-menu-entry__icon">
                 <UserOutlined />
               </span>
-              <span>Профиль</span>
+              <span>{HEADER_TEXT.profile}</span>
             </span>
           ),
         },
@@ -84,7 +118,7 @@ export default function Header() {
   };
 
   const activeMobileMenuKey =
-    ["/requests", "/planner", "/profile"].find((path) => location.pathname.startsWith(path)) ?? "";
+    ["/planner", "/automation", "/requests", "/profile"].find((path) => location.pathname.startsWith(path)) ?? "";
 
   const openNotifications = () => {
     setMobileMenuOpen(false);
@@ -134,8 +168,8 @@ export default function Header() {
               onClick: onMobileMenuClick,
             }}
           >
-            <AppButton className="mobile-menu-btn" aria-label={mobileMenuOpen ? "Закрыть меню" : "Открыть меню"}>
-	              <MenuOutlined />
+            <AppButton className="mobile-menu-btn" aria-label={mobileMenuOpen ? HEADER_TEXT.closeMenu : HEADER_TEXT.openMenu}>
+              <MenuOutlined />
             </AppButton>
           </Dropdown>
         </div>
@@ -148,12 +182,19 @@ export default function Header() {
           <>
             <AppButton className="head-btn head-btn--muted" onClick={() => navigate("/requests")}>
               <BarsOutlined />
-              <span>{user.role === "student" ? "Мои заявки" : "Заявки"}</span>
+              <span>{user.role === "student" ? HEADER_TEXT.myRequests : HEADER_TEXT.requests}</span>
             </AppButton>
+
+            {canManageAutomation && (
+              <AppButton className="head-btn head-btn--automation" onClick={() => navigate("/automation")}>
+                <SettingOutlined />
+                <span>{HEADER_TEXT.automation}</span>
+              </AppButton>
+            )}
 
             <AppButton className="head-btn head-btn--planner" onClick={() => navigate("/planner")}>
               <TeamOutlined />
-              <span>Планировщик</span>
+              <span>{HEADER_TEXT.planner}</span>
             </AppButton>
           </>
         )}
@@ -171,16 +212,16 @@ export default function Header() {
             <div className="profile-box" onClick={() => navigate("/profile")}>
               <UserOutlined className="profile-icon" />
               <div className="profile-text">
-                <div className="role">{user.role === "organizer" ? "Организатор" : "Проектант"}</div>
-                <div className="name">{user.name ? `${user.name} ${user.surname || ""}` : "Гость"}</div>
+                <div className="role">{user.role === "organizer" ? HEADER_TEXT.organizer : HEADER_TEXT.projectant}</div>
+                <div className="name">{user.name ? `${user.name} ${user.surname || ""}` : HEADER_TEXT.guest}</div>
               </div>
             </div>
 
-            <AppButton className="head-btn head-btn--notify" onClick={openNotifications} aria-label="Центр уведомлений">
+            <AppButton className="head-btn head-btn--notify" onClick={openNotifications} aria-label={HEADER_TEXT.notificationCenter}>
               <Badge dot={unreadCount > 0} className="notification-badge">
                 <BellOutlined />
               </Badge>
-              <span>Уведомления</span>
+              <span>{HEADER_TEXT.notifications}</span>
             </AppButton>
 
             <AppButton
@@ -192,21 +233,21 @@ export default function Header() {
               }}
             >
               <LogoutOutlined />
-              <span>Выйти</span>
+              <span>{HEADER_TEXT.logout}</span>
             </AppButton>
           </>
         ) : (
           <AppButton className="head-btn head-btn--login" onClick={() => navigate("/login")}>
             <LoginOutlined />
-            <span>Войти</span>
+            <span>{HEADER_TEXT.login}</span>
           </AppButton>
         )}
       </div>
 
-      <Modal isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} title="Центр уведомлений">
+      <Modal isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} title={HEADER_TEXT.notificationCenter}>
         <div className="notification-center">
           {notifications.length === 0 ? (
-            <div className="notification-empty">Пока нет уведомлений</div>
+            <div className="notification-empty">{HEADER_TEXT.noNotifications}</div>
           ) : (
             <>
               <div className="notification-center__toolbar">
@@ -214,24 +255,27 @@ export default function Header() {
                   {HEADER_TEXT.deleteAllNotifications}
                 </AppButton>
               </div>
-              {notifications.map((n) => (
-              <div key={n.id} className={`notification-item ${n.read ? "is-read" : "is-unread"}`}>
-                <div className="notification-item__head">
-                  <div className="notification-item__title">{n.title}</div>
-                  <div className="notification-item__date">{formatDateTime(n.createdAt)}</div>
-                </div>
-                {n.message && <div className="notification-item__message">{n.message}</div>}
-                <div className="notification-item__actions">
-                  {n.link && user?.role !== "organizer" && (
-                    <AppButton className="notification-link-btn" onClick={() => openNotificationLink(n.id, n.link)}>
-                      Открыть ссылку
+              {notifications.map((notification) => (
+                <div key={notification.id} className={`notification-item ${notification.read ? "is-read" : "is-unread"}`}>
+                  <div className="notification-item__head">
+                    <div className="notification-item__title">{notification.title}</div>
+                    <div className="notification-item__date">{formatDateTime(notification.createdAt)}</div>
+                  </div>
+                  {notification.message && <div className="notification-item__message">{notification.message}</div>}
+                  <div className="notification-item__actions">
+                    {notification.link && user?.role !== "organizer" && (
+                      <AppButton
+                        className="notification-link-btn"
+                        onClick={() => openNotificationLink(notification.id, notification.link)}
+                      >
+                        {HEADER_TEXT.openLink}
+                      </AppButton>
+                    )}
+                    <AppButton className="notification-remove-btn" onClick={() => removeNotification(notification.id)}>
+                      {HEADER_TEXT.delete}
                     </AppButton>
-                  )}
-                  <AppButton className="notification-remove-btn" onClick={() => removeNotification(n.id)}>
-                    Удалить
-                  </AppButton>
+                  </div>
                 </div>
-              </div>
               ))}
             </>
           )}
