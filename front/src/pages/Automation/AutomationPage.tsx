@@ -1,16 +1,26 @@
-import { useContext } from "react";
-import { Empty } from "antd";
+import { useContext, useState } from "react";
+import { Empty, Segmented } from "antd";
 import AutomationPanel from "../../components/Automation/AutomationPanel";
 import { AuthContext } from "../../context/AuthContext";
+import type { AutomationScope } from "../../types/automation";
 import "./automation.scss";
 
 const TEXT = {
+  title: "Роботы и триггеры",
+  subtitle: "Переключайтесь между сценариями автоматизации для CRM, планировщика и заявок.",
   noAccessTitle: "Настройка доступна организаторам",
   noAccessDescription: "Студенты могут смотреть свои заявки, а автоматизация настраивается со стороны организатора.",
 } as const;
 
+const AUTOMATION_TABS: Array<{ label: string; value: AutomationScope }> = [
+  { label: "CRM", value: "crm" },
+  { label: "Планировщик", value: "planner" },
+  { label: "Заявки", value: "requests" },
+];
+
 export default function AutomationPage() {
   const { user } = useContext(AuthContext);
+  const [tab, setTab] = useState<AutomationScope>("crm");
   const canManageAutomation = Boolean(user && user.role !== "student");
 
   if (!canManageAutomation) {
@@ -27,7 +37,23 @@ export default function AutomationPage() {
 
   return (
     <section className="automation-page">
-      <AutomationPanel scope="crm" />
+      <div className="automation-page__head">
+        <div>
+          <h1>{TEXT.title}</h1>
+          <p>{TEXT.subtitle}</p>
+        </div>
+
+        <Segmented
+          className="automation-page__tabs"
+          size="large"
+          shape="round"
+          value={tab}
+          onChange={(value) => setTab(value as AutomationScope)}
+          options={AUTOMATION_TABS}
+        />
+      </div>
+
+      <AutomationPanel scope={tab} />
     </section>
   );
 }

@@ -8,7 +8,6 @@ import { getEvents } from "../../api/events";
 import { getRequests, removeRequest, updateRequestStatus } from "../../api/requests";
 import Modal from "../../components/Modal/Modal";
 import Table from "../../components/Table/Table";
-import AutomationPanel from "../../components/Automation/AutomationPanel";
 import { ORGANIZER_REQUEST_STATUSES, REQUEST_STATUS, getRequestTransitionCopy } from "../../constants/requestProgress";
 import { AuthContext } from "../../context/AuthContext";
 import { useSearchSubmitFeedback } from "../../hooks/useSearchSubmitFeedback";
@@ -26,7 +25,6 @@ const TEXT = {
   requests: "\u0417\u0430\u044f\u0432\u043a\u0438",
   list: "\u0421\u043f\u0438\u0441\u043e\u043a",
   diagram: "\u0414\u0438\u0430\u0433\u0440\u0430\u043c\u043c\u0430",
-  robots: "\u0420\u043e\u0431\u043e\u0442\u044b",
   search: "\u041f\u043e\u0438\u0441\u043a...",
   studentName: "\u0424\u0418\u041e \u0441\u0442\u0443\u0434\u0435\u043d\u0442\u0430",
   event: "\u041c\u0435\u0440\u043e\u043f\u0440\u0438\u044f\u0442\u0438\u0435",
@@ -89,7 +87,7 @@ type PendingTransition = {
   message: string;
 };
 
-type RequestsView = "list" | "diagram" | "robots";
+type RequestsView = "list" | "diagram";
 type EventFilter = number | "all";
 type AnalyticsStatusKey = "submitted" | "testing" | "started" | "other";
 
@@ -314,12 +312,11 @@ export default function RequestsPage() {
             shape="round"
             value={view}
             onChange={(value) => setView(value as RequestsView)}
-            options={[
-              { label: TEXT.list, value: "list" },
-              { label: TEXT.diagram, value: "diagram" },
-              { label: TEXT.robots, value: "robots" },
-            ]}
-          />
+              options={[
+                { label: TEXT.list, value: "list" },
+                { label: TEXT.diagram, value: "diagram" },
+              ]}
+            />
         )}
 
 	        {isOrganizer && (
@@ -346,13 +343,7 @@ export default function RequestsPage() {
 	        )}
 	      </div>
 
-      {view === "robots" ? (
-        <AutomationPanel
-          scope="crm"
-          lockedEventId={typeof selectedEventId === "number" ? selectedEventId : undefined}
-          className="requests-automation"
-        />
-      ) : view === "list" ? (
+      {view === "list" ? (
         <Table
           columns={[
             { key: "studentName", title: TEXT.studentName, width: "310px" },

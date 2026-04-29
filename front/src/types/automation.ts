@@ -1,4 +1,4 @@
-export type AutomationScope = "crm" | "tasks";
+export type AutomationScope = "crm" | "planner" | "requests";
 
 export type AutomationRunMode = "queue" | "parallel";
 

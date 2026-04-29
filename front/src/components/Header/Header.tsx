@@ -19,7 +19,7 @@ import Modal from "../Modal/Modal";
 import AppButton from "../UI/Button";
 
 const HEADER_TEXT = {
-  automation: "Автоматизация",
+  automation: "Роботы и триггеры",
   closeMenu: "Закрыть меню",
   delete: "Удалить",
   deleteAllNotifications: "Удалить все",

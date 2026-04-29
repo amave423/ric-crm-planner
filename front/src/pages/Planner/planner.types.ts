@@ -1,4 +1,4 @@
-export type PlannerTab = "teams" | "backlog" | "kanban" | "gantt" | "robots";
+export type PlannerTab = "teams" | "backlog" | "kanban" | "gantt";
 
 export type ParentEditDraft = {
   title: string;
