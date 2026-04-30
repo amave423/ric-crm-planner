@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Empty, Segmented } from "antd";
 import AutomationPanel from "../../components/Automation/AutomationPanel";
 import { AuthContext } from "../../context/AuthContext";
@@ -18,10 +18,23 @@ const AUTOMATION_TABS: Array<{ label: string; value: AutomationScope }> = [
   { label: "Заявки", value: "requests" },
 ];
 
+const AUTOMATION_TAB_STORAGE_KEY = "automation-selected-tab";
+
+function isAutomationScope(value: string | null): value is AutomationScope {
+  return AUTOMATION_TABS.some((tab) => tab.value === value);
+}
+
 export default function AutomationPage() {
   const { user } = useContext(AuthContext);
-  const [tab, setTab] = useState<AutomationScope>("crm");
+  const [tab, setTab] = useState<AutomationScope>(() => {
+    const savedTab = window.localStorage.getItem(AUTOMATION_TAB_STORAGE_KEY);
+    return isAutomationScope(savedTab) ? savedTab : "crm";
+  });
   const canManageAutomation = Boolean(user && user.role !== "student");
+
+  useEffect(() => {
+    window.localStorage.setItem(AUTOMATION_TAB_STORAGE_KEY, tab);
+  }, [tab]);
 
   if (!canManageAutomation) {
     return (

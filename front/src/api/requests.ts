@@ -94,6 +94,11 @@ function isForbidden(err: unknown): boolean {
   return txt2.includes("permission") || txt2.includes("forbidden") || txt2.includes("403");
 }
 
+function isProjectantRole(role?: string): boolean {
+  const normalized = String(role || "").toLowerCase();
+  return normalized === "student" || normalized.includes("project");
+}
+
 async function loadStatuses(): Promise<BackendStatus[]> {
   if (statusCache) return statusCache;
   try {
@@ -194,7 +199,7 @@ export async function getRequests(options: GetRequestsOptions = {}): Promise<Req
     if (!Array.isArray(raw)) return [];
 
     const mapped = (raw as BackendRequest[]).map((x) => mapBackendRequest(x, statuses));
-    const shouldFilterByOwner = options.role === "student" && typeof options.ownerId !== "undefined";
+    const shouldFilterByOwner = isProjectantRole(options.role) && typeof options.ownerId !== "undefined";
     const filtered =
       !shouldFilterByOwner
         ? mapped
@@ -203,7 +208,7 @@ export async function getRequests(options: GetRequestsOptions = {}): Promise<Req
     filtered.forEach((r) => cacheBackendRequest(r));
     return filtered;
   } catch (err) {
-    if (options.role === "student" || typeof options.ownerId !== "undefined") {
+    if (isProjectantRole(options.role) || typeof options.ownerId !== "undefined") {
       return getBackendRequestCache(options.ownerId).map((item) => normalizeRequest(item));
     }
     if (isForbidden(err)) return [];

@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useState } from "react";
-import { Dropdown, Progress, Segmented } from "antd";
+import { Checkbox, Dropdown, Progress, Segmented, Tooltip } from "antd";
 import type { MenuProps } from "antd";
-import { DownOutlined } from "@ant-design/icons";
+import { DownOutlined, SettingFilled } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
 import client from "../../api/client";
 import { getEvents } from "../../api/events";
@@ -21,48 +21,60 @@ import { useToast } from "../../components/Toast/ToastProvider";
 import "./requests.scss";
 
 const TEXT = {
-  myRequests: "\u041c\u043e\u0438 \u0437\u0430\u044f\u0432\u043a\u0438",
-  requests: "\u0417\u0430\u044f\u0432\u043a\u0438",
-  list: "\u0421\u043f\u0438\u0441\u043e\u043a",
-  diagram: "\u0414\u0438\u0430\u0433\u0440\u0430\u043c\u043c\u0430",
-  search: "\u041f\u043e\u0438\u0441\u043a...",
-  studentName: "\u0424\u0418\u041e \u0441\u0442\u0443\u0434\u0435\u043d\u0442\u0430",
-  event: "\u041c\u0435\u0440\u043e\u043f\u0440\u0438\u044f\u0442\u0438\u0435",
-  specialization: "\u0421\u043f\u0435\u0446\u0438\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u044f",
-  status: "\u0421\u0442\u0430\u0442\u0443\u0441",
-  withdrawRequest: "\u041e\u0442\u043e\u0437\u0432\u0430\u0442\u044c \u0437\u0430\u044f\u0432\u043a\u0443",
-  other: "\u041e\u0441\u0442\u0430\u043b\u044c\u043d\u044b\u0435",
-  requestsDiagram: "\u0414\u0438\u0430\u0433\u0440\u0430\u043c\u043c\u0430 \u0437\u0430\u044f\u0432\u043e\u043a",
+  myRequests: "Мои заявки",
+  requests: "Заявки",
+  list: "Список",
+  diagram: "Диаграмма",
+  search: "Поиск...",
+  studentName: "ФИО студента",
+  event: "Мероприятие",
+  specialization: "Специализация",
+  status: "Статус",
+  withdrawRequest: "Отозвать заявку",
+  other: "Остальные",
+  requestsDiagram: "Диаграмма заявок",
   distribution:
-    "\u0420\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u0441\u0442\u0443\u0434\u0435\u043d\u0442\u043e\u0432 \u043f\u043e \u0442\u0435\u043a\u0443\u0449\u0438\u043c \u0441\u0442\u0430\u0442\u0443\u0441\u0430\u043c",
-  total: "\u0432\u0441\u0435\u0433\u043e",
-  keyStatuses: "\u041a\u043b\u044e\u0447\u0435\u0432\u044b\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u044b",
-  greenSegment:
-    "\u0417\u0435\u043b\u0435\u043d\u044b\u0439 \u0441\u0435\u0433\u043c\u0435\u043d\u0442 \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0435\u0442 \u0441\u0442\u0443\u0434\u0435\u043d\u0442\u043e\u0432 \u0441\u043e \u0441\u0442\u0430\u0442\u0443\u0441\u043e\u043c",
+    "Распределение студентов по текущим статусам",
+  total: "всего",
+  keyStatuses: "Ключевые статусы",
+  activeRequests: "Активные заявки",
+  statusDistribution:
+    "Расклад по статусам",
+  circleDiagram: "Круговая",
+  lineDiagram: "Линейная",
+  statusDisplaySettings:
+    "Настройка отображения статусов",
+  statusDisplayDescription:
+    "Выбранные статусы отображаются отдельно. Невыбранные статусы попадут в \"Остальные\".",
+  selectAllStatuses:
+    "Выбрать все",
+  ready: "Готово",
+  colorHint:
+    "Цвета на диаграмме совпадают со статусами заявок.",
   percentOfTotal:
-    "\u043e\u0442 \u043e\u0431\u0449\u0435\u0433\u043e \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u0430",
+    "от общего количества",
   confirmAction:
-    "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435",
+    "Подтвердите действие",
   withdrawConfirm:
-    "\u0412\u044b \u0443\u0432\u0435\u0440\u0435\u043d\u044b, \u0447\u0442\u043e \u0445\u043e\u0442\u0438\u0442\u0435 \u043e\u0442\u043e\u0437\u0432\u0430\u0442\u044c \u0437\u0430\u044f\u0432\u043a\u0443?",
-  cancel: "\u041e\u0442\u043c\u0435\u043d\u0430",
-  withdraw: "\u041e\u0442\u043e\u0437\u0432\u0430\u0442\u044c",
+    "Вы уверены, что хотите отозвать заявку?",
+  cancel: "Отмена",
+  withdraw: "Отозвать",
   confirmation:
-    "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435",
+    "Подтверждение",
   confirmActionText:
-    "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435.",
+    "Подтвердите действие.",
   confirm:
-    "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044c",
+    "Подтвердить",
   allEvents:
-    "\u0412\u0441\u0435 \u043c\u0435\u0440\u043e\u043f\u0440\u0438\u044f\u0442\u0438\u044f",
+    "Все мероприятия",
   noStudents:
-    "\u041d\u0435\u0442 \u0441\u0442\u0443\u0434\u0435\u043d\u0442\u043e\u0432",
+    "Нет студентов",
   showStudents:
-    "\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u0441\u0442\u0443\u0434\u0435\u043d\u0442\u043e\u0432",
+    "Показать студентов",
   hideStudents:
-    "\u0421\u043a\u0440\u044b\u0442\u044c \u0441\u0442\u0443\u0434\u0435\u043d\u0442\u043e\u0432",
+    "Скрыть студентов",
   requestNotFound:
-    "\u0422\u0430\u043a\u043e\u0439 \u0437\u0430\u044f\u0432\u043a\u0438 \u043d\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442!",
+    "Такой заявки не существует!",
 } as const;
 
 type RequestRecord = RequestType & {
@@ -88,8 +100,62 @@ type PendingTransition = {
 };
 
 type RequestsView = "list" | "diagram";
+type RequestsChartView = "circle" | "line";
 type EventFilter = number | "all";
-type AnalyticsStatusKey = "submitted" | "testing" | "started" | "other";
+type AnalyticsStatusKey = string;
+
+const CHART_VIEW_STORAGE_KEY = "requests-chart-view";
+const REQUESTS_VIEW_STORAGE_KEY = "requests-view";
+const DISPLAYED_STATUSES_STORAGE_KEY = "requests-displayed-statuses";
+const DASHBOARD_START_ANGLE = 225;
+const DASHBOARD_SWEEP_ANGLE = 270;
+const OTHER_STATUS_KEY = "other";
+const OTHER_STATUS_COLOR = "#94a3b8";
+const REQUEST_STATUS_COLORS: Record<string, string> = {
+  [REQUEST_STATUS.SUBMITTED]: "#6495ed",
+  [REQUEST_STATUS.TESTING]: "#f59e0b",
+  [REQUEST_STATUS.JOINED_CHAT]: "#14b8a6",
+  [REQUEST_STATUS.STARTED]: "#22c55e",
+};
+
+function isRequestsChartView(value: string | null): value is RequestsChartView {
+  return value === "circle" || value === "line";
+}
+
+function isRequestsView(value: string | null): value is RequestsView {
+  return value === "list" || value === "diagram";
+}
+
+function readDisplayedStatuses() {
+  const fallback = [...ORGANIZER_REQUEST_STATUSES];
+  const savedStatuses = window.localStorage.getItem(DISPLAYED_STATUSES_STORAGE_KEY);
+  if (!savedStatuses) return fallback;
+
+  try {
+    const parsed = JSON.parse(savedStatuses);
+    if (!Array.isArray(parsed)) return fallback;
+
+    return ORGANIZER_REQUEST_STATUSES.filter((status) => parsed.includes(status));
+  } catch {
+    return fallback;
+  }
+}
+
+function getArcPoint(cx: number, cy: number, radius: number, angle: number) {
+  const radians = ((angle - 90) * Math.PI) / 180;
+  return {
+    x: cx + radius * Math.cos(radians),
+    y: cy + radius * Math.sin(radians),
+  };
+}
+
+function getArcPath(startAngle: number, endAngle: number) {
+  const start = getArcPoint(100, 100, 72, endAngle);
+  const end = getArcPoint(100, 100, 72, startAngle);
+  const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+
+  return `M ${start.x} ${start.y} A 72 72 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
+}
 
 type AnalyticsStatus = {
   key: AnalyticsStatusKey;
@@ -104,12 +170,23 @@ function eventTitleFromRecord(request: RequestRecord) {
   return request.eventTitle || request.eventName || request.event || request.event_name || "-";
 }
 
+function isOrganizerRole(role?: string) {
+  const normalized = String(role || "").toLowerCase();
+  return normalized === "organizer" || normalized.includes("admin") || normalized.includes("curator");
+}
+
+function isProjectantRole(role?: string) {
+  const normalized = String(role || "").toLowerCase();
+  return normalized === "student" || normalized.includes("project");
+}
+
 export default function RequestsPage() {
   const { user } = useContext(AuthContext);
   const { showToast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
-  const isOrganizer = user?.role === "organizer";
+  const isOrganizer = isOrganizerRole(user?.role);
+  const isProjectant = isProjectantRole(user?.role);
 
   const [requests, setRequests] = useState<RequestRecord[]>([]);
   const [events, setEvents] = useState<EventType[]>([]);
@@ -120,7 +197,16 @@ export default function RequestsPage() {
   const [toRemoveId, setToRemoveId] = useState<number | null>(null);
   const [transitionOpen, setTransitionOpen] = useState(false);
   const [pendingTransition, setPendingTransition] = useState<PendingTransition | null>(null);
-  const [view, setView] = useState<RequestsView>("list");
+  const [view, setView] = useState<RequestsView>(() => {
+    const savedView = window.localStorage.getItem(REQUESTS_VIEW_STORAGE_KEY);
+    return isRequestsView(savedView) ? savedView : "list";
+  });
+  const [chartView, setChartView] = useState<RequestsChartView>(() => {
+    const savedView = window.localStorage.getItem(CHART_VIEW_STORAGE_KEY);
+    return isRequestsChartView(savedView) ? savedView : "circle";
+  });
+  const [statusSettingsOpen, setStatusSettingsOpen] = useState(false);
+  const [displayedStatuses, setDisplayedStatuses] = useState<string[]>(readDisplayedStatuses);
 
   const load = useCallback(async () => {
     const loadedRequests = await getRequests({ ownerId: user?.id, role: user?.role }).catch(() => []);
@@ -141,7 +227,22 @@ export default function RequestsPage() {
   }, [loadEvents]);
 
   useEffect(() => {
-    if (user?.role !== "student") return;
+    window.localStorage.setItem(CHART_VIEW_STORAGE_KEY, chartView);
+  }, [chartView]);
+
+  useEffect(() => {
+    window.localStorage.setItem(REQUESTS_VIEW_STORAGE_KEY, view);
+  }, [view]);
+
+  useEffect(() => {
+    window.localStorage.setItem(DISPLAYED_STATUSES_STORAGE_KEY, JSON.stringify(displayedStatuses));
+    setExpandedStatusKeys((current) =>
+      current.filter((key) => key === OTHER_STATUS_KEY || displayedStatuses.includes(key))
+    );
+  }, [displayedStatuses]);
+
+  useEffect(() => {
+    if (!isProjectant) return;
 
     const params = new URLSearchParams(location.search);
     if (params.get("requestAction") !== "progress") return;
@@ -163,7 +264,7 @@ export default function RequestsPage() {
       message: copy.message,
     });
     setTransitionOpen(true);
-  }, [location.search, navigate, user?.role]);
+  }, [isProjectant, location.search, navigate]);
 
   const handleStatusChange = async (id: number, status: string) => {
     try {
@@ -216,6 +317,16 @@ export default function RequestsPage() {
     );
   };
 
+  const toggleDisplayedStatus = (status: string, checked: boolean) => {
+    setDisplayedStatuses((current) => {
+      const selected = new Set(current);
+      if (checked) selected.add(status);
+      else selected.delete(status);
+
+      return ORGANIZER_REQUEST_STATUSES.filter((item) => selected.has(item));
+    });
+  };
+
   const selectedEvent =
     selectedEventId === "all" ? undefined : events.find((event) => Number(event.id) === Number(selectedEventId));
 
@@ -240,8 +351,11 @@ export default function RequestsPage() {
     return selectedEventId === "all" || Number(request.eventId) === Number(selectedEventId) || (!!selectedEventTitle && requestEventTitle === selectedEventTitle);
   };
 
-  const matchesCurrentUser = (request: RequestRecord) =>
-    user?.role === "student" ? Number(request.ownerId) === Number(user.id) : true;
+  const matchesCurrentUser = (request: RequestRecord) => {
+    if (!isProjectant) return true;
+    if (!user?.id) return false;
+    return Number(request.ownerId) === Number(user.id);
+  };
 
   const matchesSearchQuery = (request: RequestRecord, query: string) => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -274,20 +388,32 @@ export default function RequestsPage() {
     raw: request,
   }));
 
-  const analyticsStatuses: AnalyticsStatus[] = [
-    { key: "submitted", label: REQUEST_STATUS.SUBMITTED, count: 0, color: "#6495ed", students: [] },
-    { key: "testing", label: REQUEST_STATUS.TESTING, count: 0, color: "#f59e0b", students: [] },
-    { key: "started", label: REQUEST_STATUS.STARTED, count: 0, color: "#22c55e", students: [] },
-    { key: "other", label: TEXT.other, count: 0, color: "#94a3b8", students: [], showStatus: true },
-  ];
+  const displayedStatusSet = new Set(displayedStatuses);
+  const statusCounts = ORGANIZER_REQUEST_STATUSES.reduce<Record<string, number>>((acc, status) => {
+    acc[status] = 0;
+    return acc;
+  }, {});
 
   filtered.forEach((request) => {
     const status = String(request.status || "").trim();
-    let target = analyticsStatuses[3];
+    if (status in statusCounts) statusCounts[status] += 1;
+  });
 
-    if (status === REQUEST_STATUS.SUBMITTED) target = analyticsStatuses[0];
-    else if (status === REQUEST_STATUS.TESTING) target = analyticsStatuses[1];
-    else if (status === REQUEST_STATUS.STARTED) target = analyticsStatuses[2];
+  const analyticsStatuses: AnalyticsStatus[] = [
+    ...ORGANIZER_REQUEST_STATUSES.filter((status) => displayedStatusSet.has(status)).map((status) => ({
+      key: status,
+      label: status,
+      count: 0,
+      color: REQUEST_STATUS_COLORS[status] || OTHER_STATUS_COLOR,
+      students: [],
+    })),
+    { key: OTHER_STATUS_KEY, label: TEXT.other, count: 0, color: OTHER_STATUS_COLOR, students: [], showStatus: true },
+  ];
+  const otherStatus = analyticsStatuses[analyticsStatuses.length - 1];
+
+  filtered.forEach((request) => {
+    const status = String(request.status || "").trim();
+    const target = analyticsStatuses.find((item) => item.key === status) || otherStatus;
 
     target.count += 1;
     target.students.push(request);
@@ -295,10 +421,27 @@ export default function RequestsPage() {
 
   const totalRequests = filtered.length;
   const percentOfTotal = (count: number) => (totalRequests > 0 ? Math.round((count / totalRequests) * 100) : 0);
-  const activeProgress = analyticsStatuses[0].count + analyticsStatuses[1].count + analyticsStatuses[2].count;
-  const activePercent = percentOfTotal(activeProgress);
-  const startedPercent = percentOfTotal(analyticsStatuses[2].count);
-  const pageTitle = user?.role === "student" ? TEXT.myRequests : TEXT.requests;
+  const statusSegments = analyticsStatuses.map((item) => ({
+    ...item,
+    percent: totalRequests > 0 ? (item.count / totalRequests) * 100 : 0,
+    roundedPercent: percentOfTotal(item.count),
+  }));
+  const visibleStatusSegments = statusSegments.filter((item) => item.count > 0);
+  let dashboardAngle = DASHBOARD_START_ANGLE;
+  const dashboardSegments = visibleStatusSegments.map((item) => {
+    const sweep = (item.percent / 100) * DASHBOARD_SWEEP_ANGLE;
+    const gap = Math.min(2.4, sweep / 4);
+    const startAngle = dashboardAngle;
+    const endAngle = dashboardAngle + sweep;
+    dashboardAngle = endAngle;
+
+    return {
+      ...item,
+      path: getArcPath(startAngle + gap, endAngle - gap),
+    };
+  });
+  const visibleView = isOrganizer ? view : "list";
+  const pageTitle = isProjectant ? TEXT.myRequests : TEXT.requests;
 
   return (
     <div className="page page--events">
@@ -343,7 +486,7 @@ export default function RequestsPage() {
 	        )}
 	      </div>
 
-      {view === "list" ? (
+      {visibleView === "list" ? (
         <Table
           columns={[
             { key: "studentName", title: TEXT.studentName, width: "310px" },
@@ -371,7 +514,7 @@ export default function RequestsPage() {
               );
             }
 
-		            if (user?.role === "student") {
+		            if (isProjectant) {
 		              const canWithdraw = row.status !== REQUEST_STATUS.STARTED;
 
 	              return (
@@ -390,44 +533,101 @@ export default function RequestsPage() {
           }}
         />
       ) : (
-        <section className="requests-analytics">
-          <div className="requests-analytics__head">
-            <div>
-              <h2>{TEXT.requestsDiagram}</h2>
-              <p>{TEXT.distribution}</p>
-            </div>
-            <div className="requests-analytics__total">
-              <span>{totalRequests}</span>
-              <small>{TEXT.total}</small>
-            </div>
-          </div>
+	          <section className="requests-analytics">
+	          <div className={`requests-analytics__hero requests-analytics__hero--${chartView}`}>
+	            <div className="requests-analytics__copy">
+	              <h2>{TEXT.requestsDiagram}</h2>
+	              <p>{TEXT.distribution}</p>
+	              <Segmented
+	                className="requests-chart-toggle"
+	                size="large"
+	                shape="round"
+	                value={chartView}
+	                onChange={(value) => setChartView(value as RequestsChartView)}
+                options={[
+                  { label: TEXT.circleDiagram, value: "circle" },
+                  { label: TEXT.lineDiagram, value: "line" },
+	                ]}
+	              />
+                <AppButton className="requests-status-settings-btn" onClick={() => setStatusSettingsOpen(true)}>
+                  <SettingFilled />
+                  <span>{TEXT.statusDisplaySettings}</span>
+                </AppButton>
+		            </div>
+	
+	            {chartView === "circle" ? (
+		              <div className="requests-analytics__dashboard">
+                  <div className="requests-analytics__dashboard-chart">
+                    <svg className="requests-analytics__dashboard-svg" viewBox="0 0 200 170" aria-label={TEXT.requestsDiagram}>
+                      <path className="requests-analytics__dashboard-trail" d={getArcPath(DASHBOARD_START_ANGLE, DASHBOARD_START_ANGLE + DASHBOARD_SWEEP_ANGLE)} />
+                      {dashboardSegments.map((item) => (
+                        <Tooltip
+                          key={item.key}
+                          title={`${item.label}: ${item.count} ${TEXT.total}, ${item.roundedPercent}% ${TEXT.percentOfTotal}`}
+                        >
+                          <path className="requests-analytics__dashboard-segment" d={item.path} stroke={item.color} />
+                        </Tooltip>
+                      ))}
+                    </svg>
+                    <div className="requests-analytics__dashboard-label">
+                      <strong>{totalRequests}</strong>
+                      <span>{TEXT.total}</span>
+                    </div>
+                  </div>
+                  <div className="requests-analytics__line-labels requests-analytics__line-labels--dashboard">
+                    {visibleStatusSegments.map((item) => (
+                      <span key={item.key} style={{ ["--status-color" as string]: item.color }}>
+                        {item.label}
+                        <strong>{item.roundedPercent}%</strong>
+                      </span>
+                    ))}
+                  </div>
+		              </div>
+		            ) : (
+	              <div className="requests-analytics__linear-summary">
+	                <div className="requests-analytics__summary-top">
+	                  <span>{TEXT.total}</span>
+	                  <strong>{totalRequests}</strong>
+	                </div>
+	                <div className="requests-analytics__stacked-bar" role="img" aria-label={TEXT.statusDistribution}>
+	                  {visibleStatusSegments.map((item) => (
+	                    <Tooltip
+	                      key={item.key}
+	                      title={`${item.label}: ${item.count} ${TEXT.total}, ${item.roundedPercent}% ${TEXT.percentOfTotal}`}
+                    >
+                      <span
+                        style={{
+                          width: `${item.percent}%`,
+                          minWidth: item.count > 0 ? 10 : 0,
+                          backgroundColor: item.color,
+                        }}
+	                      />
+	                    </Tooltip>
+	                  ))}
+	                </div>
+                  <div className="requests-analytics__line-labels">
+                    {visibleStatusSegments.map((item) => (
+                      <span key={item.key} style={{ ["--status-color" as string]: item.color }}>
+                        {item.label}
+                        <strong>{item.roundedPercent}%</strong>
+                      </span>
+                    ))}
+                  </div>
+	              </div>
+	            )}
+	          </div>
 
-          <div className="requests-analytics__summary">
-            <div className="requests-analytics__summary-top">
-              <span>{TEXT.keyStatuses}</span>
-              <strong>{activePercent}%</strong>
-            </div>
-            <Progress
-              percent={activePercent}
-              success={{ percent: startedPercent }}
-              showInfo={false}
-              strokeColor="#6495ed"
-              trailColor="#eef3ff"
-            />
-            <div className="requests-analytics__hint">
-              {TEXT.greenSegment} "{REQUEST_STATUS.STARTED}".
-            </div>
-          </div>
-
-          <div className="requests-analytics__grid">
+		          <div className="requests-analytics__grid">
             {analyticsStatuses.map((item) => {
               const percent = percentOfTotal(item.count);
               const isOpen = expandedStatusKeys.includes(item.key);
 
               return (
-                <div className="requests-status-card" key={item.key}>
+                <div className="requests-status-card" key={item.key} style={{ ["--status-color" as string]: item.color }}>
                   <div className="requests-status-card__top">
-                    <span>{item.label}</span>
+                    <span className="requests-status-card__label-dot">
+                      {item.label}
+                    </span>
                     <div className="requests-status-card__actions">
                       <strong>{item.count}</strong>
                       <button
@@ -440,13 +640,36 @@ export default function RequestsPage() {
                       </button>
                     </div>
                   </div>
-                  <Progress
-                    percent={percent}
-                    success={item.key === "started" ? { percent } : undefined}
-                    showInfo={false}
-                    strokeColor={item.color}
-                    trailColor="#eef2f7"
-                  />
+
+                  {chartView === "circle" ? (
+                    <Tooltip title={`${item.count} ${TEXT.total}, ${percent}% ${TEXT.percentOfTotal}`}>
+                      <div className="requests-status-card__circle">
+                        <Progress
+                          type="circle"
+                          percent={percent}
+                          strokeColor={item.color}
+                          trailColor="#edf2f7"
+                          strokeWidth={10}
+                          size={104}
+	                          format={() => (
+	                            <div className="requests-status-card__circle-label">
+	                              <strong>{percent}%</strong>
+	                            </div>
+	                          )}
+                        />
+                      </div>
+                    </Tooltip>
+                  ) : (
+                    <div className="requests-status-card__bar">
+                      <Progress
+                        percent={percent}
+                        showInfo={false}
+                        strokeColor={item.color}
+                        trailColor="#eef2f7"
+                        strokeWidth={10}
+                      />
+                    </div>
+                  )}
                   <small>{percent}% {TEXT.percentOfTotal}</small>
 
                   {isOpen && (
@@ -472,7 +695,7 @@ export default function RequestsPage() {
         </section>
       )}
 
-      <Modal isOpen={confirmOpen} onClose={() => setConfirmOpen(false)} title={TEXT.confirmAction}>
+	      <Modal isOpen={confirmOpen} onClose={() => setConfirmOpen(false)} title={TEXT.confirmAction}>
         <div className="confirm-body">
           <div className="confirm-text">{TEXT.withdrawConfirm}</div>
           <div className="confirm-actions">
@@ -484,9 +707,44 @@ export default function RequestsPage() {
             </AppButton>
           </div>
         </div>
-      </Modal>
+	      </Modal>
 
-      <Modal isOpen={transitionOpen} onClose={closeTransitionModal} title={pendingTransition?.title || TEXT.confirmation}>
+      <Modal
+        isOpen={statusSettingsOpen}
+        onClose={() => setStatusSettingsOpen(false)}
+        title={TEXT.statusDisplaySettings}
+      >
+        <div className="requests-status-settings">
+          <p>{TEXT.statusDisplayDescription}</p>
+          <div className="requests-status-settings__list">
+            {ORGANIZER_REQUEST_STATUSES.map((status) => (
+              <label
+                className="requests-status-settings__option"
+                key={status}
+                style={{ ["--status-color" as string]: REQUEST_STATUS_COLORS[status] || OTHER_STATUS_COLOR }}
+              >
+                <Checkbox
+                  checked={displayedStatuses.includes(status)}
+                  onChange={(event) => toggleDisplayedStatus(status, event.target.checked)}
+                >
+                  {status}
+                </Checkbox>
+                <span>{statusCounts[status] || 0}</span>
+              </label>
+            ))}
+          </div>
+          <div className="confirm-actions">
+            <AppButton className="close-btn" onClick={() => setDisplayedStatuses([...ORGANIZER_REQUEST_STATUSES])}>
+              {TEXT.selectAllStatuses}
+            </AppButton>
+            <AppButton className="btn-send" onClick={() => setStatusSettingsOpen(false)}>
+              {TEXT.ready}
+            </AppButton>
+          </div>
+        </div>
+      </Modal>
+	
+	      <Modal isOpen={transitionOpen} onClose={closeTransitionModal} title={pendingTransition?.title || TEXT.confirmation}>
         <div className="confirm-body">
           <div className="confirm-text">{pendingTransition?.message || TEXT.confirmActionText}</div>
           <div className="confirm-actions">

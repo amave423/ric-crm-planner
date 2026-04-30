@@ -72,8 +72,8 @@ export default function ProfilePage() {
       if (client.USE_MOCK) {
         const userRecord = user as unknown as Record<string, unknown>;
         setProfile({
-          name: user.name || "\u0418\u043c\u044f",
-          surname: user.surname || "\u0424\u0430\u043c\u0438\u043b\u0438\u044f",
+          name: user.name || "Имя",
+          surname: user.surname || "Фамилия",
           university: String(userRecord.university ?? ""),
           course: String(userRecord.course ?? ""),
           specialty: String(userRecord.specialty ?? ""),

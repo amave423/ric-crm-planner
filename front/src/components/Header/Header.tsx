@@ -39,6 +39,16 @@ const HEADER_TEXT = {
   requests: "Заявки",
 } as const;
 
+function isProjectantRole(role?: string) {
+  const normalized = String(role || "").toLowerCase();
+  return normalized === "student" || normalized.includes("project");
+}
+
+function isOrganizerRole(role?: string) {
+  const normalized = String(role || "").toLowerCase();
+  return normalized === "organizer" || normalized.includes("admin") || normalized.includes("curator");
+}
+
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -48,7 +58,9 @@ export default function Header() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const canManageAutomation = Boolean(user && user.role !== "student");
+  const isProjectant = isProjectantRole(user?.role);
+  const isOrganizer = isOrganizerRole(user?.role);
+  const canManageAutomation = Boolean(user && !isProjectant);
 
   useEffect(() => {
     if (!notificationsOpen) return;
@@ -69,7 +81,7 @@ export default function Header() {
               <span className="mobile-menu-entry__icon">
                 <BarsOutlined />
               </span>
-              <span>{user.role === "student" ? HEADER_TEXT.myRequests : HEADER_TEXT.requests}</span>
+              <span>{isProjectant ? HEADER_TEXT.myRequests : HEADER_TEXT.requests}</span>
             </span>
           ),
         },
@@ -182,7 +194,7 @@ export default function Header() {
           <>
             <AppButton className="head-btn head-btn--muted" onClick={() => navigate("/requests")}>
               <BarsOutlined />
-              <span>{user.role === "student" ? HEADER_TEXT.myRequests : HEADER_TEXT.requests}</span>
+              <span>{isProjectant ? HEADER_TEXT.myRequests : HEADER_TEXT.requests}</span>
             </AppButton>
 
             {canManageAutomation && (
@@ -212,7 +224,7 @@ export default function Header() {
             <div className="profile-box" onClick={() => navigate("/profile")}>
               <UserOutlined className="profile-icon" />
               <div className="profile-text">
-                <div className="role">{user.role === "organizer" ? HEADER_TEXT.organizer : HEADER_TEXT.projectant}</div>
+                <div className="role">{isOrganizer ? HEADER_TEXT.organizer : HEADER_TEXT.projectant}</div>
                 <div className="name">{user.name ? `${user.name} ${user.surname || ""}` : HEADER_TEXT.guest}</div>
               </div>
             </div>
@@ -263,7 +275,7 @@ export default function Header() {
                   </div>
                   {notification.message && <div className="notification-item__message">{notification.message}</div>}
                   <div className="notification-item__actions">
-                    {notification.link && user?.role !== "organizer" && (
+                    {notification.link && !isOrganizer && (
                       <AppButton
                         className="notification-link-btn"
                         onClick={() => openNotificationLink(notification.id, notification.link)}

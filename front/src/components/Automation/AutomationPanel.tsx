@@ -90,6 +90,9 @@ type AutomationPanelProps = {
   className?: string;
 };
 
+const AUTOMATION_SELECTED_EVENT_STORAGE_PREFIX = "automation-selected-event";
+const AUTOMATION_SELECTED_STAGE_STORAGE_PREFIX = "automation-selected-stage";
+
 function getEventTitle(event?: Event) {
   return event?.title?.trim() || `Мероприятие #${event?.id ?? ""}`;
 }
@@ -98,6 +101,28 @@ function clampDelay(value: string) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
   return Math.round(parsed);
+}
+
+function getEventStorageKey(scope: AutomationScope) {
+  return `${AUTOMATION_SELECTED_EVENT_STORAGE_PREFIX}:${scope}`;
+}
+
+function getStageStorageKey(scope: AutomationScope, eventId: number) {
+  return `${AUTOMATION_SELECTED_STAGE_STORAGE_PREFIX}:${scope}:${eventId}`;
+}
+
+function readStoredEventId(scope: AutomationScope, events: Event[]) {
+  const savedEventId = Number(window.localStorage.getItem(getEventStorageKey(scope)));
+  if (!Number.isFinite(savedEventId)) return null;
+
+  return events.some((event) => Number(event.id) === savedEventId) ? savedEventId : null;
+}
+
+function readStoredStageId(scope: AutomationScope, eventId: number, config: AutomationConfig) {
+  const savedStageId = window.localStorage.getItem(getStageStorageKey(scope, eventId));
+  if (!savedStageId) return "";
+
+  return config.stages.some((stage) => stage.id === savedStageId) ? savedStageId : "";
 }
 
 export default function AutomationPanel({ scope, lockedEventId, className = "" }: AutomationPanelProps) {
@@ -116,7 +141,6 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
       .then((items) => {
         if (!mounted) return;
         setEvents(items);
-        setSelectedEventId((current) => lockedEventId ?? current ?? items[0]?.id ?? null);
       })
       .catch(() => {
         if (mounted) showToast("error", TEXT.loadError);
@@ -131,9 +155,28 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
   }, [lockedEventId, showToast]);
 
   useEffect(() => {
-    if (!lockedEventId) return;
-    setSelectedEventId(lockedEventId);
-  }, [lockedEventId]);
+    if (lockedEventId) {
+      setSelectedEventId(lockedEventId);
+      return;
+    }
+
+    if (events.length === 0) {
+      setSelectedEventId(null);
+      return;
+    }
+
+    setSelectedEventId((current) => {
+      const savedEventId = readStoredEventId(scope, events);
+      if (savedEventId) return savedEventId;
+      if (current && events.some((event) => Number(event.id) === Number(current))) return current;
+      return Number(events[0]?.id) || null;
+    });
+  }, [events, lockedEventId, scope]);
+
+  useEffect(() => {
+    if (lockedEventId || !selectedEventId) return;
+    window.localStorage.setItem(getEventStorageKey(scope), String(selectedEventId));
+  }, [lockedEventId, scope, selectedEventId]);
 
   useEffect(() => {
     if (!selectedEventId) {
@@ -143,8 +186,13 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
 
     const nextConfig = readAutomationConfig(scope, selectedEventId);
     setConfig(nextConfig);
-    setSelectedStageId((current) => current || nextConfig.stages[0]?.id || "");
+    setSelectedStageId(readStoredStageId(scope, selectedEventId, nextConfig) || nextConfig.stages[0]?.id || "");
   }, [scope, selectedEventId]);
+
+  useEffect(() => {
+    if (!selectedEventId || !selectedStageId) return;
+    window.localStorage.setItem(getStageStorageKey(scope, selectedEventId), selectedStageId);
+  }, [scope, selectedEventId, selectedStageId]);
 
   useEffect(() => {
     if (!config) return;

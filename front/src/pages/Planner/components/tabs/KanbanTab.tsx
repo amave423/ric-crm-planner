@@ -300,7 +300,7 @@ export default function KanbanTab({
               <div className="kanban-column-actions">
                 <span className="kanban-column-count">{column.totalChildrenCount}</span>
                 <span className="kanban-column-drag-hint" aria-hidden="true">
-                  {"\u2039"}
+                  {"‹"}
                 </span>
                 <AppButton
                   type="button"
@@ -314,7 +314,7 @@ export default function KanbanTab({
                   title="Удалить колонку"
                   aria-label="Удалить колонку"
                 >
-                  {"\u00d7"}
+                  {"×"}
                 </AppButton>
               </div>
             </div>
