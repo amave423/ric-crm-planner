@@ -10,7 +10,7 @@ import {
   saveRequest as _saveRequest,
   updateRequestStatus as _updateRequestStatus,
 } from "../storage/requests";
-import { getEventById as _getMockEventById } from "../storage/storage";
+import { getArchivedEventIds, getEventById as _getMockEventById } from "../storage/storage";
 
 const USE_MOCK = client.USE_MOCK;
 
@@ -52,10 +52,15 @@ type BackendRequest = {
   event_name?: string;
   directionId?: number | string;
   direction?: number | string;
+  directionTitle?: string;
+  directionName?: string;
+  direction_name?: string;
   specialization?: string | { id?: number | string; name?: string; title?: string };
   specializationId?: number | string;
   about?: string;
   message?: string;
+  customFields?: Record<string, string>;
+  custom_fields?: Record<string, string>;
   status?: string | number;
   createdAt?: string;
   dateSub?: string;
@@ -142,6 +147,7 @@ function mapBackendRequest(item: BackendRequest, statuses: BackendStatus[]): Req
     eventId,
     eventTitle: item.eventTitle || item.eventName || item.event_name,
     directionId,
+    directionTitle: item.directionTitle || item.directionName || item.direction_name,
     specializationId: toNumber(item.specializationId ?? specializationObject?.id),
     specialization: specializationObject
       ? specializationObject.name ?? specializationObject.title
@@ -149,11 +155,17 @@ function mapBackendRequest(item: BackendRequest, statuses: BackendStatus[]): Req
         ? String(item.specialization)
         : undefined,
     about: item.about ?? item.message ?? "",
+    customFields: item.customFields ?? item.custom_fields,
     status: mappedStatus.status,
     statusId: mappedStatus.statusId,
     ownerId,
     createdAt: item.createdAt ?? item.dateSub ?? item.date_sub,
   });
+}
+
+function filterArchivedRequests(items: ReqType[]): ReqType[] {
+  const archivedEventIds = new Set(getArchivedEventIds());
+  return items.filter((request) => !request.eventId || !archivedEventIds.has(Number(request.eventId)));
 }
 
 async function enrichMockRequests(items: ReqType[]): Promise<ReqType[]> {
@@ -190,7 +202,7 @@ async function enrichMockRequests(items: ReqType[]): Promise<ReqType[]> {
 export async function getRequests(options: GetRequestsOptions = {}): Promise<ReqType[]> {
   if (USE_MOCK) {
     const items = await _getRequests();
-    return enrichMockRequests(items);
+    return filterArchivedRequests(await enrichMockRequests(items));
   }
 
   const statuses = await loadStatuses();
@@ -205,11 +217,12 @@ export async function getRequests(options: GetRequestsOptions = {}): Promise<Req
         ? mapped
         : mapped.filter((r) => Number(r.ownerId) === Number(options.ownerId));
 
-    filtered.forEach((r) => cacheBackendRequest(r));
-    return filtered;
+    const visible = filterArchivedRequests(filtered);
+    visible.forEach((r) => cacheBackendRequest(r));
+    return visible;
   } catch (err) {
     if (isProjectantRole(options.role) || typeof options.ownerId !== "undefined") {
-      return getBackendRequestCache(options.ownerId).map((item) => normalizeRequest(item));
+      return filterArchivedRequests(getBackendRequestCache(options.ownerId).map((item) => normalizeRequest(item)));
     }
     if (isForbidden(err)) return [];
     return [];
@@ -243,6 +256,7 @@ export async function saveRequest(req: ReqType): Promise<ReqType> {
   if (typeof projectId !== "undefined") payload.project_ref = projectId;
   if (typeof req.specializationId !== "undefined") payload.specialization = req.specializationId;
   else if (req.specialization) payload.specialization = req.specialization;
+  if (req.customFields && Object.keys(req.customFields).length > 0) payload.custom_fields = req.customFields;
 
   if (req.id && req.id > 0) {
     const updated = await client.put<BackendRequest>(`/api/users/applications/${req.id}/`, payload);

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { CheckOutlined } from "@ant-design/icons";
+import { useEffect, useMemo, useState } from "react";
 import { useWizard } from "../EventWizardModal";
 import type { DirectionModel } from "../types";
 import { getDirectionsByEvent, saveDirectionsForEvent as persistDirections } from "../../../api/directions";
@@ -34,6 +35,26 @@ function toDirectionModel(direction: Direction): DirectionModel {
   };
 }
 
+function buildDirectionSnapshot(
+  directions: DirectionModel[],
+  input: string,
+  description: string,
+  selectedOrganizer: string,
+  editingDirectionId: number | null
+) {
+  return JSON.stringify({
+    directions: directions.map((direction) => ({
+      title: direction.title?.trim() ?? "",
+      description: direction.description?.trim() ?? "",
+      organizer: String(direction.organizer ?? "").trim(),
+    })),
+    input: input.trim(),
+    description: description.trim(),
+    selectedOrganizer: selectedOrganizer.trim(),
+    editingDirectionId,
+  });
+}
+
 export default function DirectionForm() {
   const { mode, saveDirections, eventId, savedDirections, directionId: ctxDirectionId } = useWizard();
   const { showToast } = useToast();
@@ -46,8 +67,20 @@ export default function DirectionForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [usersList, setUsersList] = useState<User[]>([]);
+  const [saveState, setSaveState] = useState<"idle" | "synced">("idle");
+  const [savedSnapshot, setSavedSnapshot] = useState("");
 
   const organizers = usersList.filter((user) => user.role === "organizer");
+  const formSnapshot = useMemo(
+    () => buildDirectionSnapshot(directions, input, description, selectedOrganizer, editingDirectionId),
+    [description, directions, editingDirectionId, input, selectedOrganizer]
+  );
+
+  useEffect(() => {
+    if (saveState === "synced" && savedSnapshot && savedSnapshot !== formSnapshot) {
+      setSaveState("idle");
+    }
+  }, [formSnapshot, saveState, savedSnapshot]);
 
   const fillForm = (direction?: DirectionModel) => {
     if (!direction) return;
@@ -238,11 +271,26 @@ export default function DirectionForm() {
     try {
       const saved = await persistDirections(Number(eventId), payload as Direction[]);
       const mapped = (saved as Direction[]).map((direction) => toDirectionModel(direction));
+      const activeDirection =
+        mode === "edit" && ctxDirectionId
+          ? mapped.find((direction) => Number(direction.id) === Number(ctxDirectionId))
+          : undefined;
+
       setDirections(mapped);
       saveDirections?.(mapped);
       if (mode === "edit" && ctxDirectionId) {
-        fillForm(mapped.find((direction) => Number(direction.id) === Number(ctxDirectionId)));
+        fillForm(activeDirection);
       }
+      setSavedSnapshot(
+        buildDirectionSnapshot(
+          mapped,
+          activeDirection?.title ?? input,
+          activeDirection?.description ?? description,
+          String(activeDirection?.organizer ?? selectedOrganizer),
+          editingDirectionId
+        )
+      );
+      setSaveState("synced");
       showToast("success", "Направления сохранены");
     } catch {
       showToast("error", "Ошибка при сохранении направлений");
@@ -255,7 +303,7 @@ export default function DirectionForm() {
 
       <div className={`field-wrap ${errors.input ? "error" : ""}`}>
         <label className="text-small">
-          Название направления
+          <span className="wizard-field-label">Название направления</span>
           <div className="wizard-inline-add-row wizard-inline-add-row--entity">
             <AppInput
               placeholder="Введите название направления"
@@ -284,13 +332,13 @@ export default function DirectionForm() {
       </div>
 
       <label className="text-small">
-        Описание
+        <span className="wizard-field-label">Описание</span>
         <AppTextArea value={description} onChange={(event) => setDescription(event.target.value)} />
       </label>
 
       <div className={`field-wrap ${errors.selectedOrganizer ? "error" : ""}`}>
         <label className="text-small">
-          Организатор направления
+          <span className="wizard-field-label">Организатор направления</span>
           <AppSelect
             tone="directions"
             value={selectedOrganizer}
@@ -343,8 +391,13 @@ export default function DirectionForm() {
       </div>
 
       <div className="wizard-actions">
-        <AppButton className="primary" onClick={handleSave} type="button">
-          Сохранить направления
+        <AppButton className="primary" onClick={handleSave} type="button" disabled={saveState === "synced"}>
+          {saveState === "synced" && <CheckOutlined />}
+          {saveState === "synced"
+            ? "Изменения сохранены"
+            : mode === "edit" || directions.length > 0
+              ? "Сохранить изменения"
+              : "Сохранить направления"}
         </AppButton>
       </div>
     </div>

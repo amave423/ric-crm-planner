@@ -131,6 +131,20 @@ export default function EventsPage() {
     void loadEvents();
   }, [loadEvents]);
 
+  useEffect(() => {
+    const handleArchived = (event: globalThis.Event) => {
+      const eventId = Number((event as CustomEvent<{ eventId?: number }>).detail?.eventId);
+      if (!eventId) return;
+
+      setAllEvents((prev) => prev.filter((item) => Number(item.id) !== eventId));
+      setRequests((prev) => prev.filter((item) => Number(item.eventId) !== eventId));
+      setSelectedEvent((prev) => (Number(prev?.id) === eventId ? null : prev));
+    };
+
+    window.addEventListener("events:archived", handleArchived);
+    return () => window.removeEventListener("events:archived", handleArchived);
+  }, []);
+
   const refreshRequests = useCallback(async () => {
     if (!user) {
       setRequests([]);
@@ -307,6 +321,7 @@ export default function EventsPage() {
         eventId={selectedEvent?.id}
         eventTitle={selectedEvent?.title}
         specializations={selectedEvent?.specializations || []}
+        applicationFormFields={selectedEvent?.applicationFormFields || []}
         onSubmit={async (request) => {
           if (!user?.id || !selectedEvent?.id) return false;
           if (isApplyDeadlineExpired(selectedEvent)) {

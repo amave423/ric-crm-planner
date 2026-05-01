@@ -1,7 +1,11 @@
-import { useContext, useEffect, useState } from "react";
+﻿import { useContext, useEffect, useMemo, useState } from "react";
 import client from "../../api/client";
+import { getDirectionsByEvent } from "../../api/directions";
+import { normalizeApplicationFormFields, SYSTEM_APPLICATION_FIELD_IDS } from "../../constants/applicationForm";
 import { REQUEST_STATUS } from "../../constants/requestProgress";
 import { AuthContext } from "../../context/AuthContext";
+import type { ApplicationFormField } from "../../types/event";
+import type { Direction } from "../../types/direction";
 import type { Request } from "../../types/request";
 import Modal from "../Modal/Modal";
 import { useToast } from "../Toast/ToastProvider";
@@ -26,6 +30,7 @@ interface Props {
   eventTitle?: string;
   directionId?: number;
   specializations?: { id: number; title: string }[];
+  applicationFormFields?: ApplicationFormField[];
   onSubmit: (req: Request) => boolean | Promise<boolean>;
 }
 
@@ -38,6 +43,7 @@ export default function ApplyModal({
   eventTitle,
   directionId,
   specializations = [],
+  applicationFormFields,
   onSubmit,
 }: Props) {
   const { user } = useContext(AuthContext);
@@ -48,8 +54,18 @@ export default function ApplyModal({
   const [university, setUniversity] = useState("");
   const [course, setCourse] = useState("");
   const [specialization, setSpecialization] = useState<string>(specializations[0]?.title || "");
-  const [about, setAbout] = useState("");
+  const [eventDirections, setEventDirections] = useState<Direction[]>([]);
+  const [selectedDirectionId, setSelectedDirectionId] = useState("");
+  const [customFields, setCustomFields] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const fields = useMemo(() => normalizeApplicationFormFields(applicationFormFields), [applicationFormFields]);
+  const customApplicationFields = useMemo(
+    () => fields.filter((field) => !SYSTEM_APPLICATION_FIELD_IDS.has(field.id)),
+    [fields]
+  );
+  const labelById = useMemo(() => new Map(fields.map((field) => [field.id, field.label])), [fields]);
+  const showDirectionSelect = !directionId && eventDirections.length > 0;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -66,7 +82,12 @@ export default function ApplyModal({
         setUniversity(String(profile?.university ?? userRecord.university ?? ""));
         setCourse(String(profile?.course ?? userRecord.course ?? ""));
         setSpecialization(String(profile?.specialty ?? userRecord.specialty ?? specializations[0]?.title ?? ""));
-        setAbout(String(profile?.about ?? userRecord.about ?? ""));
+        setSelectedDirectionId("");
+        setCustomFields(
+          customApplicationFields.some((field) => field.id === "about")
+            ? { about: String(profile?.about ?? userRecord.about ?? "") }
+            : {}
+        );
         setErrors({});
       } catch {
         if (!mounted) return;
@@ -75,7 +96,8 @@ export default function ApplyModal({
         setUniversity("");
         setCourse("");
         setSpecialization(specializations[0]?.title || "");
-        setAbout("");
+        setSelectedDirectionId("");
+        setCustomFields({});
         setErrors({});
       }
     })();
@@ -83,16 +105,44 @@ export default function ApplyModal({
     return () => {
       mounted = false;
     };
-  }, [isOpen, specializations, user]);
+  }, [customApplicationFields, isOpen, specializations, user]);
+
+  useEffect(() => {
+    if (!isOpen || !eventId) {
+      setEventDirections([]);
+      return;
+    }
+
+    let mounted = true;
+
+    getDirectionsByEvent(Number(eventId))
+      .then((items) => {
+        if (mounted) setEventDirections(Array.isArray(items) ? items : []);
+      })
+      .catch(() => {
+        if (mounted) setEventDirections([]);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [eventId, isOpen]);
 
   const validate = () => {
     const nextErrors: Record<string, string> = {};
+
     if (!studentName.trim()) nextErrors.studentName = "Введите ФИО";
-    if (!telegram.trim()) nextErrors.telegram = "Укажите аккаунт в Telegram";
+    if (!telegram.trim()) nextErrors.telegram = "Укажите аккаунт в ВК";
     if (!university.trim()) nextErrors.university = "Укажите университет";
     if (!course.trim()) nextErrors.course = "Укажите курс";
     if (!specialization.trim()) nextErrors.specialization = "Выберите специализацию";
     if (!eventId) nextErrors.event = "Не найдено мероприятие";
+    if (showDirectionSelect && !selectedDirectionId) nextErrors.direction = "Выберите направление";
+
+    customApplicationFields.forEach((field) => {
+      if (field.required && !customFields[field.id]?.trim()) nextErrors[field.id] = "Заполните поле";
+    });
+
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -104,6 +154,14 @@ export default function ApplyModal({
     }
 
     const selectedSpecialization = specializations.find((item) => item.title === specialization);
+    const effectiveDirectionId = directionId ?? (selectedDirectionId ? Number(selectedDirectionId) : undefined);
+    const selectedDirection = eventDirections.find((direction) => Number(direction.id) === Number(effectiveDirectionId));
+    const filteredCustomFields = Object.fromEntries(
+      Object.entries(customFields)
+        .map(([key, value]) => [key, value.trim()])
+        .filter(([, value]) => value)
+    );
+
     const request: Request = {
       id: 0,
       studentName: studentName.trim(),
@@ -114,10 +172,12 @@ export default function ApplyModal({
       projectTitle,
       eventId,
       eventTitle,
-      directionId,
+      directionId: effectiveDirectionId,
+      directionTitle: selectedDirection?.title,
       specializationId: selectedSpecialization?.id,
       specialization,
-      about: about.trim(),
+      about: filteredCustomFields.about ?? "",
+      customFields: filteredCustomFields,
       status: REQUEST_STATUS.SUBMITTED,
       createdAt: new Date().toISOString(),
       ownerId: user?.id,
@@ -126,6 +186,14 @@ export default function ApplyModal({
     const result = onSubmit(request);
     Promise.resolve(result).then((ok) => {
       if (ok) onClose();
+    });
+  };
+
+  const clearError = (key: string) => {
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
     });
   };
 
@@ -138,17 +206,13 @@ export default function ApplyModal({
 
         <div className="form-body">
           <div className="form-field">
-            <label className="text-small">ФИО</label>
+            <label className="text-small">{labelById.get("studentName") ?? "ФИО"}</label>
             <AppInput
               className="text-regular"
               value={studentName}
               onChange={(event) => {
                 setStudentName(event.target.value);
-                setErrors((prev) => {
-                  const next = { ...prev };
-                  delete next.studentName;
-                  return next;
-                });
+                clearError("studentName");
               }}
               aria-invalid={!!errors.studentName}
             />
@@ -156,17 +220,13 @@ export default function ApplyModal({
           </div>
 
           <div className="form-field">
-            <label className="text-small">Аккаунт в VK, Telegram</label>
+            <label className="text-small">{labelById.get("telegram") ?? "Аккаунт в ВК"}</label>
             <AppInput
               className="text-regular"
               value={telegram}
               onChange={(event) => {
                 setTelegram(event.target.value);
-                setErrors((prev) => {
-                  const next = { ...prev };
-                  delete next.telegram;
-                  return next;
-                });
+                clearError("telegram");
               }}
               aria-invalid={!!errors.telegram}
             />
@@ -174,17 +234,13 @@ export default function ApplyModal({
           </div>
 
           <div className="form-field">
-            <label className="text-small">Университет</label>
+            <label className="text-small">{labelById.get("university") ?? "Университет"}</label>
             <AppInput
               className="text-regular"
               value={university}
               onChange={(event) => {
                 setUniversity(event.target.value);
-                setErrors((prev) => {
-                  const next = { ...prev };
-                  delete next.university;
-                  return next;
-                });
+                clearError("university");
               }}
               aria-invalid={!!errors.university}
             />
@@ -192,35 +248,47 @@ export default function ApplyModal({
           </div>
 
           <div className="form-field">
-            <label className="text-small">Курс</label>
+            <label className="text-small">{labelById.get("course") ?? "Курс"}</label>
             <AppInput
               className="text-regular"
               value={course}
               onChange={(event) => {
                 setCourse(event.target.value);
-                setErrors((prev) => {
-                  const next = { ...prev };
-                  delete next.course;
-                  return next;
-                });
+                clearError("course");
               }}
               aria-invalid={!!errors.course}
             />
             {errors.course && <div className="field-error">{errors.course}</div>}
           </div>
 
+          {showDirectionSelect && (
+            <div className="form-field">
+              <label className="text-small">Направление</label>
+              <AppSelect
+                className="text-regular"
+                value={selectedDirectionId}
+                onChange={(value) => {
+                  setSelectedDirectionId(String(value));
+                  clearError("direction");
+                }}
+                aria-invalid={!!errors.direction}
+                options={[
+                  { value: "", label: "Выберите направление" },
+                  ...eventDirections.map((direction) => ({ value: String(direction.id), label: direction.title })),
+                ]}
+              />
+              {errors.direction && <div className="field-error">{errors.direction}</div>}
+            </div>
+          )}
+
           <div className="form-field">
-            <label className="text-small">Специализация</label>
+            <label className="text-small">{labelById.get("specialization") ?? "Специализация"}</label>
             <AppSelect
               className="text-regular"
               value={specialization}
               onChange={(value) => {
                 setSpecialization(String(value));
-                setErrors((prev) => {
-                  const next = { ...prev };
-                  delete next.specialization;
-                  return next;
-                });
+                clearError("specialization");
               }}
               aria-invalid={!!errors.specialization}
               options={[
@@ -231,10 +299,48 @@ export default function ApplyModal({
             {errors.specialization && <div className="field-error">{errors.specialization}</div>}
           </div>
 
-          <div className="form-field">
-            <label className="text-small">О себе (необязательно)</label>
-            <AppTextArea value={about} onChange={(event) => setAbout(event.target.value)} />
-          </div>
+          {customApplicationFields.map((field) => (
+            <div className="form-field" key={field.id}>
+              <label className="text-small">
+                {field.label}
+                {!field.required ? " (необязательно)" : ""}
+              </label>
+              {field.type === "textarea" ? (
+                <AppTextArea
+                  value={customFields[field.id] ?? ""}
+                  onChange={(event) => {
+                    setCustomFields((prev) => ({ ...prev, [field.id]: event.target.value }));
+                    clearError(field.id);
+                  }}
+                />
+              ) : field.type === "select" ? (
+                <AppSelect
+                  className="text-regular"
+                  value={customFields[field.id] ?? ""}
+                  onChange={(value) => {
+                    setCustomFields((prev) => ({ ...prev, [field.id]: String(value) }));
+                    clearError(field.id);
+                  }}
+                  aria-invalid={!!errors[field.id]}
+                  options={[
+                    { value: "", label: "Выберите значение" },
+                    ...(field.options ?? []).map((option) => ({ value: option, label: option })),
+                  ]}
+                />
+              ) : (
+                <AppInput
+                  className="text-regular"
+                  value={customFields[field.id] ?? ""}
+                  onChange={(event) => {
+                    setCustomFields((prev) => ({ ...prev, [field.id]: event.target.value }));
+                    clearError(field.id);
+                  }}
+                  aria-invalid={!!errors[field.id]}
+                />
+              )}
+              {errors[field.id] && <div className="field-error">{errors[field.id]}</div>}
+            </div>
+          ))}
         </div>
 
         <div className="apply-actions">

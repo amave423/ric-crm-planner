@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { CheckOutlined } from "@ant-design/icons";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getDirectionsByEvent } from "../../../api/directions";
 import { getProjectsByDirection, saveProjectsForDirection } from "../../../api/projects";
 import type { Project } from "../../../types/project";
@@ -10,6 +11,26 @@ import AppInput, { AppTextArea } from "../../UI/Input";
 import AppSelect from "../../UI/Select";
 
 type LocalProject = ProjectModel & { directionId?: string };
+
+function buildProjectSnapshot(
+  projects: LocalProject[],
+  directionId: string,
+  title: string,
+  description: string,
+  editingProjectId: number | null
+) {
+  return JSON.stringify({
+    directionId,
+    projects: projects.map((project) => ({
+      title: project.title?.trim() ?? "",
+      description: project.description?.trim() ?? "",
+      directionId: String(project.directionId ?? ""),
+    })),
+    title: title.trim(),
+    description: description.trim(),
+    editingProjectId,
+  });
+}
 
 export default function ProjectForm() {
   const { mode, eventId, savedDirections, directionId: ctxDirectionId, projectId: ctxProjectId } = useWizard();
@@ -24,6 +45,19 @@ export default function ProjectForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadingDirections, setLoadingDirections] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "synced">("idle");
+  const [savedSnapshot, setSavedSnapshot] = useState("");
+
+  const formSnapshot = useMemo(
+    () => buildProjectSnapshot(projects, directionId, title, description, editingProjectId),
+    [description, directionId, editingProjectId, projects, title]
+  );
+
+  useEffect(() => {
+    if (saveState === "synced" && savedSnapshot && savedSnapshot !== formSnapshot) {
+      setSaveState("idle");
+    }
+  }, [formSnapshot, saveState, savedSnapshot]);
 
   const resetDraft = () => {
     setEditingProjectId(null);
@@ -201,11 +235,27 @@ export default function ProjectForm() {
         description: project.description ?? "",
         directionId: String(directionId),
       }));
+      const activeProject =
+        mode === "edit" && ctxProjectId
+          ? mapped.find((project) => Number(project.id) === Number(ctxProjectId))
+          : undefined;
+
       setProjects(mapped);
-      resetDraft();
-      if (mode === "edit" && ctxProjectId) {
-        fillForm(mapped.find((project) => Number(project.id) === Number(ctxProjectId)));
+      if (activeProject) {
+        fillForm(activeProject);
+      } else {
+        resetDraft();
       }
+      setSavedSnapshot(
+        buildProjectSnapshot(
+          mapped,
+          directionId,
+          activeProject?.title ?? "",
+          activeProject?.description ?? "",
+          activeProject ? Number(activeProject.id) : null
+        )
+      );
+      setSaveState("synced");
       showToast("success", "Проекты сохранены");
     } catch {
       showToast("error", "Ошибка при сохранении проектов");
@@ -218,7 +268,7 @@ export default function ProjectForm() {
 
       <div className={`field-wrap ${errors.directionId ? "error" : ""}`}>
         <label className="text-small">
-          Выберите направление
+          <span className="wizard-field-label">Выберите направление</span>
           <AppSelect
             tone="projects"
             value={directionId}
@@ -247,7 +297,7 @@ export default function ProjectForm() {
 
       <div className={`field-wrap ${errors.title ? "error" : ""}`}>
         <label className="text-small">
-          Название проекта
+          <span className="wizard-field-label">Название проекта</span>
           <div className="wizard-inline-add-row wizard-inline-add-row--entity">
             <AppInput
               placeholder="Введите название проекта"
@@ -276,7 +326,7 @@ export default function ProjectForm() {
       </div>
 
       <label className="text-small">
-        Описание
+        <span className="wizard-field-label">Описание</span>
         <AppTextArea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Краткое описание проекта" />
       </label>
 
@@ -308,8 +358,13 @@ export default function ProjectForm() {
       </div>
 
       <div className="wizard-actions">
-        <AppButton className="primary" type="button" onClick={handleSave}>
-          Сохранить настройки проекта
+        <AppButton className="primary" type="button" onClick={handleSave} disabled={saveState === "synced"}>
+          {saveState === "synced" && <CheckOutlined />}
+          {saveState === "synced"
+            ? "Изменения сохранены"
+            : mode === "edit" || projects.length > 0
+              ? "Сохранить изменения"
+              : "Сохранить настройки проекта"}
         </AppButton>
       </div>
     </div>

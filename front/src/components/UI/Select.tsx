@@ -3,8 +3,9 @@ import type { SelectProps } from "antd";
 import "../../styles/ui.scss";
 
 type AppSelectTone = "event" | "directions" | "projects";
+type AppSelectValue = string | number | Array<string | number>;
 
-type AppSelectProps = SelectProps<string | number> & {
+type AppSelectProps = SelectProps<AppSelectValue> & {
   tone?: AppSelectTone;
 };
 

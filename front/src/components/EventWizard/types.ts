@@ -1,7 +1,7 @@
 import type { Event } from "../../types/event";
 
 export type WizardMode = "create" | "edit";
-export type WizardTab = "event" | "directions" | "projects";
+export type WizardTab = "event" | "directions" | "projects" | "form";
 
 export type WizardPage = "events" | "directions" | "projects";
 

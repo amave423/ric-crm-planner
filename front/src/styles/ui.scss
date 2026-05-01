@@ -373,6 +373,63 @@
   transition: none !important;
 }
 
+.app-select.ant-select-multiple .ant-select-selector {
+  display: flex;
+  align-items: center;
+  min-height: 42px !important;
+  padding: 5px 38px 5px 10px !important;
+}
+
+.app-select.ant-select-multiple .ant-select-selection-wrap {
+  align-items: center;
+  min-height: 30px;
+}
+
+.app-select.ant-select-multiple .ant-select-selection-overflow {
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0;
+}
+
+.app-select.ant-select-multiple .ant-select-selection-overflow-item {
+  display: flex;
+  align-items: center;
+}
+
+.app-select.ant-select-multiple .ant-select-selection-item {
+  height: 26px;
+  margin: 0 !important;
+  padding: 0 9px !important;
+  border: 1px solid #d8e1ef !important;
+  border-radius: 10px !important;
+  background: #f7f9fc !important;
+  color: #111827;
+  line-height: 24px !important;
+  display: inline-flex;
+  align-items: center;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.app-select.ant-select-multiple .ant-select-selection-item-content {
+  line-height: 24px;
+}
+
+.app-select.ant-select-multiple .ant-select-selection-item-remove {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  color: #8a95a8;
+}
+
+.app-select.ant-select-multiple .ant-select-selection-placeholder {
+  inset-inline-start: 12px !important;
+  color: #a5adbb;
+  line-height: 30px !important;
+  display: flex;
+  align-items: center;
+}
+
 .app-select.ant-select-single .ant-select-selector .ant-select-selection-search {
   inset-inline-start: 12px !important;
   inset-inline-end: 38px !important;

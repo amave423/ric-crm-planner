@@ -1,18 +1,13 @@
-import { createContext, useContext, useState } from "react";
+﻿import { createContext, useContext, useState } from "react";
 import "./event-wizard.scss";
 
 import EventForm from "./forms/EventForm";
 import DirectionForm from "./forms/DirectionForm";
 import ProjectForm from "./forms/ProjectForm";
+import FormBuilderForm from "./forms/FormBuilderForm";
 import { useToast } from "../Toast/ToastProvider";
 
-import type {
-  WizardContextState,
-  WizardMode,
-  WizardPage,
-  WizardTab,
-  DirectionModel
-} from "./types";
+import type { DirectionModel, WizardContextState, WizardMode, WizardPage, WizardTab } from "./types";
 import type { Event } from "../../types/event";
 import AppButton from "../UI/Button";
 
@@ -46,7 +41,7 @@ export default function EventWizardModal({
   context,
   initialEventId,
   initialDirectionId,
-  onClose
+  onClose,
 }: Props) {
   const resolvedPage: WizardPage =
     page ??
@@ -62,10 +57,8 @@ export default function EventWizardModal({
     resolvedPage === "projects" ? "projects" : resolvedPage === "directions" ? "directions" : "event";
 
   const [activeTab, setActiveTab] = useState<WizardTab>(initialTab);
-
   const [isEventSaved, setIsEventSaved] = useState(false);
   const [savedEvent, setSavedEvent] = useState<Event | null>(null);
-
   const [savedDirections, setSavedDirections] = useState<DirectionModel[]>([]);
   const [isDirectionsSaved, setIsDirectionsSaved] = useState(false);
   const [eventIdState, setEventIdState] = useState<number | undefined>(initialEventId ?? context?.eventId);
@@ -89,34 +82,34 @@ export default function EventWizardModal({
     directionId: initialDirectionId ?? context?.directionId,
     projectId: context?.projectId,
     setActiveTab,
-
     isEventSaved,
     saveEvent,
     savedEvent,
-
     savedDirections,
     isDirectionsSaved,
-    saveDirections
+    saveDirections,
   };
 
   return (
     <WizardContext.Provider value={ctxValue}>
       <div className="wizard-overlay" onClick={onClose}>
-        <div
-          className={`wizard wizard-tab--${activeTab}`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <AppButton className="wizard-close" aria-label="Закрыть" onClick={onClose}>x</AppButton>
+        <div className={`wizard wizard-tab--${activeTab}`} onClick={(event) => event.stopPropagation()}>
+          <AppButton className="wizard-close" aria-label="Закрыть" onClick={onClose}>
+            x
+          </AppButton>
+
           <aside className="wizard-nav">
             <NavButton tab="event" label="Настройка мероприятия" />
             <NavButton tab="directions" label="Настройка направлений" />
             <NavButton tab="projects" label="Настройка проектов" />
+            <NavButton tab="form" label="Конструктор формы" />
           </aside>
 
           <section className="wizard-content">
             {activeTab === "event" && <EventForm />}
             {activeTab === "directions" && <DirectionForm />}
             {activeTab === "projects" && <ProjectForm />}
+            {activeTab === "form" && <FormBuilderForm />}
           </section>
         </div>
       </div>
@@ -130,15 +123,17 @@ function NavButton({ tab, label }: { tab: WizardTab; label: string }) {
 
   const handleClick = () => {
     if (mode === "create") {
-      if ((tab === "directions" || tab === "projects") && !isEventSaved && !eventId) {
+      if ((tab === "directions" || tab === "projects" || tab === "form") && !isEventSaved && !eventId) {
         showToast("error", "Сначала сохраните настройки мероприятия.");
         return;
       }
+
       if (tab === "projects" && !isDirectionsSaved && !directionId) {
         showToast("error", "Добавьте и сохраните хотя бы одно направление перед переходом к проектам.");
         return;
       }
     }
+
     setActiveTab(tab);
   };
 
@@ -152,4 +147,3 @@ function NavButton({ tab, label }: { tab: WizardTab; label: string }) {
     </AppButton>
   );
 }
-

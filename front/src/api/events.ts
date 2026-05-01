@@ -1,17 +1,20 @@
-import client from "../api/client";
+﻿import client from "../api/client";
 import { readPlannerState } from "../storage/planner";
 import {
+  archiveEvent as archiveStoredEvent,
   getAllUsers,
-  getDirectionsByEvent as _getDirectionsByEvent,
-  getEventById as _getEventById,
-  getEvents as _getEvents,
-  removeEvent as _removeEvent,
-  saveEvent as _saveEvent,
+  getArchivedEventIds,
+  getDirectionsByEvent as getStoredDirectionsByEvent,
+  getEventById as getStoredEventById,
+  getEvents as getStoredEvents,
+  rememberArchivedEventId,
+  saveEvent as saveStoredEvent,
 } from "../storage/storage";
-import type { Event } from "../types/event";
+import type { ApplicationFormField, Event } from "../types/event";
 import type { User } from "../types/user";
 
 const USE_MOCK = client.USE_MOCK;
+const LS_EVENT_EXTENSIONS = "ric_event_extensions_v1";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -35,11 +38,16 @@ type BackendEvent = {
   end_app_date?: string;
   leader?: number | string;
   organizer?: number | string;
+  organizerIds?: Array<number | string>;
   organizerName?: string;
+  archived?: boolean;
+  is_archived?: boolean;
   stage?: string;
   specializations?: unknown[];
   specialization?: number | string;
   specializationId?: number | string;
+  applicationFormFields?: ApplicationFormField[];
+  application_form_fields?: ApplicationFormField[];
 };
 
 type BackendEventPayload = {
@@ -50,11 +58,40 @@ type BackendEventPayload = {
   end_app_date?: string;
   stage: string;
   leader?: number;
+  organizerIds?: number[];
   specialization?: number;
   specializations?: number[];
+  applicationFormFields?: ApplicationFormField[];
+  is_archived?: boolean;
 };
 
 let specializationCache: BackendSpecialization[] | null = null;
+
+function readEventExtensions(): Record<string, Partial<Event>> {
+  const raw = localStorage.getItem(LS_EVENT_EXTENSIONS);
+  if (!raw) return {};
+
+  try {
+    return JSON.parse(raw) as Record<string, Partial<Event>>;
+  } catch {
+    return {};
+  }
+}
+
+function getEventExtension(id: number): Partial<Event> {
+  return readEventExtensions()[String(id)] ?? {};
+}
+
+function writeEventExtension(id: number, patch: Partial<Event>) {
+  if (!Number.isFinite(id) || id <= 0) return;
+
+  const current = readEventExtensions();
+  current[String(id)] = {
+    ...(current[String(id)] ?? {}),
+    ...patch,
+  };
+  localStorage.setItem(LS_EVENT_EXTENSIONS, JSON.stringify(current));
+}
 
 function asRecord(value: unknown): UnknownRecord {
   return value && typeof value === "object" ? (value as UnknownRecord) : {};
@@ -66,16 +103,6 @@ function toStringValue(value: unknown): string | undefined {
   return undefined;
 }
 
-function getSpecName(s: BackendSpecialization): string {
-  return String(s.name ?? s.title ?? "").trim();
-}
-
-function computeStatus(endDate?: string) {
-  if (!endDate) return "Неактивно";
-  const end = new Date(endDate);
-  return end >= new Date() ? "Активно" : "Неактивно";
-}
-
 function toNumber(value: unknown): number | undefined {
   if (typeof value === "number" && !Number.isNaN(value)) return value;
   if (typeof value === "string") {
@@ -85,8 +112,60 @@ function toNumber(value: unknown): number | undefined {
   return undefined;
 }
 
+function getSpecName(spec: BackendSpecialization): string {
+  return String(spec.name ?? spec.title ?? "").trim();
+}
+
+function computeStatus(endDate?: string) {
+  if (!endDate) return "Неактивно";
+  const end = new Date(endDate);
+  return end >= new Date() ? "Активно" : "Неактивно";
+}
+
+function normalizeIdList(value: unknown): Array<number | string> | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  const ids = value
+    .map((item) => {
+      if (typeof item === "number" || typeof item === "string") return item;
+      return asRecord(item).id;
+    })
+    .filter((item): item is number | string => typeof item === "number" || typeof item === "string");
+
+  return ids.length ? ids : undefined;
+}
+
+function normalizeFormFields(value: unknown): ApplicationFormField[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  return value
+    .map((item) => {
+      const field = asRecord(item);
+      const id = toStringValue(field.id)?.trim();
+      const label = toStringValue(field.label)?.trim();
+      if (!id || !label) return null;
+      const type = field.type === "textarea" || field.type === "select" ? field.type : "text";
+      const options = Array.isArray(field.options)
+        ? field.options.map((option) => String(option).trim()).filter(Boolean)
+        : undefined;
+
+      return {
+        id,
+        label,
+        type,
+        options: type === "select" && options?.length ? options : undefined,
+        required: Boolean(field.required),
+        locked: Boolean(field.locked),
+        system: Boolean(field.system),
+      } satisfies ApplicationFormField;
+    })
+    .filter(Boolean) as ApplicationFormField[];
+}
+
 function normalizeBackendEvent(data: unknown): BackendEvent {
   const obj = asRecord(data);
+  const applicationFields = normalizeFormFields(obj.applicationFormFields ?? obj.application_form_fields);
+
   return {
     id: typeof obj.id === "number" || typeof obj.id === "string" ? obj.id : undefined,
     title: toStringValue(obj.title),
@@ -100,15 +179,18 @@ function normalizeBackendEvent(data: unknown): BackendEvent {
     end_app_date: toStringValue(obj.end_app_date),
     leader: typeof obj.leader === "number" || typeof obj.leader === "string" ? obj.leader : undefined,
     organizer: typeof obj.organizer === "number" || typeof obj.organizer === "string" ? obj.organizer : undefined,
-    organizerName: toStringValue(obj.organizerName),
+    organizerIds: normalizeIdList(obj.organizerIds ?? obj.organizers ?? obj.organizer_ids),
+    organizerName: toStringValue(obj.organizerName ?? obj.organizer_name),
+    archived: Boolean(obj.archived),
+    is_archived: Boolean(obj.is_archived),
     stage: toStringValue(obj.stage),
     specializations: Array.isArray(obj.specializations) ? obj.specializations : undefined,
     specialization:
       typeof obj.specialization === "number" || typeof obj.specialization === "string" ? obj.specialization : undefined,
     specializationId:
-      typeof obj.specializationId === "number" || typeof obj.specializationId === "string"
-        ? obj.specializationId
-        : undefined,
+      typeof obj.specializationId === "number" || typeof obj.specializationId === "string" ? obj.specializationId : undefined,
+    applicationFormFields: applicationFields,
+    application_form_fields: applicationFields,
   };
 }
 
@@ -148,6 +230,7 @@ function normalizeSpecList(data: BackendEvent, specs: BackendSpecialization[]): 
 async function getSpecializations(): Promise<BackendSpecialization[]> {
   if (USE_MOCK) return [];
   if (specializationCache) return specializationCache;
+
   try {
     const raw = await client.get("/api/users/specializations/");
     const list = Array.isArray(raw) ? raw : [];
@@ -161,7 +244,7 @@ async function getSpecializations(): Promise<BackendSpecialization[]> {
           description: spec.description ? String(spec.description) : undefined,
         };
       })
-      .filter((s: BackendSpecialization) => Number.isFinite(s.id) && getSpecName(s));
+      .filter((spec: BackendSpecialization) => Number.isFinite(spec.id) && getSpecName(spec));
     return specializationCache;
   } catch {
     specializationCache = [];
@@ -169,34 +252,42 @@ async function getSpecializations(): Promise<BackendSpecialization[]> {
   }
 }
 
-function extractUserDisplay(u: User): string {
-  const obj = u as User & UnknownRecord;
-  const name = u.name ?? toStringValue(obj.firstName ?? obj.first_name) ?? "";
-  const surname = u.surname ?? toStringValue(obj.lastName ?? obj.last_name) ?? "";
+function extractUserDisplay(user: User): string {
+  const obj = user as User & UnknownRecord;
+  const name = user.name ?? toStringValue(obj.firstName ?? obj.first_name) ?? "";
+  const surname = user.surname ?? toStringValue(obj.lastName ?? obj.last_name) ?? "";
   return `${surname} ${name}`.trim();
 }
 
-async function resolveOrganizer(e: BackendEvent): Promise<string | undefined> {
-  if (e.organizerName && e.organizerName.trim()) return e.organizerName.trim();
+async function resolveOrganizer(event: BackendEvent): Promise<string | undefined> {
+  if (event.organizerName && event.organizerName.trim()) return event.organizerName.trim();
 
-  let id: number | string | undefined = e.leader ?? e.organizer;
-  if (typeof id === "undefined" && typeof e.id !== "undefined") {
+  let organizerIds = event.organizerIds;
+  let id: number | string | undefined = organizerIds?.[0] ?? event.leader ?? event.organizer;
+
+  if (typeof id === "undefined" && typeof event.id !== "undefined") {
     try {
-      const dirs = await _getDirectionsByEvent(Number(e.id));
+      const dirs = await getStoredDirectionsByEvent(Number(event.id));
       if (Array.isArray(dirs) && dirs.length > 0) id = dirs[0].leader ?? dirs[0].organizer;
     } catch {
+      // fallback to unknown organizer
     }
   }
-  if (typeof id === "undefined") return undefined;
+
+  if (!organizerIds?.length && typeof id !== "undefined") organizerIds = [id];
+  if (!organizerIds?.length) return undefined;
 
   try {
     const users = await getAllUsers();
-    const u = users.find((x) => String(x.id) === String(id));
-    if (!u) return String(id);
-    const display = extractUserDisplay(u);
-    return display || String(id);
+    return organizerIds
+      .map((organizerId) => {
+        const user = users.find((item) => String(item.id) === String(organizerId));
+        return user ? extractUserDisplay(user) || String(organizerId) : String(organizerId);
+      })
+      .filter(Boolean)
+      .join(", ");
   } catch {
-    return String(id);
+    return organizerIds.map(String).join(", ");
   }
 }
 
@@ -204,45 +295,65 @@ async function mapEventToUi(data: unknown): Promise<Event> {
   const event = normalizeBackendEvent(data);
   const specs = await getSpecializations();
   const plannerState = readPlannerState(USE_MOCK);
+  const archivedIds = new Set(getArchivedEventIds());
   const eventId = Number(event.id ?? 0);
   const isEnrollmentClosed = plannerState.closedEventIds.includes(eventId);
+  const organizerIds = event.organizerIds?.length
+    ? event.organizerIds
+    : typeof event.leader !== "undefined"
+      ? [event.leader]
+      : typeof event.organizer !== "undefined"
+        ? [event.organizer]
+        : undefined;
 
-  return {
+  const baseEvent: Event = {
     id: eventId,
     title: event.title ?? event.name ?? "",
     description: event.description ?? "",
     startDate: event.startDate ?? event.start_date,
     endDate: event.endDate ?? event.end_date,
     applyDeadline: event.applyDeadline ?? event.end_app_date,
-    leader:
-      typeof event.leader !== "undefined"
-        ? String(event.leader)
-        : typeof event.organizer !== "undefined"
-          ? String(event.organizer)
-          : undefined,
+    leader: organizerIds?.[0] != null ? String(organizerIds[0]) : undefined,
+    organizerIds,
     specializations: normalizeSpecList(event, specs),
     status: isEnrollmentClosed ? "Набор завершен" : computeStatus(event.endDate ?? event.end_date),
-    organizer: await resolveOrganizer(event),
+    organizer: await resolveOrganizer({ ...event, organizerIds }),
+    archived: event.archived || event.is_archived || archivedIds.has(eventId),
+    applicationFormFields: event.applicationFormFields ?? event.application_form_fields,
+  };
+
+  const extension = getEventExtension(eventId);
+
+  return {
+    ...baseEvent,
+    ...extension,
+    id: eventId,
+    archived: baseEvent.archived || extension.archived,
+    organizerIds: extension.organizerIds ?? baseEvent.organizerIds,
+    organizer: extension.organizer ?? baseEvent.organizer,
+    applicationFormFields: extension.applicationFormFields ?? baseEvent.applicationFormFields,
   };
 }
 
 export async function getEvents(): Promise<Event[]> {
-  const raw = USE_MOCK ? await _getEvents() : await client.get("/api/users/events/");
+  const raw = USE_MOCK ? await getStoredEvents() : await client.get("/api/users/events/");
   const list = Array.isArray(raw) ? raw : [];
-  return Promise.all(list.map((e) => mapEventToUi(e)));
+  const events = await Promise.all(list.map((event) => mapEventToUi(event)));
+  const archivedIds = new Set(getArchivedEventIds());
+
+  return events.filter((event) => !event.archived && !archivedIds.has(Number(event.id)));
 }
 
 export async function getEventById(id: number): Promise<Event | undefined> {
-  const data = USE_MOCK ? await _getEventById(id) : await client.get(`/api/users/events/${id}/`);
+  const data = USE_MOCK ? await getStoredEventById(id) : await client.get(`/api/users/events/${id}/`);
   if (!data) return undefined;
   return mapEventToUi(data);
 }
 
-const fmtEndApp = (v?: string) => {
-  if (!v) return undefined;
-  if (v.includes("T")) return v;
-  const d = new Date(`${v}T23:59:59`);
-  return d.toISOString();
+const fmtEndApp = (value?: string) => {
+  if (!value) return undefined;
+  if (value.includes("T")) return value;
+  return new Date(`${value}T23:59:59`).toISOString();
 };
 
 async function resolveSpecializationIds(data: Event): Promise<number[]> {
@@ -303,8 +414,14 @@ async function toBackendEvent(data: Event): Promise<BackendEventPayload> {
     stage: stageValue && stageValue.trim() ? stageValue : "-",
   };
 
-  const leaderId = toNumber(data.leader);
+  const leaderId = toNumber(data.organizerIds?.[0] ?? data.leader);
   if (typeof leaderId !== "undefined") payload.leader = leaderId;
+
+  const organizerIds = (data.organizerIds ?? [])
+    .map((id) => toNumber(id))
+    .filter((id): id is number => typeof id === "number");
+  if (organizerIds.length > 0) payload.organizerIds = organizerIds;
+  if (data.applicationFormFields) payload.applicationFormFields = data.applicationFormFields;
 
   const specializationIds = await resolveSpecializationIds(data);
   if (specializationIds.length > 0) {
@@ -316,21 +433,39 @@ async function toBackendEvent(data: Event): Promise<BackendEventPayload> {
 }
 
 export async function saveEvent(data: Event): Promise<Event> {
-  if (USE_MOCK) return _saveEvent({ ...data });
+  if (USE_MOCK) return saveStoredEvent({ ...data });
 
   const payload = await toBackendEvent(data);
   const saved = data.id
     ? await client.put(`/api/users/events/${data.id}/`, payload)
     : await client.post("/api/users/events/", payload);
+  const mapped = await mapEventToUi(saved);
+  const extension: Partial<Event> = {
+    organizerIds: data.organizerIds ?? mapped.organizerIds,
+    organizer: data.organizer ?? mapped.organizer,
+    applicationFormFields: data.applicationFormFields ?? mapped.applicationFormFields,
+  };
+  writeEventExtension(Number(mapped.id), extension);
 
-  return mapEventToUi(saved);
+  return {
+    ...mapped,
+    ...extension,
+  };
+}
+
+export async function archiveEvent(id: number): Promise<unknown> {
+  if (USE_MOCK) return archiveStoredEvent(id);
+
+  rememberArchivedEventId(id);
+  writeEventExtension(Number(id), { archived: true, archivedAt: new Date().toISOString() });
+
+  try {
+    return await client.patch(`/api/users/events/${id}/`, { archived: true, is_archived: true });
+  } catch {
+    return { ok: true };
+  }
 }
 
 export async function removeEvent(id: number): Promise<unknown> {
-  if (USE_MOCK) return _removeEvent(id);
-  return client.del(`/api/users/events/${id}/`);
+  return archiveEvent(id);
 }
-
-
-
-

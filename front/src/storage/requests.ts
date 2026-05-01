@@ -9,6 +9,8 @@ export const LS_KEY = "ric_mock_requests";
 const LS_BACKEND_CACHE = "ric_backend_my_requests";
 
 type UnknownRecord = Record<string, unknown>;
+const seedRequestList = seedRequests as unknown as ReqType[];
+const seedRequestRecords = seedRequests as unknown as UnknownRecord[];
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
@@ -36,12 +38,12 @@ function nextId(items: Array<{ id?: number }>) {
 function ensureMockSeeded() {
   const storedVersion = localStorage.getItem(LS_MOCK_SEED_VERSION);
   if (storedVersion !== CURRENT_MOCK_SEED_VERSION) {
-    writeLS(LS_KEY, seedRequests as UnknownRecord[]);
+    writeLS(LS_KEY, seedRequestRecords);
     localStorage.setItem(LS_MOCK_SEED_VERSION, CURRENT_MOCK_SEED_VERSION);
     return;
   }
 
-  if (!localStorage.getItem(LS_KEY)) writeLS(LS_KEY, seedRequests as UnknownRecord[]);
+  if (!localStorage.getItem(LS_KEY)) writeLS(LS_KEY, seedRequestRecords);
 }
 
 export function getBackendRequestCache(ownerId?: number): ReqType[] {
@@ -78,7 +80,7 @@ export async function getRequests(): Promise<ReqType[]> {
   }
 
   ensureMockSeeded();
-  return readLS<ReqType[]>(LS_KEY, seedRequests as ReqType[]);
+  return readLS<ReqType[]>(LS_KEY, seedRequestList);
 }
 
 export async function saveRequest(req: ReqType): Promise<ReqType> {
@@ -91,7 +93,7 @@ export async function saveRequest(req: ReqType): Promise<ReqType> {
   }
 
   ensureMockSeeded();
-  const requests = readLS<ReqType[]>(LS_KEY, seedRequests as ReqType[]);
+  const requests = readLS<ReqType[]>(LS_KEY, seedRequestList);
   const id = req.id && req.id > 0 ? req.id : nextId(requests as Array<{ id?: number }>);
   const created: ReqType = {
     ...req,
@@ -110,7 +112,7 @@ export async function updateRequestStatus(id: number, status: string): Promise<R
   if (!USE_MOCK) return client.put(`/api/users/applications/${id}/`, { status });
 
   ensureMockSeeded();
-  const requests = readLS<ReqType[]>(LS_KEY, seedRequests as ReqType[]);
+  const requests = readLS<ReqType[]>(LS_KEY, seedRequestList);
   const idx = requests.findIndex((r) => Number(r.id) === Number(id));
   if (idx < 0) return undefined;
   requests[idx] = { ...requests[idx], status };
@@ -122,7 +124,7 @@ export async function removeRequest(id: number): Promise<ReqType | undefined> {
   if (!USE_MOCK) return client.del(`/api/users/applications/${id}/`);
 
   ensureMockSeeded();
-  const requests = readLS<ReqType[]>(LS_KEY, seedRequests as ReqType[]);
+  const requests = readLS<ReqType[]>(LS_KEY, seedRequestList);
   const target = requests.find((r) => Number(r.id) === Number(id));
   if (!target) return undefined;
   writeLS(
