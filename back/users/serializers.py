@@ -1,4 +1,4 @@
-import json
+﻿import json
 from decimal import Decimal
 
 from django.conf import settings
@@ -32,14 +32,14 @@ from .models import (
 )
 
 
-DEFAULT_APPLICATION_STATUS_NAME = "Прислал заявку"
+DEFAULT_APPLICATION_STATUS_NAME = "РџСЂРёСЃР»Р°Р» Р·Р°СЏРІРєСѓ"
 DEFAULT_APPLICATION_STATUS_NAMES = (
-    "Прислал заявку",
-    "Прохождение тестирования",
-    "Добавился в орг чат",
-    "Приступил к ПШ",
+    "РџСЂРёСЃР»Р°Р» Р·Р°СЏРІРєСѓ",
+    "РџСЂРѕС…РѕР¶РґРµРЅРёРµ С‚РµСЃС‚РёСЂРѕРІР°РЅРёСЏ",
+    "Р”РѕР±Р°РІРёР»СЃСЏ РІ РѕСЂРі С‡Р°С‚",
+    "РџСЂРёСЃС‚СѓРїРёР» Рє РџРЁ",
 )
-TESTING_APPLICATION_STATUS_NAME = "Прохождение тестирования"
+TESTING_APPLICATION_STATUS_NAME = "РџСЂРѕС…РѕР¶РґРµРЅРёРµ С‚РµСЃС‚РёСЂРѕРІР°РЅРёСЏ"
 
 
 def build_user_display_name(user) -> str:
@@ -175,10 +175,10 @@ class RegisterUserSerializer(ModelSerializer):
         user_model = get_user_model()
 
         if user_model.objects.filter(email__iexact=normalized_email).exists():
-            raise serializers.ValidationError("Пользователь с таким email уже существует.")
+            raise serializers.ValidationError("РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ С‚Р°РєРёРј email СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚.")
 
         if user_model.objects.filter(username__iexact=normalized_email).exists():
-            raise serializers.ValidationError("Пользователь с таким email уже существует.")
+            raise serializers.ValidationError("РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ С‚Р°РєРёРј email СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚.")
 
         return normalized_email
 
@@ -204,7 +204,7 @@ class RegisterUserSerializer(ModelSerializer):
                 user = get_user_model().objects.create_user(**validated_data, is_active=True)
         except IntegrityError as exc:
             raise serializers.ValidationError(
-                {"email": "Пользователь с таким email уже существует."}
+                {"email": "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ С‚Р°РєРёРј email СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚."}
             ) from exc
         return user
 
@@ -340,7 +340,16 @@ class EventSerializer(ModelSerializer):
     endDate = serializers.DateField(source="end_date", read_only=True)
     applyDeadline = serializers.DateTimeField(source="end_app_date", read_only=True)
     organizer = serializers.IntegerField(source="leader_id", read_only=True)
+    organizerIds = serializers.PrimaryKeyRelatedField(
+        queryset=get_user_model().objects.all(),
+        source="organizers",
+        many=True,
+        required=False,
+    )
     organizerName = serializers.SerializerMethodField()
+    archived = serializers.BooleanField(source="is_archived", required=False)
+    archivedAt = serializers.DateTimeField(source="archived_at", read_only=True)
+    applicationFormFields = serializers.JSONField(source="application_form_fields", required=False)
     specializations = serializers.PrimaryKeyRelatedField(
         queryset=Specialization.objects.all(),
         many=True,
@@ -357,6 +366,7 @@ class EventSerializer(ModelSerializer):
             "specializations",
             "leader",
             "organizer",
+            "organizerIds",
             "organizerName",
             "name",
             "description",
@@ -367,6 +377,12 @@ class EventSerializer(ModelSerializer):
             "end_date",
             "applyDeadline",
             "end_app_date",
+            "is_archived",
+            "archived",
+            "archived_at",
+            "archivedAt",
+            "application_form_fields",
+            "applicationFormFields",
         )
         read_only_fields = (
             "id",
@@ -376,9 +392,14 @@ class EventSerializer(ModelSerializer):
             "applyDeadline",
             "organizer",
             "organizerName",
+            "archivedAt",
+            "archived_at",
         )
 
     def get_organizerName(self, obj):
+        organizers = list(obj.organizers.all())
+        if organizers:
+            return ", ".join(filter(None, (build_user_display_name(user) for user in organizers))) or None
         return build_user_display_name(obj.leader) or None
 
     def to_representation(self, instance):
@@ -418,20 +439,30 @@ class EventSerializer(ModelSerializer):
 
     def create(self, validated_data):
         chosen_specializations = self._resolve_specializations(validated_data)
+        organizers = validated_data.pop("organizers", None)
         if chosen_specializations:
             validated_data["specialization"] = chosen_specializations[0]
+        if organizers and not validated_data.get("leader"):
+            validated_data["leader"] = organizers[0]
 
         event = super().create(validated_data)
+        if organizers is not None:
+            event.organizers.set(organizers)
         if chosen_specializations is not None:
             self._sync_specializations(event, chosen_specializations)
         return event
 
     def update(self, instance, validated_data):
         chosen_specializations = self._resolve_specializations(validated_data)
+        organizers = validated_data.pop("organizers", None)
         if chosen_specializations is not None:
             validated_data["specialization"] = chosen_specializations[0] if chosen_specializations else None
+        if organizers and not validated_data.get("leader"):
+            validated_data["leader"] = organizers[0]
 
         event = super().update(instance, validated_data)
+        if organizers is not None:
+            event.organizers.set(organizers)
         if chosen_specializations is not None:
             self._sync_specializations(event, chosen_specializations)
         return event
@@ -513,7 +544,7 @@ class ProjectSerializer(ModelSerializer):
 
 class ApplicationCreateSerializer(ModelSerializer):
     event_id = serializers.PrimaryKeyRelatedField(
-        queryset=Event.objects.all(), write_only=True, source="event", required=False
+        queryset=Event.objects.filter(is_archived=False), write_only=True, source="event", required=False
     )
     direction_id = serializers.PrimaryKeyRelatedField(
         queryset=Direction.objects.all(), write_only=True, source="direction", required=False
@@ -550,6 +581,7 @@ class ApplicationCreateSerializer(ModelSerializer):
             "project",
             "project_ref",
             "specialization",
+            "custom_fields",
         )
         read_only_fields = ("id", "date_sub", "date_end", "direction", "event")
 
@@ -594,12 +626,18 @@ class ApplicationCreateSerializer(ModelSerializer):
                 date_end=event.end_app_date,
                 status=resolve_application_status(),
             )
-            if event.leader_id:
-                student_name = build_user_display_name(user) or user.email
+            student_name = build_user_display_name(user) or user.email
+            recipients = list(event.organizers.all())
+            if event.leader_id and all(recipient.id != event.leader_id for recipient in recipients):
+                recipients.append(event.leader)
+
+            for recipient in recipients:
+                if not recipient:
+                    continue
                 Notification.objects.create(
-                    user=event.leader,
+                    user=recipient,
                     title="Новая заявка",
-                    message=f'{student_name} подал(а) заявку на мероприятие "{event.name}".',
+                    message=f"{student_name} подал(а) заявку на мероприятие \"{event.name}\".",
                     link="/requests",
                 )
             return application
@@ -699,6 +737,7 @@ class ApplicationSerializer(ModelSerializer):
             "tests_assigned",
             "tests_assigned_at",
             "test_session_id",
+            "custom_fields",
         )
         read_only_fields = ("id", "user", "direction", "event", "date_sub")
 

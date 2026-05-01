@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import status
 from drf_yasg import openapi
@@ -503,7 +504,7 @@ class ProfileView(RetrieveUpdateAPIView):
 class EventListCreateView(ListCreateAPIView):
     permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = EventSerializer
-    queryset = Event.objects.select_related("leader", "specialization")
+    queryset = Event.objects.filter(is_archived=False).select_related("leader", "specialization").prefetch_related("organizers")
     lookup_url_kwarg = "event_id"
 
 
@@ -548,8 +549,13 @@ class EventListCreateView(ListCreateAPIView):
 class EventDetailView(RetrieveUpdateDestroyAPIView):
     permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = EventSerializer
-    queryset = Event.objects.select_related("leader", "specialization")
+    queryset = Event.objects.filter(is_archived=False).select_related("leader", "specialization").prefetch_related("organizers")
     lookup_url_kwarg = "event_id"
+
+    def perform_destroy(self, instance):
+        instance.is_archived = True
+        instance.archived_at = timezone.now()
+        instance.save(update_fields=("is_archived", "archived_at"))
 
 @method_decorator(
     name="get",
@@ -604,12 +610,12 @@ class DirectionListCreateView(ListCreateAPIView):
     serializer_class = DirectionSerializer
 
     def get_queryset(self):
-        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
+        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"), is_archived=False)
         return Direction.objects.filter(event=event).select_related("event", "leader")
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["event"] = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
+        context["event"] = get_object_or_404(Event, pk=self.kwargs.get("event_id"), is_archived=False)
         return context
 
 
@@ -657,7 +663,7 @@ class DirectionDetailView(RetrieveUpdateDestroyAPIView):
     lookup_url_kwarg = "direction_id"
 
     def get_queryset(self):
-        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
+        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"), is_archived=False)
         return Direction.objects.filter(event=event).select_related("event", "leader")
 
 @method_decorator(
@@ -684,7 +690,7 @@ class ProjectListCreateView(ListCreateAPIView):
     serializer_class = ProjectSerializer
 
     def get_queryset(self):
-        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
+        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"), is_archived=False)
         direction = get_object_or_404(
             Direction, pk=self.kwargs.get("direction_id"), event=event
         )
@@ -695,7 +701,7 @@ class ProjectListCreateView(ListCreateAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
+        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"), is_archived=False)
         direction = get_object_or_404(
             Direction, pk=self.kwargs.get("direction_id"), event=event
         )
@@ -745,7 +751,7 @@ class ProjectDetailView(RetrieveUpdateDestroyAPIView):
     permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = ProjectSerializer
     lookup_url_kwarg = "project_id"
-    queryset = Project.objects.select_related("direction", "curator", "direction__event")
+    queryset = Project.objects.filter(direction__event__is_archived=False).select_related("direction", "curator", "direction__event")
 
 @method_decorator(
     name="get",
@@ -769,7 +775,7 @@ class ProjectDetailView(RetrieveUpdateDestroyAPIView):
 class UserProjectListCreateView(ListCreateAPIView):
     permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = ProjectSerializer
-    queryset = Project.objects.select_related("direction", "curator", "direction__event")
+    queryset = Project.objects.filter(direction__event__is_archived=False).select_related("direction", "curator", "direction__event")
 
 
 @method_decorator(
@@ -784,7 +790,7 @@ class UserProjectListCreateView(ListCreateAPIView):
 class UserDirectionListView(ListAPIView):
     permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = DirectionSerializer
-    queryset = Direction.objects.select_related("event", "leader")
+    queryset = Direction.objects.filter(event__is_archived=False).select_related("event", "leader")
 
 class ApplicationListView(ListCreateAPIView):
     """List and create applications."""
@@ -875,7 +881,7 @@ class ApplicationListView(ListCreateAPIView):
     def get_queryset(self):
         queryset = Application.objects.select_related(
             "user", "direction", "event", "project", "specialization", "status"
-        ).order_by("-date_sub")
+        ).filter(Q(event__is_archived=False) | Q(event__isnull=True)).order_by("-date_sub")
         
         if not CuratorOrAdminPermission().has_permission(self.request, self):
             queryset = queryset.filter(user=self.request.user)
@@ -912,7 +918,7 @@ class ApplicationListView(ListCreateAPIView):
             direction_id = self.request.data.get("direction") or self.request.data.get("direction_id")
 
             if event_id:
-                context["event"] = get_object_or_404(Event, pk=event_id)
+                context["event"] = get_object_or_404(Event, pk=event_id, is_archived=False)
             if direction_id:
                 context["direction"] = get_object_or_404(Direction, pk=direction_id)
 
@@ -1232,7 +1238,7 @@ class DirectionApplicationCreateView(CreateAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
+        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"), is_archived=False)
         direction = get_object_or_404(
             Direction, pk=self.kwargs.get("direction_id"), event=event
         )

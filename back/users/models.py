@@ -151,12 +151,20 @@ class Event(models.Model):
         blank=True,
         related_name="lead_events",
     )
+    organizers = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="organized_events",
+    )
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     stage = models.CharField(max_length=100)
     start_date = models.DateField()
     end_date = models.DateField()
     end_app_date = models.DateTimeField()
+    is_archived = models.BooleanField(default=False)
+    archived_at = models.DateTimeField(blank=True, null=True)
+    application_form_fields = models.JSONField(default=list, blank=True)
 
     class Meta:
         db_table = "CRM_EVENT"
@@ -297,6 +305,7 @@ class Application(models.Model):
         Status, on_delete=models.SET_NULL, null=True, blank=True, related_name="applications"
     )
     team_id = models.BigIntegerField(null=True, blank=True)
+    custom_fields = models.JSONField(default=dict, blank=True)
 
     tests_assigned = models.BooleanField(default=False)
     tests_assigned_at = models.DateTimeField(blank=True, null=True)
