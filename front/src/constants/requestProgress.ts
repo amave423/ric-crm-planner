@@ -12,7 +12,7 @@ export const ORGANIZER_REQUEST_STATUSES = [
   REQUEST_STATUS.STARTED,
 ];
 
-export type RequestTransitionSource = "testing" | "start";
+export type RequestTransitionSource = "testing" | "chat" | "start";
 
 export function buildMockRequestTransitionUrl(
   requestId: number,
@@ -32,6 +32,13 @@ export function getRequestTransitionCopy(source: RequestTransitionSource, target
     return {
       title: "Подтверждение перехода",
       message: `Подтвердить завершение тестирования и перевод заявки в статус "${targetStatus}"?`,
+    };
+  }
+
+  if (source === "chat") {
+    return {
+      title: "Подтверждение перехода",
+      message: `Подтвердить переход в организационный чат и перевод заявки в статус "${targetStatus}"?`,
     };
   }
 
