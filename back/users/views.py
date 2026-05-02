@@ -504,8 +504,12 @@ class ProfileView(RetrieveUpdateAPIView):
 class EventListCreateView(ListCreateAPIView):
     permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = EventSerializer
-    queryset = Event.objects.filter(is_archived=False).select_related("leader", "specialization").prefetch_related("organizers")
+    queryset = Event.objects.all().select_related("leader", "specialization").prefetch_related("organizers")
     lookup_url_kwarg = "event_id"
+
+    def get_queryset(self):
+        archived = str(self.request.query_params.get("archived", "")).lower() in ("1", "true", "yes")
+        return self.queryset.filter(is_archived=archived)
 
 
 @method_decorator(
@@ -549,7 +553,7 @@ class EventListCreateView(ListCreateAPIView):
 class EventDetailView(RetrieveUpdateDestroyAPIView):
     permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = EventSerializer
-    queryset = Event.objects.filter(is_archived=False).select_related("leader", "specialization").prefetch_related("organizers")
+    queryset = Event.objects.all().select_related("leader", "specialization").prefetch_related("organizers")
     lookup_url_kwarg = "event_id"
 
     def perform_destroy(self, instance):
