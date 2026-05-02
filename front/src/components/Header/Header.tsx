@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+﻿import { useContext, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Badge, Dropdown } from "antd";
 import type { MenuProps } from "antd";
@@ -8,7 +8,7 @@ import {
   LoginOutlined,
   LogoutOutlined,
   MenuOutlined,
-  SettingOutlined,
+  SaveOutlined,
   TeamOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -19,7 +19,7 @@ import Modal from "../Modal/Modal";
 import AppButton from "../UI/Button";
 
 const HEADER_TEXT = {
-  automation: "Роботы и триггеры",
+  automation: "Архив мероприятий",
   closeMenu: "Закрыть меню",
   delete: "Удалить",
   deleteAllNotifications: "Удалить все",
@@ -92,7 +92,7 @@ export default function Header() {
                 label: (
                   <span className="mobile-menu-entry">
                     <span className="mobile-menu-entry__icon">
-                      <SettingOutlined />
+                      <SaveOutlined />
                     </span>
                     <span>{HEADER_TEXT.automation}</span>
                   </span>
@@ -199,7 +199,7 @@ export default function Header() {
 
             {canManageAutomation && (
               <AppButton className="head-btn head-btn--automation" onClick={() => navigate("/automation")}>
-                <SettingOutlined />
+                <SaveOutlined />
                 <span>{HEADER_TEXT.automation}</span>
               </AppButton>
             )}

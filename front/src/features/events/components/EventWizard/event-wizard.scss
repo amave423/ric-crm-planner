@@ -1,4 +1,4 @@
-@use "../../styles/variables.scss" as *;
+﻿@use "../../../../styles/variables.scss" as *;
 
 .wizard-tab--event {
   --wizard-accent: var(--event-color, #6495ed);
@@ -91,6 +91,23 @@
   border-color: transparent !important;
   color: #fff !important;
   box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+  transform: translateX(4px);
+}
+
+.wizard-nav .wizard-nav-btn--automation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  border: 1px solid var(--wizard-soft-border);
+  color: var(--wizard-accent);
+}
+
+.wizard-nav .wizard-nav-btn--automation:hover,
+.wizard-nav .wizard-nav-btn--automation:focus {
+  background: var(--wizard-accent) !important;
+  color: #fff !important;
+  border-color: var(--wizard-accent) !important;
   transform: translateX(4px);
 }
 
@@ -272,6 +289,39 @@
   border-radius: 10px;
   padding: 10px 14px;
   cursor: pointer;
+}
+
+.wizard-actions .wizard-settings-btn {
+  border-color: var(--wizard-accent) !important;
+  background: #fff !important;
+  color: var(--wizard-accent) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.wizard-actions .wizard-settings-btn:hover,
+.wizard-actions .wizard-settings-btn:focus {
+  background: var(--wizard-accent) !important;
+  color: #fff !important;
+  border-color: var(--wizard-accent) !important;
+}
+
+.automation-settings-modal .ant-modal-content {
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.automation-settings-modal .ant-modal-body {
+  max-height: min(76vh, 760px);
+  overflow: auto;
+  padding: 18px;
+  background: #f5f8fc;
+}
+
+.automation-settings-modal .automation-panel {
+  box-shadow: none;
 }
 
 .wizard-close.app-button.ant-btn {
@@ -568,3 +618,5 @@ select:focus {
     grid-template-columns: 1fr;
   }
 }
+
+

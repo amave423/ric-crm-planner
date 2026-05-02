@@ -133,6 +133,22 @@ export function rememberArchivedEventId(id: number) {
   hideArchivedEventInPlanner(eventId);
 }
 
+export function forgetArchivedEventId(id: number) {
+  const eventId = Number(id);
+  if (!Number.isFinite(eventId) || eventId <= 0) return;
+
+  writeLS(
+    LS_ARCHIVED_EVENT_IDS,
+    getArchivedEventIds().filter((archivedId) => Number(archivedId) !== eventId)
+  );
+
+  const state = readPlannerState(USE_MOCK);
+  writePlannerState({
+    ...state,
+    hiddenEventIds: state.hiddenEventIds.filter((hiddenId) => Number(hiddenId) !== eventId),
+  });
+}
+
 export async function archiveEvent(id: number): Promise<Event | undefined> {
   const eventId = Number(id);
   const events = mockEvents();
@@ -151,6 +167,32 @@ export async function archiveEvent(id: number): Promise<Event | undefined> {
   events[idx] = archivedEvent;
   writeMockEvents(events);
   return archivedEvent;
+}
+
+export async function getArchivedEvents(): Promise<Event[]> {
+  const archivedIds = new Set(getArchivedEventIds());
+  return mockEvents().filter((event) => event.archived || archivedIds.has(Number(event.id)));
+}
+
+export async function restoreEvent(id: number): Promise<Event | undefined> {
+  const eventId = Number(id);
+  const events = mockEvents();
+  const idx = events.findIndex((event) => Number(event.id) === eventId);
+
+  forgetArchivedEventId(eventId);
+
+  if (idx < 0) return undefined;
+
+  const restoredEvent: Event = {
+    ...events[idx],
+    archived: false,
+    archivedAt: undefined,
+  };
+
+  events[idx] = restoredEvent;
+  writeMockEvents(events);
+
+  return restoredEvent;
 }
 
 export async function getEvents(): Promise<Event[]> {

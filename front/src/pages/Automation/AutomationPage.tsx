@@ -1,47 +1,95 @@
-import { useContext, useEffect, useState } from "react";
-import { Empty, Segmented } from "antd";
-import AutomationPanel from "../../components/Automation/AutomationPanel";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { Empty, Modal as AntModal } from "antd";
+import { RollbackOutlined } from "@ant-design/icons";
+import { getArchivedEvents, restoreEvent } from "../../api/events";
+import TableHeader from "../../components/Layout/TableHeader";
+import Table from "../../components/Table/Table";
+import AppButton from "../../components/UI/Button";
+import { useToast } from "../../components/Toast/ToastProvider";
 import { AuthContext } from "../../context/AuthContext";
-import type { AutomationScope } from "../../types/automation";
+import { useSearchSubmitFeedback } from "../../hooks/useSearchSubmitFeedback";
+import type { Event } from "../../types/event";
+import "../../styles/page-colors.scss";
 import "./automation.scss";
 
-const TEXT = {
-  title: "Роботы и триггеры",
-  subtitle: "Переключайтесь между сценариями автоматизации для CRM, планировщика и заявок.",
-  noAccessTitle: "Настройка доступна организаторам",
-  noAccessDescription: "Студенты могут смотреть свои заявки, а автоматизация настраивается со стороны организатора.",
-} as const;
+function isProjectantRole(role?: string) {
+  const normalized = String(role || "").toLowerCase();
+  return normalized === "student" || normalized.includes("project");
+}
 
-const AUTOMATION_TABS: Array<{ label: string; value: AutomationScope }> = [
-  { label: "CRM", value: "crm" },
-  { label: "Планировщик", value: "planner" },
-  { label: "Заявки", value: "requests" },
-];
+function filterEventsByQuery(items: Event[], query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return items;
 
-const AUTOMATION_TAB_STORAGE_KEY = "automation-selected-tab";
-
-function isAutomationScope(value: string | null): value is AutomationScope {
-  return AUTOMATION_TABS.some((tab) => tab.value === value);
+  return items.filter(
+    (event) =>
+      (event.title || "").toLowerCase().includes(normalizedQuery) ||
+      (event.organizer || "").toLowerCase().includes(normalizedQuery) ||
+      (event.status || "").toLowerCase().includes(normalizedQuery)
+  );
 }
 
 export default function AutomationPage() {
   const { user } = useContext(AuthContext);
-  const [tab, setTab] = useState<AutomationScope>(() => {
-    const savedTab = window.localStorage.getItem(AUTOMATION_TAB_STORAGE_KEY);
-    return isAutomationScope(savedTab) ? savedTab : "crm";
-  });
-  const canManageAutomation = Boolean(user && user.role !== "student");
+  const { showToast } = useToast();
+  const [events, setEvents] = useState<Event[]>([]);
+  const [search, setSearch] = useState("");
+  const [restoreCandidate, setRestoreCandidate] = useState<Event | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const canManageArchive = Boolean(user && !isProjectantRole(user.role));
+
+  const loadEvents = useCallback(async () => {
+    if (!canManageArchive) {
+      setEvents([]);
+      return;
+    }
+
+    try {
+      const archived = await getArchivedEvents();
+      setEvents(archived);
+    } catch {
+      setEvents([]);
+      showToast("error", "Не удалось загрузить архив мероприятий");
+    }
+  }, [canManageArchive, showToast]);
 
   useEffect(() => {
-    window.localStorage.setItem(AUTOMATION_TAB_STORAGE_KEY, tab);
-  }, [tab]);
+    void loadEvents();
+  }, [loadEvents]);
 
-  if (!canManageAutomation) {
+  const filteredEvents = useMemo(() => filterEventsByQuery(events, search), [events, search]);
+
+  const { animatedIds: searchAnimatedIds, handleSearchSubmit } = useSearchSubmitFeedback({
+    getMatches: (query) => filterEventsByQuery(events, query),
+    getId: (event) => event.id,
+    notFoundMessage: "Такого мероприятия в архиве нет!",
+    showToast,
+  });
+
+  const handleRestore = async () => {
+    if (!restoreCandidate?.id) return;
+    const eventId = Number(restoreCandidate.id);
+    setRestoring(true);
+
+    try {
+      await restoreEvent(eventId);
+      setRestoreCandidate(null);
+      showToast("success", "Мероприятие возвращено из архива");
+      await loadEvents();
+      window.dispatchEvent(new CustomEvent("events:restored", { detail: { eventId } }));
+    } catch {
+      showToast("error", "Не удалось вернуть мероприятие из архива");
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  if (!canManageArchive) {
     return (
       <section className="automation-page">
         <div className="automation-page__empty">
-          <Empty description={TEXT.noAccessDescription}>
-            <h1>{TEXT.noAccessTitle}</h1>
+          <Empty description="Архив мероприятий доступен организаторам.">
+            <h1>Архив мероприятий</h1>
           </Empty>
         </div>
       </section>
@@ -49,24 +97,49 @@ export default function AutomationPage() {
   }
 
   return (
-    <section className="automation-page">
-      <div className="automation-page__head">
-        <div>
-          <h1>{TEXT.title}</h1>
-          <p>{TEXT.subtitle}</p>
-        </div>
+    <div className="page page--events">
+      <TableHeader
+        title="Архив мероприятий"
+        search={search}
+        onSearch={setSearch}
+        onSearchSubmit={handleSearchSubmit}
+      />
 
-        <Segmented
-          className="automation-page__tabs"
-          size="large"
-          shape="round"
-          value={tab}
-          onChange={(value) => setTab(value as AutomationScope)}
-          options={AUTOMATION_TABS}
-        />
-      </div>
+      <Table
+        columns={[
+          { key: "title", title: "Название" },
+          { key: "startDate", title: "Дата начала" },
+          { key: "endDate", title: "Дата окончания" },
+          { key: "organizer", title: "Организатор" },
+          { key: "status", title: "Статус" },
+        ]}
+        data={filteredEvents}
+        animatedIds={searchAnimatedIds}
+        badgeKeys={["startDate", "endDate", "status"]}
+        onEdit={(row) => setRestoreCandidate(row)}
+        editIcon={<RollbackOutlined />}
+        editTooltip="Вернуть из архива"
+      />
 
-      <AutomationPanel scope={tab} />
-    </section>
+      <AntModal
+        open={Boolean(restoreCandidate)}
+        onCancel={() => setRestoreCandidate(null)}
+        title="Вернуть мероприятие из архива?"
+        footer={[
+          <AppButton key="cancel" className="close-btn" onClick={() => setRestoreCandidate(null)} disabled={restoring}>
+            Отмена
+          </AppButton>,
+          <AppButton key="restore" className="primary-btn" onClick={handleRestore} disabled={restoring}>
+            {restoring ? "Возвращаем..." : "Вернуть"}
+          </AppButton>,
+        ]}
+        centered
+      >
+        <p>
+          Мероприятие снова появится в списке мероприятий, а связанные заявки, направления, проекты и команды снова
+          станут доступны в рабочих разделах.
+        </p>
+      </AntModal>
+    </div>
   );
 }
