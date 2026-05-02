@@ -1,0 +1,60 @@
+import type { AutomationScope } from "../types";
+
+export const SCOPE_TEXT: Record<AutomationScope, { title: string; subtitle: string; empty: string; badge: string }> = {
+  crm: {
+    title: "Роботы и триггеры CRM",
+    subtitle:
+      "Автоматизация по реальным статусам заявок: триггеры двигают карточку, роботы выполняют действия.",
+    empty: "Выберите мероприятие, чтобы настроить автоматизацию CRM.",
+    badge: "CRM",
+  },
+  planner: {
+    title: "Роботы и триггеры задач",
+    subtitle: "Автоматизация задач по стадиям планировщика.",
+    empty: "Выберите мероприятие, чтобы настроить автоматизацию задач.",
+    badge: "Задачи",
+  },
+  requests: {
+    title: "Роботы и триггеры заявок",
+    subtitle: "Автоматизация заявок проектантов по стадиям обработки.",
+    empty: "Выберите мероприятие, чтобы настроить автоматизацию заявок.",
+    badge: "Заявки",
+  },
+};
+
+export const TEXT = {
+  event: "Мероприятие",
+  save: "Сохранить",
+  saved: "Настройки роботов и триггеров сохранены",
+  loadError: "Не удалось загрузить мероприятия",
+  noEvents: "Мероприятия не найдены",
+  robots: "Роботы",
+  triggers: "Триггеры",
+  addRobot: "Добавить робота",
+  addTrigger: "Добавить триггер",
+  noRobots: "Нет роботов",
+  noTriggers: "Нет триггеров",
+  active: "включен",
+  inactive: "выключен",
+  selected: "Выберите робота или триггер",
+  selectedHint: "Кликните по карточке на стадии, чтобы открыть настройки. Или нажмите «Добавить».",
+  catalogTitleRobot: "Добавить робота",
+  catalogTitleTrigger: "Добавить триггер",
+  title: "Название",
+  description: "Описание",
+  runMode: "По очереди",
+  timing: "Когда",
+  delayMinutes: "Задержка, минут",
+  condition: "При условии",
+  noConditions: "Без условий: правило сработает всегда",
+  addCondition: "Добавить условие",
+  subject: "Тема",
+  message: "Текст сообщения",
+  targetStage: "Переместить на стадию",
+  allowBack: "Разрешить переходить на предыдущий статус",
+  delete: "Удалить",
+  settings: "Настройки",
+  actionCode: "Код действия",
+  eventCode: "Код события",
+  close: "Закрыть",
+} as const;

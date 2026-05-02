@@ -4,13 +4,31 @@ export type AutomationRunMode = "queue" | "parallel";
 
 export type AutomationTiming = "immediate" | "delayed";
 
-export type AutomationCondition =
-  | "always"
-  | "important"
-  | "overdue"
-  | "has_vk"
-  | "testing"
-  | "deadline_soon";
+export type AutomationConditionMode = "all" | "any";
+
+export type AutomationConditionOperator =
+  | "equals"
+  | "not_equals"
+  | "contains"
+  | "not_contains"
+  | "filled"
+  | "empty"
+  | "greater_or_equal"
+  | "less_or_equal"
+  | "in_range";
+
+export interface AutomationConditionRule {
+  id: string;
+  field: string;
+  operator: AutomationConditionOperator;
+  value: string;
+  valueTo?: string;
+}
+
+export interface AutomationConditionGroup {
+  mode: AutomationConditionMode;
+  rules: AutomationConditionRule[];
+}
 
 export interface AutomationStage {
   id: string;
@@ -22,7 +40,7 @@ export interface AutomationCommonSettings {
   runMode: AutomationRunMode;
   timing: AutomationTiming;
   delayMinutes: number;
-  condition: AutomationCondition;
+  condition: AutomationConditionGroup;
 }
 
 export interface AutomationRobot {
@@ -32,6 +50,7 @@ export interface AutomationRobot {
   description: string;
   action: string;
   enabled: boolean;
+  deleted?: boolean;
   settings: AutomationCommonSettings;
   subject: string;
   message: string;
@@ -44,6 +63,7 @@ export interface AutomationTrigger {
   description: string;
   eventCode: string;
   enabled: boolean;
+  deleted?: boolean;
   settings: AutomationCommonSettings;
   targetStageId: string;
   allowBackTransition: boolean;

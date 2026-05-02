@@ -8,10 +8,14 @@ import {
   markNotificationAsRead as markBackendNotificationAsRead,
 } from "../api/notifications";
 import client from "../api/client";
+import {
+  LS_NOTIFICATIONS,
+  NOTIFICATIONS_CHANGED_EVENT,
+  pushNotification,
+  readNotifications,
+} from "../storage/notifications";
 import type { CreateNotificationInput, NotificationItem } from "../types/notification";
 import { AuthContext } from "./AuthContext";
-
-const LS_NOTIFICATIONS = "ric_notifications_v1";
 
 interface NotificationsContextType {
   notifications: NotificationItem[];
@@ -25,31 +29,32 @@ interface NotificationsContextType {
 
 const NotificationsContext = createContext<NotificationsContextType | null>(null);
 
-function readLS<T>(key: string, fallback: T): T {
-  const raw = localStorage.getItem(key);
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function nextId() {
-  return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
 function shouldUseBackendNotifications(isAuthenticated: boolean) {
   return isAuthenticated && !client.USE_MOCK;
 }
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { user } = useContext(AuthContext);
-  const [items, setItems] = useState<NotificationItem[]>(() => readLS<NotificationItem[]>(LS_NOTIFICATIONS, []));
+  const [items, setItems] = useState<NotificationItem[]>(() => readNotifications());
 
   useEffect(() => {
     localStorage.setItem(LS_NOTIFICATIONS, JSON.stringify(items));
   }, [items]);
+
+  useEffect(() => {
+    if (!client.USE_MOCK) return;
+
+    const syncNotifications = () => {
+      setItems(readNotifications());
+    };
+
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, syncNotifications);
+    window.addEventListener("storage", syncNotifications);
+    return () => {
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, syncNotifications);
+      window.removeEventListener("storage", syncNotifications);
+    };
+  }, []);
 
   useEffect(() => {
     if (!user || !shouldUseBackendNotifications(Boolean(user))) return;
@@ -92,16 +97,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const created: NotificationItem = {
-        id: nextId(),
-        userId: input.userId ?? user.id,
-        title: input.title,
-        message: input.message,
-        link: input.link,
-        createdAt: new Date().toISOString(),
-        read: false,
-      };
-      setItems((prev) => [created, ...prev]);
+      pushNotification({ ...input, userId: input.userId ?? user.id });
+      setItems(readNotifications());
     },
     [user]
   );
