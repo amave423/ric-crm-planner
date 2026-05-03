@@ -10,7 +10,7 @@
 } from "../types";
 import { DEFAULT_SETTINGS, ROBOT_TEMPLATES, STAGE_TEMPLATES, TRIGGER_TEMPLATES } from "./defaults";
 
-const STORAGE_KEY = "ric_crm_automation_configs_v3";
+const STORAGE_KEY = "ric_crm_automation_configs_v4";
 
 type AutomationConfigs = Record<string, AutomationConfig>;
 

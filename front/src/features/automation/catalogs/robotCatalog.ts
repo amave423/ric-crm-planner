@@ -1,4 +1,4 @@
-import type { AutomationScope, CatalogGroup } from "../types";
+﻿import type { AutomationScope, CatalogGroup } from "../types";
 
 export const ROBOT_CATALOG: Record<AutomationScope, CatalogGroup[]> = {
   crm: [
@@ -15,7 +15,7 @@ export const ROBOT_CATALOG: Record<AutomationScope, CatalogGroup[]> = {
         {
           code: "notification.user",
           title: "Отправить уведомление",
-          description: "Показывает уведомление проектанту в системе.",
+          description: "Показывает проектанту уведомление в системе.",
           subject: "Уведомление",
           message: "Проверьте обновления по мероприятию.",
         },
@@ -55,21 +55,52 @@ export const ROBOT_CATALOG: Record<AutomationScope, CatalogGroup[]> = {
   ],
   planner: [
     {
+      title: "Уведомления",
+      items: [
+        {
+          code: "notification.assignee",
+          title: "Уведомить исполнителя",
+          description: "Отправляет уведомление назначенному исполнителю задачи или подзадачи.",
+          subject: "Вам назначена задача",
+          message: "Проверьте задачу, сроки и текущий статус в планировщике.",
+        },
+        {
+          code: "notification.curator",
+          title: "Уведомить куратора",
+          description: "Сообщает куратору команды о риске, просрочке или переходе задачи на проверку.",
+          subject: "Задача требует внимания",
+          message: "Проверьте задачу команды: изменился статус или появился риск по сроку.",
+        },
+      ],
+    },
+    {
       title: "Задачи",
       items: [
         {
           code: "task.create",
           title: "Создать задачу",
-          description: "Создает новую задачу для участника или организатора.",
+          description: "Создает новую большую задачу или follow-up для команды.",
           subject: "Новая задача",
-          message: "Проверьте задачу и сроки выполнения.",
+          message: "Создана новая задача. Назначьте ответственного и срок выполнения.",
         },
         {
+          code: "task.review",
+          title: "Поставить проверку",
+          description: "Создает действие на проверку результата для куратора.",
+          subject: "Проверить результат",
+          message: "Задача отправлена на проверку. Проверьте результат и оставьте обратную связь.",
+        },
+      ],
+    },
+    {
+      title: "Сроки",
+      items: [
+        {
           code: "notification.deadline",
-          title: "Напомнить о сроке",
-          description: "Отправляет напоминание исполнителю по задаче.",
+          title: "Напомнить о дедлайне",
+          description: "Отправляет напоминание исполнителю или куратору перед крайним сроком.",
           subject: "Скоро дедлайн",
-          message: "Проверьте состояние задачи.",
+          message: "До крайнего срока осталось мало времени. Проверьте состояние задачи.",
         },
       ],
     },

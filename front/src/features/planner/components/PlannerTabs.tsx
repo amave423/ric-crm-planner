@@ -1,4 +1,4 @@
-import { SettingOutlined } from "@ant-design/icons";
+﻿import { SettingOutlined } from "@ant-design/icons";
 import type { PlannerTab } from "../planner.types";
 import AppButton from "../../../components/UI/Button";
 

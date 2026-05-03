@@ -45,7 +45,32 @@ export const TRIGGER_CATALOG: Record<AutomationScope, CatalogGroup[]> = {
   ],
   planner: [
     {
-      title: "Задачи",
+      title: "Жизненный цикл задачи",
+      items: [
+        {
+          code: "task.created",
+          title: "Задача создана",
+          description: "Срабатывает после создания большой задачи или подзадачи.",
+        },
+        {
+          code: "task.sprint_added",
+          title: "Подзадача добавлена в спринт",
+          description: "Срабатывает, когда подзадачу включили в спринт и она появилась в канбане.",
+        },
+        {
+          code: "task.assignee_changed",
+          title: "Изменен исполнитель",
+          description: "Срабатывает при назначении или смене ответственного за задачу.",
+        },
+        {
+          code: "task.status_changed",
+          title: "Статус задачи изменен",
+          description: "Срабатывает при любой смене статуса задачи в канбане.",
+        },
+      ],
+    },
+    {
+      title: "Сроки и контроль",
       items: [
         {
           code: "task.deadline_soon",
@@ -53,19 +78,34 @@ export const TRIGGER_CATALOG: Record<AutomationScope, CatalogGroup[]> = {
           description: "Срабатывает за выбранное время до крайнего срока.",
         },
         {
-          code: "task.status_changed",
-          title: "Статус задачи изменен",
-          description: "Срабатывает при смене статуса задачи.",
+          code: "task.overdue",
+          title: "Задача просрочена",
+          description: "Срабатывает, если крайний срок прошел, а задача не завершена.",
+        },
+        {
+          code: "task.review_requested",
+          title: "Задача отправлена на проверку",
+          description: "Срабатывает при переходе задачи на стадию проверки.",
         },
         {
           code: "task.status_done",
           title: "Задача завершена",
-          description: "Срабатывает, когда задача переходит в готовность.",
+          description: "Срабатывает, когда задача переходит в финальный статус.",
+        },
+      ],
+    },
+    {
+      title: "Команда",
+      items: [
+        {
+          code: "team.confirmed",
+          title: "Команда подтверждена",
+          description: "Срабатывает после подтверждения состава команды организатором.",
         },
         {
-          code: "task.status_started",
-          title: "Задача взята в работу",
-          description: "Срабатывает, когда исполнитель начал выполнение задачи.",
+          code: "team.curator_assigned",
+          title: "Куратор назначен",
+          description: "Срабатывает после назначения или смены куратора команды.",
         },
       ],
     },

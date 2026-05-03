@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AutomationCommonSettings,
   AutomationConditionGroup,
   AutomationConditionMode,
@@ -46,6 +46,13 @@ export const CONDITION_FIELD_OPTIONS = [
   { value: "application_date", label: "Дата подачи заявки" },
   { value: "testing_result", label: "Результат тестирования" },
   { value: "responsible", label: "Ответственный" },
+  { value: "task_type", label: "Тип задачи" },
+  { value: "task_status", label: "Статус задачи" },
+  { value: "team", label: "Команда" },
+  { value: "curator", label: "Куратор" },
+  { value: "assignee", label: "Исполнитель" },
+  { value: "deadline", label: "Дедлайн" },
+  { value: "in_sprint", label: "В спринте" },
 ];
 
 export const CONDITION_OPERATOR_OPTIONS: Array<{ value: AutomationConditionOperator; label: string }> = [
