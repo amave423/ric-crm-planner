@@ -12,6 +12,8 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer, Serializer
 
+from integrations.vk.crm_notifications import notify_application_testing_started
+
 from .models import CRMRole, ROLE_PROJECTANT, ROLE_CURATOR, ROLE_ADMIN
 from .models import (
     Answer,
@@ -780,6 +782,12 @@ class ApplicationSerializer(ModelSerializer):
 
         return super().validate(attrs)
 
+    def update(self, instance, validated_data):
+        previous_status_id = instance.status_id
+        application = super().update(instance, validated_data)
+        notify_application_testing_started(application, previous_status_id=previous_status_id)
+        return application
+
 
 class StatusSerializer(ModelSerializer):
     class Meta:
@@ -1045,6 +1053,7 @@ class IntegrationTestSessionUpsertSerializer(Serializer):
 
     def create(self, validated_data):
         application: Application = self.context["application"]
+        previous_status_id = application.status_id
         testing_status = resolve_testing_status()
         answers_data = validated_data.pop("answers_data", None)
         session_id = validated_data["session_id"]
@@ -1077,6 +1086,7 @@ class IntegrationTestSessionUpsertSerializer(Serializer):
                 "status",
             ]
         )
+        notify_application_testing_started(application, previous_status_id=previous_status_id)
 
         self.context["created"] = created
         return session

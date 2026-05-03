@@ -39,6 +39,7 @@ urlpatterns = [
     path("api/users/planner/", PlannerStateCompatView.as_view(), name="planner-state"),
     path('api/users/', include("users.urls")),
     path("api/planner/", include("planner.urls")),
+    path("api/integrations/", include("integrations.urls")),
     re_path(r"^swagger(?P<format>\.json|\.yaml)$", schema_view.without_ui(cache_timeout=0), name="schema-json"),
     path("swagger/", schema_view.with_ui("swagger", cache_timeout=0), name="schema-swagger-ui"),
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
