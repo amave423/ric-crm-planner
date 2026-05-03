@@ -36,6 +36,7 @@ from users.serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     RegisterUserSerializer,
+    UserSerializer,
 )
 
 
@@ -122,6 +123,18 @@ class SerializerTests(TestCase):
         self.assertIsNotNone(role)
         self.assertEqual(role.content_type, ContentType.objects.get_for_model(Profile))
         self.assertEqual(role.object_id, new_user.crm_profile.pk)
+
+    def test_user_serializer_prefers_curator_role_over_default_projectant_role(self):
+        CRMRole.objects.create(
+            user=self.user,
+            role_type=ROLE_CURATOR,
+            content_type=ContentType.objects.get_for_model(Profile),
+            object_id=self.user.crm_profile.pk,
+        )
+
+        data = UserSerializer(self.user).data
+
+        self.assertEqual(data["role"], "organizer")
 
     def test_email_confirmation_serializer_activates_user(self):
         inactive_user = self.user_model.objects.create_user(
