@@ -7,6 +7,7 @@ type ApplicantAccumulator = {
   ownerId: number;
   name: string;
   status?: string;
+  specialization?: string;
   requestIds: number[];
   latestRequestId: number;
 };
@@ -33,6 +34,7 @@ function upsertApplicant(
       ownerId,
       name: displayName,
       status: request.status,
+      specialization: request.specialization,
       requestIds: [request.id],
       latestRequestId: Number(request.id) || 0,
     });
@@ -43,6 +45,7 @@ function upsertApplicant(
   if ((Number(request.id) || 0) >= current.latestRequestId) {
     current.latestRequestId = Number(request.id) || current.latestRequestId;
     current.status = request.status;
+    current.specialization = request.specialization || current.specialization;
     if (displayName) current.name = displayName;
   }
 }
@@ -124,6 +127,7 @@ export function buildProjectApplicantGroups({
         ownerId: applicant.ownerId,
         name: applicant.name,
         status: applicant.status,
+        specialization: applicant.specialization,
         requestIds: applicant.requestIds,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, "ru"));
@@ -170,6 +174,7 @@ export function buildProjectApplicantGroups({
         ownerId: applicant.ownerId,
         name: applicant.name,
         status: applicant.status,
+        specialization: applicant.specialization,
         requestIds: applicant.requestIds,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, "ru")),

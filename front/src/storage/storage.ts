@@ -45,6 +45,32 @@ function nextId(items: Array<{ id?: number }>): number {
   return max + 1;
 }
 
+function toNumber(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function mapUserRecord(raw: unknown): User | null {
+  if (!raw || typeof raw !== "object") return null;
+  const record = raw as UnknownRecord;
+  const profile = record.profile && typeof record.profile === "object" ? (record.profile as UnknownRecord) : {};
+  const id = toNumber(record.id ?? record.pk);
+  if (!id) return null;
+
+  const email = String(record.email ?? profile.email ?? "");
+  const name = String(record.name ?? record.firstName ?? record.first_name ?? profile.name ?? "");
+  const surname = String(record.surname ?? record.lastName ?? record.last_name ?? profile.surname ?? "");
+  const role = String(record.role ?? profile.role ?? "");
+
+  return {
+    id,
+    email,
+    name,
+    surname,
+    role: role || "student",
+  };
+}
+
 function ensureMockSeeded() {
   const storedVersion = localStorage.getItem(LS_MOCK_SEED_VERSION);
   if (storedVersion !== CURRENT_MOCK_SEED_VERSION) {
@@ -348,7 +374,9 @@ export async function getAllUsers(): Promise<User[]> {
   if (!USE_MOCK) {
     if (!localStorage.getItem("currentUser")) return [];
     try {
-      return await client.get("/api/users/");
+      const raw = await client.get<unknown[]>("/api/users/");
+      if (!Array.isArray(raw)) return [];
+      return raw.map(mapUserRecord).filter((user): user is User => Boolean(user));
     } catch {
       return [];
     }

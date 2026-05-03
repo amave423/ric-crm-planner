@@ -88,6 +88,15 @@ export default function TaskCardModal({
               </div>
             )}
 
+            {taskCardParent && (
+              <div className="planner-task-row">
+                <div className="planner-task-label">Ответственный</div>
+                <div className="planner-task-value">
+                  {taskCardParent.assigneeId ? displayAssigneeLabel(taskCardParent.assigneeId) : "—"}
+                </div>
+              </div>
+            )}
+
             {taskCardSubtask && (
               <>
                 <div className="planner-task-row">

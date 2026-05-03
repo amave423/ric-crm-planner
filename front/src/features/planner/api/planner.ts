@@ -22,6 +22,31 @@ type BackendPlanner = {
   columns?: string[];
 };
 
+type BackendPlannerTeam = Partial<PlannerState["teams"][number]> & {
+  title?: string;
+  name?: string;
+  curator_id?: number | string;
+  member_ids?: Array<number | string>;
+  memberRoles?: Record<string, string>;
+  member_roles?: Record<string, string>;
+  event_id?: number | string;
+  direction_id?: number | string;
+  project_id?: number | string;
+  source_request_ids?: Array<number | string>;
+};
+
+type BackendPlannerParentTask = Partial<PlannerState["parentTasks"][number]> & {
+  assigneeId?: number | string;
+  assignee_id?: number | string;
+};
+
+type BackendPlannerSubtask = Partial<PlannerState["subtasks"][number]> & {
+  assigneeId?: number | string;
+  assignee_id?: number | string;
+  inSprint?: boolean;
+  in_sprint?: boolean | number | string;
+};
+
 function toNumber(value: unknown): number | undefined {
   if (typeof value === "number" && !Number.isNaN(value)) return value;
   if (typeof value === "string") {
@@ -35,6 +60,53 @@ export function hasStartedWork(status?: string) {
   return String(status || "").trim().toLowerCase() === REQUEST_STATUS.STARTED.toLowerCase();
 }
 
+function mapBackendTeams(teams: unknown, fallback: PlannerState): PlannerState["teams"] {
+  if (!Array.isArray(teams)) return fallback.teams;
+
+  return teams.map((item) => {
+    const team = item as BackendPlannerTeam;
+    return {
+      ...team,
+      id: toNumber(team.id) ?? 0,
+      name: String(team.name ?? team.title ?? ""),
+      curatorId: toNumber(team.curatorId ?? team.curator_id),
+      memberIds: Array.isArray(team.memberIds ?? team.member_ids)
+        ? (team.memberIds ?? team.member_ids ?? []).map((id) => Number(id)).filter((id) => Number.isFinite(id))
+        : [],
+      memberRoles:
+        team.memberRoles && typeof team.memberRoles === "object"
+          ? team.memberRoles
+          : team.member_roles && typeof team.member_roles === "object"
+            ? team.member_roles
+            : {},
+      confirmed: Boolean(team.confirmed),
+      eventId: toNumber(team.eventId ?? team.event_id),
+      directionId: toNumber(team.directionId ?? team.direction_id),
+      projectId: toNumber(team.projectId ?? team.project_id),
+      sourceRequestIds: Array.isArray(team.sourceRequestIds ?? team.source_request_ids)
+        ? (team.sourceRequestIds ?? team.source_request_ids ?? []).map((id) => Number(id)).filter((id) => Number.isFinite(id))
+        : [],
+    };
+  });
+}
+
+function mapBackendParentTasks(parentTasks: unknown, fallback: PlannerState): PlannerState["parentTasks"] {
+  if (!Array.isArray(parentTasks)) return fallback.parentTasks;
+
+  return parentTasks.map((item) => {
+    const task = item as BackendPlannerParentTask;
+    return {
+      ...task,
+      id: toNumber(task.id) ?? 0,
+      teamId: toNumber(task.teamId) ?? 0,
+      title: String(task.title ?? ""),
+      assigneeId: toNumber(task.assigneeId ?? task.assignee_id),
+      startDate: String(task.startDate ?? ""),
+      endDate: String(task.endDate ?? ""),
+    };
+  });
+}
+
 function mapBackendPlanner(raw: unknown): PlannerState {
   const fallback = readPlannerState(false);
   if (!raw || typeof raw !== "object") return fallback;
@@ -45,14 +117,29 @@ function mapBackendPlanner(raw: unknown): PlannerState {
   );
   const mappedSubtasks = Array.isArray(planner.subtasks)
     ? planner.subtasks.map((item) => {
-        const subtask = item as PlannerState["subtasks"][number];
+        const subtask = item as BackendPlannerSubtask;
         const id = Number((subtask as { id?: number | string }).id ?? 0);
         const fallbackSubtask = fallbackSubtasksById.get(id);
+        const rawSprint = typeof subtask.inSprint === "boolean" ? subtask.inSprint : subtask.in_sprint;
+        const inSprint =
+          typeof rawSprint === "boolean"
+            ? rawSprint
+            : typeof rawSprint === "undefined"
+              ? fallbackSubtask?.inSprint ?? false
+              : rawSprint === 1 || rawSprint === "1" || String(rawSprint).toLowerCase() === "true";
         return {
           ...fallbackSubtask,
           ...subtask,
           id: id || (fallbackSubtask?.id ?? 0),
-          inSprint: typeof subtask.inSprint === "boolean" ? subtask.inSprint : fallbackSubtask?.inSprint ?? false,
+          teamId: toNumber(subtask.teamId) ?? fallbackSubtask?.teamId ?? 0,
+          parentTaskId: toNumber(subtask.parentTaskId) ?? fallbackSubtask?.parentTaskId ?? 0,
+          title: String(subtask.title ?? fallbackSubtask?.title ?? ""),
+          role: String(subtask.role ?? fallbackSubtask?.role ?? ""),
+          assigneeId: toNumber(subtask.assigneeId ?? subtask.assignee_id),
+          startDate: String(subtask.startDate ?? fallbackSubtask?.startDate ?? ""),
+          endDate: String(subtask.endDate ?? fallbackSubtask?.endDate ?? ""),
+          inSprint,
+          status: String(subtask.status ?? fallbackSubtask?.status ?? ""),
         };
       })
     : fallback.subtasks;
@@ -80,12 +167,8 @@ function mapBackendPlanner(raw: unknown): PlannerState {
           }))
           .filter((participant) => participant.id > 0 && participant.fullName)
       : fallback.participants,
-    teams: Array.isArray(planner.teams) ? planner.teams : fallback.teams,
-    parentTasks: Array.isArray(planner.parentTasks)
-      ? planner.parentTasks
-      : Array.isArray(planner.parent_tasks)
-        ? planner.parent_tasks
-        : fallback.parentTasks,
+    teams: mapBackendTeams(planner.teams, fallback),
+    parentTasks: mapBackendParentTasks(planner.parentTasks ?? planner.parent_tasks, fallback),
     subtasks: mappedSubtasks,
     columns: Array.isArray(planner.columns) && planner.columns.length > 0 ? planner.columns : fallback.columns,
   };

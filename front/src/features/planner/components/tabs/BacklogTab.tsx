@@ -10,12 +10,15 @@ import AppSwitch from "../../../../components/UI/Switch";
 type BacklogTabProps = {
   activeTeamName: string;
   parentTitle: string;
+  parentAssigneeId: string;
   parentStart: string;
   parentEnd: string;
   onParentTitleChange: (value: string) => void;
+  onParentAssigneeChange: (value: string) => void;
   onParentStartChange: (value: string) => void;
   onParentEndChange: (value: string) => void;
   onAddParentTask: () => void;
+  activeTeamMembers: number[];
   filteredParents: PlannerParentTask[];
   selectedParentId: number | null;
   onSelectParent: (parentId: number) => void;
@@ -71,12 +74,15 @@ const getSubtaskAssignee = (subtask: PlannerSubtask, displayAssigneeLabel: (id: 
 export default function BacklogTab({
   activeTeamName,
   parentTitle,
+  parentAssigneeId,
   parentStart,
   parentEnd,
   onParentTitleChange,
+  onParentAssigneeChange,
   onParentStartChange,
   onParentEndChange,
   onAddParentTask,
+  activeTeamMembers,
   filteredParents,
   selectedParentId,
   onSelectParent,
@@ -145,6 +151,21 @@ export default function BacklogTab({
               Название
               <AppInput value={parentTitle} onChange={(event) => onParentTitleChange(event.target.value)} placeholder="Например: Сделать MVP" />
             </label>
+            <label className="planner-label">
+              Ответственный
+              <AppSelect
+                value={parentAssigneeId || ""}
+                onChange={(value) => onParentAssigneeChange(String(value))}
+                disabled={activeTeamMembers.length === 0}
+                options={[
+                  { value: "", label: "Без ответственного" },
+                  ...activeTeamMembers.map((id) => ({
+                    value: String(id),
+                    label: displayAssigneeLabel(Number(id)),
+                  })),
+                ]}
+              />
+            </label>
             <DateRangeField
               className="planner-label"
               label={"Срок большой задачи"}
@@ -183,6 +204,22 @@ export default function BacklogTab({
                           setEditingParentDraft((prev) => (prev ? { ...prev, title: event.target.value } : prev))
                         }
                       />
+                      <AppSelect
+                        value={editingParentDraft.assigneeId != null ? String(editingParentDraft.assigneeId) : ""}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(value) =>
+                          setEditingParentDraft((prev) =>
+                            prev ? { ...prev, assigneeId: value ? Number(value) : undefined } : prev
+                          )
+                        }
+                        options={[
+                          { value: "", label: "Без ответственного" },
+                          ...getTeamMemberIds(parent.teamId).map((id) => ({
+                            value: String(id),
+                            label: displayAssigneeLabel(Number(id)),
+                          })),
+                        ]}
+                      />
                       <div className="planner-inline-edit-row planner-inline-edit-row--date" onClick={(event) => event.stopPropagation()}>
                         <DateRangeField
                           startValue={editingParentDraft.startDate}
@@ -213,6 +250,10 @@ export default function BacklogTab({
                         <span>
                           <small>В спринте</small>
                           {parentSprintCount}/{parentSubtasks.length}
+                        </span>
+                        <span>
+                          <small>Ответственный</small>
+                          {parent.assigneeId ? displayAssigneeLabel(parent.assigneeId) : "Не назначен"}
                         </span>
                       </div>
                     </>

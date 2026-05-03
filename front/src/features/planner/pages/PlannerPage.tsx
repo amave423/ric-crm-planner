@@ -1,4 +1,4 @@
-﻿import { useContext, useEffect, useMemo, useState } from "react";
+﻿import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Modal as AntModal } from "antd";
 import { buildParticipantsFromRequests, getPlannerState, hasStartedWork, savePlannerState, syncParticipants } from "../api/planner";
 import { getRequests } from "../../requests/api/requests";
@@ -36,6 +36,7 @@ export default function PlannerPage() {
   const { showToast } = useToast();
   const { isOrganizer, isCurator, isStudent } = roleFlags(user?.role);
   const userId = Number(user?.id || 0);
+  const skipNextPlannerSaveRef = useRef(false);
 
   const [tab, setTab] = useState<PlannerTab>(() => {
     const raw = localStorage.getItem("planner_tab_v1");
@@ -67,6 +68,7 @@ export default function PlannerPage() {
   const [projectTitleById, setProjectTitleById] = useState<Record<number, string>>({});
 
   const [parentTitle, setParentTitle] = useState("");
+  const [parentAssigneeId, setParentAssigneeId] = useState("");
   const [parentStart, setParentStart] = useState("");
   const [parentEnd, setParentEnd] = useState("");
   const [selectedParentId, setSelectedParentId] = useState<number | null>(null);
@@ -102,6 +104,10 @@ export default function PlannerPage() {
 
   useEffect(() => {
     if (!isPlannerLoaded) return;
+    if (skipNextPlannerSaveRef.current) {
+      skipNextPlannerSaveRef.current = false;
+      return;
+    }
     void savePlannerState(state);
   }, [isPlannerLoaded, state]);
 
@@ -126,6 +132,7 @@ export default function PlannerPage() {
           isOrganizer && planner.closedEventIds.length > 0
             ? syncParticipants(planner, buildParticipantsFromRequests(usersData, requestsData, planner.closedEventIds))
             : planner;
+        skipNextPlannerSaveRef.current = true;
         setState(synced);
         setUsers(Array.isArray(us) ? us : []);
         setRequests(Array.isArray(rs) ? rs : []);
@@ -202,6 +209,13 @@ export default function PlannerPage() {
   );
   const specializationByOwnerId = useMemo(() => {
     const map = new Map<number, string>();
+    state.teams.forEach((team) => {
+      Object.entries(team.memberRoles || {}).forEach(([ownerId, role]) => {
+        const id = Number(ownerId);
+        const value = String(role || "").trim();
+        if (Number.isFinite(id) && value) map.set(id, value);
+      });
+    });
     requests.forEach((r) => {
       const ownerId = Number(r.ownerId);
       if (!Number.isFinite(ownerId)) return;
@@ -209,7 +223,7 @@ export default function PlannerPage() {
       if (spec) map.set(ownerId, spec);
     });
     return map;
-  }, [requests]);
+  }, [requests, state.teams]);
   const hiddenEventIdSet = useMemo(
     () => new Set(state.hiddenEventIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)),
     [state.hiddenEventIds]
@@ -267,6 +281,7 @@ export default function PlannerPage() {
   };
   const getTeamMemberIds = (teamId: number) =>
     state.teams.find((t) => Number(t.id) === Number(teamId))?.memberIds || [];
+  const activeTeamMembers = activeTeamId != null ? getTeamMemberIds(activeTeamId) : [];
   const selectedTeamMembers = selectedParent
     ? state.teams.find((t) => Number(t.id) === Number(selectedParent.teamId))?.memberIds || []
     : [];
@@ -309,7 +324,16 @@ export default function PlannerPage() {
     }
     setState((prev) => ({
       ...prev,
-      teams: prev.teams.map((t) => (Number(t.id) === Number(teamEditId) ? { ...t, memberIds: unique } : t)),
+      teams: prev.teams.map((t) => {
+        if (Number(t.id) !== Number(teamEditId)) return t;
+        const memberRoles = unique.reduce<Record<string, string>>((acc, memberId) => {
+          const existingRole = t.memberRoles?.[String(memberId)];
+          const knownRole = specializationByOwnerId.get(memberId);
+          if (existingRole || knownRole) acc[String(memberId)] = existingRole || knownRole || "";
+          return acc;
+        }, {});
+        return { ...t, memberIds: unique, memberRoles };
+      }),
     }));
     notifySuccess("Состав команды обновлён");
     closeTeamEdit();
@@ -377,11 +401,18 @@ export default function PlannerPage() {
     const curatorId = typeof curatorIdNum === "number" && !Number.isNaN(curatorIdNum) ? curatorIdNum : undefined;
 
     const requestIds = group.applicants.filter((a) => memberIds.includes(a.ownerId)).flatMap((a) => a.requestIds);
+    const memberRoles = group.applicants
+      .filter((applicant) => memberIds.includes(applicant.ownerId) && applicant.specialization)
+      .reduce<Record<string, string>>((acc, applicant) => {
+        acc[String(applicant.ownerId)] = String(applicant.specialization);
+        return acc;
+      }, {});
     const created: PlannerTeam = {
       id: nextPlannerId(state.teams),
       name: teamName,
       curatorId,
       memberIds,
+      memberRoles,
       confirmed: false,
       eventId: group.eventId,
       directionId: group.directionId,
@@ -423,9 +454,20 @@ export default function PlannerPage() {
     }
     setState((prev) => ({
       ...prev,
-      parentTasks: [...prev.parentTasks, { id: nextPlannerId(prev.parentTasks), teamId, title: parentTitle.trim(), startDate: parentStart, endDate: parentEnd }],
+      parentTasks: [
+        ...prev.parentTasks,
+        {
+          id: nextPlannerId(prev.parentTasks),
+          teamId,
+          title: parentTitle.trim(),
+          assigneeId: parentAssigneeId ? Number(parentAssigneeId) : undefined,
+          startDate: parentStart,
+          endDate: parentEnd,
+        },
+      ],
     }));
     setParentTitle("");
+    setParentAssigneeId("");
     setParentStart("");
     setParentEnd("");
     notifySuccess("Большая задача добавлена");
@@ -475,6 +517,7 @@ export default function PlannerPage() {
     setEditingParentId(parent.id);
     setEditingParentDraft({
       title: parent.title,
+      assigneeId: parent.assigneeId,
       startDate: parent.startDate,
       endDate: parent.endDate,
     });
@@ -505,7 +548,13 @@ export default function PlannerPage() {
       ...prev,
       parentTasks: prev.parentTasks.map((p) =>
         Number(p.id) === Number(editingParentId)
-          ? { ...p, title: nextTitle, startDate: editingParentDraft.startDate, endDate: editingParentDraft.endDate }
+          ? {
+              ...p,
+              title: nextTitle,
+              assigneeId: editingParentDraft.assigneeId,
+              startDate: editingParentDraft.startDate,
+              endDate: editingParentDraft.endDate,
+            }
           : p
       ),
     }));
@@ -773,12 +822,15 @@ export default function PlannerPage() {
         <BacklogTab
           activeTeamName={activeTeam?.name || ""}
           parentTitle={parentTitle}
+          parentAssigneeId={parentAssigneeId}
           parentStart={parentStart}
           parentEnd={parentEnd}
           onParentTitleChange={setParentTitle}
+          onParentAssigneeChange={setParentAssigneeId}
           onParentStartChange={setParentStart}
           onParentEndChange={setParentEnd}
           onAddParentTask={addParentTask}
+          activeTeamMembers={activeTeamMembers}
           filteredParents={filteredParents}
           selectedParentId={selectedParentId}
           onSelectParent={setSelectedParentId}
@@ -909,6 +961,7 @@ export default function PlannerPage() {
     </div>
   );
 }
+
 
 
 

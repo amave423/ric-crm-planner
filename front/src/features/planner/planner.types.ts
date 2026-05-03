@@ -2,6 +2,7 @@ export type PlannerTab = "teams" | "backlog" | "kanban" | "gantt";
 
 export type ParentEditDraft = {
   title: string;
+  assigneeId?: number;
   startDate: string;
   endDate: string;
 };
@@ -23,7 +24,7 @@ export type ProjectApplicantsGroup = {
   eventTitle: string;
   directionTitle: string;
   projectTitle: string;
-  applicants: Array<{ ownerId: number; name: string; status?: string; requestIds: number[] }>;
+  applicants: Array<{ ownerId: number; name: string; status?: string; specialization?: string; requestIds: number[] }>;
 };
 
 export type ApplicantsTreeNode = {
