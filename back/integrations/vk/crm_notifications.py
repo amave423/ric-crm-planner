@@ -35,11 +35,22 @@ def notify_organizers_about_vk_error(application: Application, reason: str) -> N
             user=organizer,
             title="Ошибка отправки VK",
             message=(
-                f'Не удалось отправить VK-сообщение проектанту {student_name} '
+                f"Не удалось отправить VK-сообщение проектанту {student_name} "
                 f'по заявке на мероприятие "{event_name}". Причина: {reason}'
             ),
             link="/requests",
         )
+
+
+def send_application_vk_message(application: Application, message: str) -> int:
+    profile = Profile.objects.filter(user=application.user).only("vk").first()
+    vk_value = profile.vk if profile else ""
+
+    vk_user_id = resolve_vk_user_id(vk_value)
+    if not vk_user_id:
+        raise ValueError("у проектанта не указан корректный VK")
+
+    return send_vk_message(user_id=vk_user_id, message=message)
 
 
 def notify_application_testing_started(application: Application, previous_status_id: int | None = None) -> int | None:
@@ -52,20 +63,8 @@ def notify_application_testing_started(application: Application, previous_status
     if not application.status_id or application.status.name != TESTING_STATUS_NAME:
         return None
 
-    profile = Profile.objects.filter(user=application.user).only("vk").first()
-    vk_value = profile.vk if profile else ""
     try:
-        vk_user_id = resolve_vk_user_id(vk_value)
-    except (VKConfigurationError, VKAPIError) as exc:
-        notify_organizers_about_vk_error(application, str(exc))
-        return None
-
-    if not vk_user_id:
-        notify_organizers_about_vk_error(application, "у проектанта не указан корректный VK")
-        return None
-
-    try:
-        return send_vk_message(user_id=vk_user_id, message=build_testing_started_message(application))
+        return send_application_vk_message(application, build_testing_started_message(application))
     except (VKConfigurationError, VKAPIError, ValueError) as exc:
         notify_organizers_about_vk_error(application, str(exc))
         return None

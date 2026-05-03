@@ -1,6 +1,7 @@
 import secrets
 
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -11,9 +12,11 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from users.models import Application
 from users.permissions import CuratorOrAdminPermission
 
-from .serializers import VKSendTestSerializer
+from .crm_notifications import notify_organizers_about_vk_error, send_application_vk_message
+from .serializers import VKApplicationMessageSerializer, VKSendTestSerializer
 from .services import VKAPIError, VKConfigurationError, normalize_vk_group_id, send_vk_message
 
 
@@ -81,3 +84,29 @@ class VKSendTestView(APIView):
             )
 
         return Response({"message_id": message_id})
+
+
+class VKApplicationMessageView(APIView):
+    permission_classes = (CuratorOrAdminPermission,)
+
+    @swagger_auto_schema(
+        operation_summary="Send VK message for application",
+        operation_description="Sends configured CRM robot VK message to the application owner.",
+        request_body=VKApplicationMessageSerializer,
+        responses={200: openapi.Response("VK message id"), 400: "Validation or VK API error", 404: "Application not found"},
+    )
+    def post(self, request, application_id: int):
+        application = get_object_or_404(
+            Application.objects.select_related("user", "event", "event__leader").prefetch_related("event__organizers"),
+            pk=application_id,
+        )
+        serializer = VKApplicationMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            message_id = send_application_vk_message(application, serializer.validated_data["text"])
+        except (VKConfigurationError, VKAPIError, ValueError) as exc:
+            notify_organizers_about_vk_error(application, str(exc))
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"message_id": message_id}, status=status.HTTP_200_OK)

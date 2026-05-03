@@ -1,4 +1,5 @@
-﻿import { buildMockRequestTransitionUrl, REQUEST_STATUS } from "../../../constants/requestProgress";
+import client from "../../../api/client";
+import { buildMockRequestTransitionUrl, REQUEST_STATUS } from "../../../constants/requestProgress";
 import { pushNotifications } from "../../../storage/notifications";
 import { getAllUsers } from "../../../storage/storage";
 import type { Event } from "../../../types/event";
@@ -109,6 +110,17 @@ async function runWithTiming(robot: AutomationRobot, execute: () => Promise<void
   await execute();
 }
 
+async function sendBackendApplicationVkMessage(robot: AutomationRobot, request: ReqType, event?: Event) {
+  if (!request.id || client.USE_MOCK) return false;
+
+  await client.post(`/api/integrations/vk/applications/${request.id}/message/`, {
+    subject: renderTemplate(robot.subject || robot.title, request, event),
+    message: renderTemplate(robot.message || robot.description, request, event),
+  });
+
+  return true;
+}
+
 export async function executeRobot(
   config: AutomationConfig,
   robot: AutomationRobot,
@@ -129,6 +141,15 @@ export async function executeRobot(
   rememberExecution(key);
 
   await runWithTiming(robot, async () => {
+    if (robot.action === "message.vk" && !client.USE_MOCK) {
+      try {
+        await sendBackendApplicationVkMessage(robot, eventItem.request, event);
+      } catch {
+        // Backend creates organizer notifications for VK delivery problems.
+      }
+      return;
+    }
+
     const notifications = await buildRobotNotifications(robot, eventItem.request, event);
     pushNotifications(notifications);
   });

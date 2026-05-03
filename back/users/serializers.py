@@ -783,10 +783,7 @@ class ApplicationSerializer(ModelSerializer):
         return super().validate(attrs)
 
     def update(self, instance, validated_data):
-        previous_status_id = instance.status_id
-        application = super().update(instance, validated_data)
-        notify_application_testing_started(application, previous_status_id=previous_status_id)
-        return application
+        return super().update(instance, validated_data)
 
 
 class StatusSerializer(ModelSerializer):

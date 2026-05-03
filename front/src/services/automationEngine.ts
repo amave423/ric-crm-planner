@@ -1,1 +1,5 @@
-﻿export { runRequestAutomation, runRequestAutomationEvents } from "../features/automation/engine/requestAutomationEngine";
+export {
+  runRequestAutomation,
+  runRequestAutomationEvents,
+  runRequestStageRobots,
+} from "../features/automation/engine/requestAutomationEngine";

@@ -87,6 +87,28 @@ export async function runRequestAutomation(eventItem: RequestAutomationEvent<Req
   return eventItem.request;
 }
 
+async function runConfigStageRobots(config: AutomationConfig, eventItem: RequestAutomationEvent<ReqType>) {
+  const event = await getRequestEvent(eventItem.request);
+  const currentStageId = getStatusStageId(config, eventItem.request.status);
+  if (!currentStageId) return;
+
+  await runRobotsForStage(config, currentStageId, eventItem, event);
+}
+
+export async function runRequestStageRobots(eventItem: RequestAutomationEvent<ReqType>) {
+  if (!eventItem.request.eventId) return eventItem.request;
+
+  const eventId = Number(eventItem.request.eventId);
+  if (!Number.isFinite(eventId)) return eventItem.request;
+
+  for (const scope of REQUEST_AUTOMATION_SCOPES) {
+    const config = readAutomationConfig(scope, eventId);
+    await runConfigStageRobots(config, { ...eventItem, request: { ...eventItem.request } });
+  }
+
+  return eventItem.request;
+}
+
 export async function runRequestAutomationEvents(events: Array<RequestAutomationEvent<ReqType>>) {
   for (const eventItem of events) {
     await runRequestAutomation(eventItem);
