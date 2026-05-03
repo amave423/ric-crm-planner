@@ -99,6 +99,24 @@
   padding: 12px;
 }
 
+.planner-access-note {
+  margin-bottom: 12px;
+  border-color: #bfdbfe;
+  background:
+    linear-gradient(90deg, rgba(37, 99, 235, 0.08), transparent 48%),
+    #fff;
+}
+
+.planner-access-note .h3 {
+  margin: 0 0 6px;
+}
+
+.planner-access-note p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.45;
+}
+
 .planner-stack {
   display: flex;
   flex-direction: column;

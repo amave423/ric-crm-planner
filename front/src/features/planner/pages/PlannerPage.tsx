@@ -17,6 +17,7 @@ import BacklogTab from "../components/tabs/BacklogTab";
 import KanbanTab from "../components/tabs/KanbanTab";
 import GanttTab from "../components/tabs/GanttTab";
 import ConfirmCloseEnrollmentModal from "../components/modals/ConfirmCloseEnrollmentModal";
+import ConfirmDeleteTeamModal from "../components/modals/ConfirmDeleteTeamModal";
 import TeamInfoModal from "../components/modals/TeamInfoModal";
 import TeamEditModal from "../components/modals/TeamEditModal";
 import TaskCardModal from "../components/modals/TaskCardModal";
@@ -62,6 +63,9 @@ export default function PlannerPage() {
   const [selectedApplicantsByGroup, setSelectedApplicantsByGroup] = useState<Record<string, number[]>>({});
   const [teamNameByGroup, setTeamNameByGroup] = useState<Record<string, string>>({});
   const [teamCuratorByGroup, setTeamCuratorByGroup] = useState<Record<string, string>>({});
+  const [teamDirectionByGroup, setTeamDirectionByGroup] = useState<Record<string, string>>({});
+  const [teamProjectByGroup, setTeamProjectByGroup] = useState<Record<string, string>>({});
+  const [activeTeamBuilderGroupKey, setActiveTeamBuilderGroupKey] = useState("");
   const [crmCatalog, setCrmCatalog] = useState<PlannerCatalogEvent[]>([]);
   const [eventTitleById, setEventTitleById] = useState<Record<number, string>>({});
   const [directionTitleById, setDirectionTitleById] = useState<Record<number, string>>({});
@@ -80,6 +84,7 @@ export default function PlannerPage() {
   const [subInSprint, setSubInSprint] = useState(false);
   const [newColumn, setNewColumn] = useState("");
   const [closeEnrollmentTarget, setCloseEnrollmentTarget] = useState<{ eventId: number; eventTitle: string } | null>(null);
+  const [deleteTeamTargetId, setDeleteTeamTargetId] = useState<number | null>(null);
   const [teamInfoOpen, setTeamInfoOpen] = useState(false);
   const [teamInfoId, setTeamInfoId] = useState<number | null>(null);
   const [teamEditOpen, setTeamEditOpen] = useState(false);
@@ -228,10 +233,19 @@ export default function PlannerPage() {
     () => new Set(state.hiddenEventIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)),
     [state.hiddenEventIds]
   );
-  const memberTeamIdsAll = useMemo(() => state.teams.filter((t) => t.memberIds.includes(userId)).map((t) => t.id), [state.teams, userId]);
+  const confirmedMemberTeamIds = useMemo(
+    () => state.teams.filter((t) => t.confirmed && t.memberIds.includes(userId)).map((t) => t.id),
+    [state.teams, userId]
+  );
   const curatorTeamIds = useMemo(() => state.teams.filter((t) => Number(t.curatorId) === userId).map((t) => t.id), [state.teams, userId]);
-  const canViewTeam = (teamId: number) => isOrganizer || isCurator || (isStudent && memberTeamIdsAll.includes(teamId));
-  const canEditTeam = (teamId: number) => isOrganizer || (isCurator && curatorTeamIds.includes(teamId)) || (isStudent && memberTeamIdsAll.includes(teamId));
+  const studentIsSyncedParticipant = useMemo(
+    () => isStudent && state.closedEventIds.length > 0 && state.participants.some((participant) => Number(participant.id) === userId),
+    [isStudent, state.closedEventIds.length, state.participants, userId]
+  );
+  const studentHasPlannerAccess = !isStudent || confirmedMemberTeamIds.length > 0 || studentIsSyncedParticipant;
+  const studentWaitingForConfirmedTeam = isStudent && studentHasPlannerAccess && confirmedMemberTeamIds.length === 0;
+  const canViewTeam = (teamId: number) => isOrganizer || isCurator || (isStudent && confirmedMemberTeamIds.includes(teamId));
+  const canEditTeam = (teamId: number) => isOrganizer || (isCurator && curatorTeamIds.includes(teamId)) || (isStudent && confirmedMemberTeamIds.includes(teamId));
 
   const visibleTeams = state.teams.filter((t) => canViewTeam(t.id) && !hiddenEventIdSet.has(Number(t.eventId)));
   const activeTeamId = teamFilter ? Number(teamFilter) : null;
@@ -313,10 +327,20 @@ export default function PlannerPage() {
     setTeamEditMembers([]);
   };
   const toggleTeamEditMember = (id: number) => {
+    const team = state.teams.find((t) => Number(t.id) === Number(teamEditId));
+    if (team?.confirmed) {
+      notifyError("Состав подтверждённой команды нельзя менять. Сначала снимите подтверждение.");
+      return;
+    }
     setTeamEditMembers((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
   const saveTeamEdit = () => {
     if (teamEditId == null) return;
+    const team = state.teams.find((t) => Number(t.id) === Number(teamEditId));
+    if (team?.confirmed) {
+      notifyError("Состав подтверждённой команды нельзя менять. Сначала снимите подтверждение.");
+      return;
+    }
     const unique = Array.from(new Set(teamEditMembers));
     if (unique.length === 0) {
       notifyError("Выберите хотя бы одного участника");
@@ -349,6 +373,25 @@ export default function PlannerPage() {
   const openCloseEnrollment = (eventId: number, eventTitle: string) => {
     setCloseEnrollmentTarget({ eventId, eventTitle });
   };
+  const openDeleteTeamConfirm = (teamId: number) => {
+    const team = state.teams.find((item) => Number(item.id) === Number(teamId));
+    if (!team) return;
+    if (team.confirmed) {
+      notifyError("Сначала расформируйте команду, затем удалите её.");
+      return;
+    }
+
+    setDeleteTeamTargetId(teamId);
+  };
+  const closeDeleteTeamConfirm = () => {
+    setDeleteTeamTargetId(null);
+  };
+  const confirmDeleteTeam = () => {
+    if (deleteTeamTargetId == null) return;
+    setState((prev) => removeTeamCascade(prev, deleteTeamTargetId));
+    setDeleteTeamTargetId(null);
+    notifySuccess("Команда удалена");
+  };
 
   const snapshotParticipants = (closedEventIds = state.closedEventIds) =>
     buildParticipantsFromRequests(users, requests, closedEventIds);
@@ -362,9 +405,8 @@ export default function PlannerPage() {
         userNameById,
         eventTitleById,
         directionTitleById,
-        projectTitleById,
       }),
-    [crmCatalog, directionTitleById, eventTitleById, projectTitleById, requests, state.closedEventIds, userNameById]
+    [crmCatalog, directionTitleById, eventTitleById, requests, state.closedEventIds, userNameById]
   );
 
   const applicantsTree = useMemo(
@@ -372,6 +414,7 @@ export default function PlannerPage() {
     [hiddenEventIdSet, projectApplicantGroups, state.closedEventIds]
   );
   const toggleApplicantForGroup = (groupKey: string, ownerId: number) => {
+    setActiveTeamBuilderGroupKey(groupKey);
     setSelectedApplicantsByGroup((prev) => {
       const current = prev[groupKey] || [];
       const hasOwner = current.includes(ownerId);
@@ -383,7 +426,14 @@ export default function PlannerPage() {
   const createTeamFromGroup = (group: ProjectApplicantsGroup, teamNameOverride?: string) => {
     const selectedOwnerIds = Array.from(new Set(selectedApplicantsByGroup[group.key] || []));
     const availableIds = new Set(group.applicants.map((a) => a.ownerId));
-    const memberIds = selectedOwnerIds.filter((id) => availableIds.has(id));
+    const assignedIds = group.eventId
+      ? new Set(
+          state.teams
+            .filter((team) => Number(team.eventId) === Number(group.eventId))
+            .flatMap((team) => team.memberIds.map((memberId) => Number(memberId)))
+        )
+      : new Set<number>();
+    const memberIds = selectedOwnerIds.filter((id) => availableIds.has(id) && !assignedIds.has(Number(id)));
     if (memberIds.length === 0) {
       notifyError("Выберите хотя бы одного участника");
       return;
@@ -399,6 +449,10 @@ export default function PlannerPage() {
     const curatorRaw = teamCuratorByGroup[group.key];
     const curatorIdNum = curatorRaw ? Number(curatorRaw) : undefined;
     const curatorId = typeof curatorIdNum === "number" && !Number.isNaN(curatorIdNum) ? curatorIdNum : undefined;
+    const directionIdNum = Number(teamDirectionByGroup[group.key]);
+    const projectIdNum = Number(teamProjectByGroup[group.key]);
+    const directionId = Number.isFinite(directionIdNum) && directionIdNum > 0 ? directionIdNum : undefined;
+    const projectId = Number.isFinite(projectIdNum) && projectIdNum > 0 ? projectIdNum : undefined;
 
     const requestIds = group.applicants.filter((a) => memberIds.includes(a.ownerId)).flatMap((a) => a.requestIds);
     const memberRoles = group.applicants
@@ -415,8 +469,8 @@ export default function PlannerPage() {
       memberRoles,
       confirmed: false,
       eventId: group.eventId,
-      directionId: group.directionId,
-      projectId: group.projectId,
+      directionId,
+      projectId,
       sourceRequestIds: requestIds,
     };
 
@@ -439,6 +493,9 @@ export default function PlannerPage() {
 
     setSelectedApplicantsByGroup((prev) => ({ ...prev, [group.key]: [] }));
     setTeamNameByGroup((prev) => ({ ...prev, [group.key]: "" }));
+    setTeamCuratorByGroup((prev) => ({ ...prev, [group.key]: "" }));
+    setTeamDirectionByGroup((prev) => ({ ...prev, [group.key]: "" }));
+    setTeamProjectByGroup((prev) => ({ ...prev, [group.key]: "" }));
     notifySuccess("Команда сформирована");
   };
 
@@ -739,6 +796,7 @@ export default function PlannerPage() {
     ? state.subtasks.filter((s) => Number(s.parentTaskId) === Number(taskCardParent.id)).length
     : 0;
   const teamInfoTeam = teamInfoId != null ? state.teams.find((t) => Number(t.id) === Number(teamInfoId)) ?? null : null;
+  const deleteTeamTarget = deleteTeamTargetId != null ? state.teams.find((t) => Number(t.id) === Number(deleteTeamTargetId)) ?? null : null;
   const teamEditTeam = teamEditId != null ? state.teams.find((t) => Number(t.id) === Number(teamEditId)) ?? null : null;
   const teamEditCandidateIds = (() => {
     const ids = new Set<number>();
@@ -774,14 +832,30 @@ export default function PlannerPage() {
 
   if (!user) return <div className="page planner-page"><div className="planner-empty">Войдите для доступа к планировщику.</div></div>;
   if (loading) return <div className="page planner-page"><div className="planner-empty">Загрузка...</div></div>;
-  if (isStudent && memberTeamIdsAll.length === 0) return <div className="page planner-page"><div className="planner-empty">Доступ откроется после подтверждения команды.</div></div>;
+  if (!studentHasPlannerAccess) {
+    return (
+      <div className="page planner-page">
+        <div className="planner-empty">Доступ откроется после завершения набора по мероприятию.</div>
+      </div>
+    );
+  }
 
   return (
     <div className="page planner-page">
       <PlannerHeader visibleTeams={visibleTeams} teamFilter={teamFilter} onTeamFilterChange={setTeamFilter} />
       <PlannerTabs tab={tab} onChange={setTab} onOpenAutomation={isOrganizer ? openPlannerAutomation : undefined} />
 
-      {tab === "teams" && (
+      {studentWaitingForConfirmedTeam && (
+        <div className="planner-card planner-access-note">
+          <h3 className="h3">Доступ к планировщику открыт</h3>
+          <p>
+            Набор завершён, вы добавлены в список участников. Рабочие вкладки станут доступны после того, как организатор
+            сформирует и подтвердит вашу команду.
+          </p>
+        </div>
+      )}
+
+      {!studentWaitingForConfirmedTeam && tab === "teams" && (
         <TeamsTab
           isOrganizer={isOrganizer}
           state={state}
@@ -789,6 +863,9 @@ export default function PlannerPage() {
           selectedApplicantsByGroup={selectedApplicantsByGroup}
           teamNameByGroup={teamNameByGroup}
           teamCuratorByGroup={teamCuratorByGroup}
+          teamDirectionByGroup={teamDirectionByGroup}
+          teamProjectByGroup={teamProjectByGroup}
+          activeTeamBuilderGroupKey={activeTeamBuilderGroupKey}
           currentUser={user}
           visibleTeams={visibleTeams}
           userNameById={userNameById}
@@ -796,8 +873,14 @@ export default function PlannerPage() {
           onToggleEventVisibility={toggleEventVisibility}
           onSyncParticipants={() => setState((prev) => ({ ...prev, participants: snapshotParticipants(prev.closedEventIds) }))}
           onToggleApplicantForGroup={toggleApplicantForGroup}
+          onSelectBuilderGroup={setActiveTeamBuilderGroupKey}
           onTeamNameChange={(groupKey, value) => setTeamNameByGroup((prev) => ({ ...prev, [groupKey]: value }))}
           onTeamCuratorChange={(groupKey, value) => setTeamCuratorByGroup((prev) => ({ ...prev, [groupKey]: value }))}
+          onTeamDirectionChange={(groupKey, value) => {
+            setTeamDirectionByGroup((prev) => ({ ...prev, [groupKey]: value }));
+            setTeamProjectByGroup((prev) => ({ ...prev, [groupKey]: "" }));
+          }}
+          onTeamProjectChange={(groupKey, value) => setTeamProjectByGroup((prev) => ({ ...prev, [groupKey]: value }))}
           onCreateTeamFromGroup={createTeamFromGroup}
           onRenameTeam={(teamId, value) =>
             setState((prev) => ({
@@ -813,12 +896,19 @@ export default function PlannerPage() {
           }
           onOpenTeamInfo={openTeamInfo}
           onOpenTeamEdit={openTeamEdit}
-          onDeleteTeam={(teamId) => setState((prev) => removeTeamCascade(prev, teamId))}
+          onAssignTeamCurator={(teamId, curatorId) => {
+            setState((prev) => ({
+              ...prev,
+              teams: prev.teams.map((team) => (team.id === teamId ? { ...team, curatorId } : team)),
+            }));
+            notifySuccess("Куратор назначен");
+          }}
+          onDeleteTeam={openDeleteTeamConfirm}
           sourceLabelForTeam={sourceLabelForTeam}
         />
       )}
 
-      {tab === "backlog" && (
+      {!studentWaitingForConfirmedTeam && tab === "backlog" && (
         <BacklogTab
           activeTeamName={activeTeam?.name || ""}
           parentTitle={parentTitle}
@@ -877,7 +967,7 @@ export default function PlannerPage() {
         />
       )}
 
-      {tab === "kanban" && (
+      {!studentWaitingForConfirmedTeam && tab === "kanban" && (
         <KanbanTab
           newColumn={newColumn}
           columns={state.columns}
@@ -900,7 +990,7 @@ export default function PlannerPage() {
         />
       )}
 
-      {tab === "gantt" && (
+      {!studentWaitingForConfirmedTeam && tab === "gantt" && (
         <GanttTab
           activeTeamName={activeTeam?.name || ""}
           parents={filteredParents}
@@ -915,6 +1005,12 @@ export default function PlannerPage() {
         eventTitle={closeEnrollmentTarget?.eventTitle}
         onClose={() => setCloseEnrollmentTarget(null)}
         onConfirm={confirmCloseEnrollment}
+      />
+      <ConfirmDeleteTeamModal
+        isOpen={Boolean(deleteTeamTarget)}
+        team={deleteTeamTarget}
+        onClose={closeDeleteTeamConfirm}
+        onConfirm={confirmDeleteTeam}
       />
       <TeamInfoModal
         isOpen={teamInfoOpen}

@@ -19,12 +19,20 @@ export type SubtaskEditDraft = {
 export type ProjectApplicantsGroup = {
   key: string;
   eventId?: number;
-  directionId?: number;
-  projectId?: number;
   eventTitle: string;
-  directionTitle: string;
-  projectTitle: string;
-  applicants: Array<{ ownerId: number; name: string; status?: string; specialization?: string; requestIds: number[] }>;
+  directionOptions: Array<{
+    id: number;
+    title: string;
+    projects: Array<{ id: number; title: string }>;
+  }>;
+  applicants: Array<{
+    ownerId: number;
+    name: string;
+    status?: string;
+    specialization?: string;
+    desiredDirections: Array<{ id?: number; title: string }>;
+    requestIds: number[];
+  }>;
 };
 
 export type ApplicantsTreeNode = {
@@ -33,11 +41,7 @@ export type ApplicantsTreeNode = {
   eventClosed?: boolean;
   eventHidden?: boolean;
   title: string;
-  directions: Array<{
-    key: string;
-    title: string;
-    projects: ProjectApplicantsGroup[];
-  }>;
+  group: ProjectApplicantsGroup;
 };
 
 export type TaskCardState = { type: "parent" | "subtask"; id: number } | null;

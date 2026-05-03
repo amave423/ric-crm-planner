@@ -24,8 +24,10 @@ export default function TeamEditModal({
   onClose,
   onSave,
 }: TeamEditModalProps) {
+  const isLocked = Boolean(team?.confirmed);
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Редактирование команды">
+    <Modal isOpen={isOpen} onClose={onClose} title={isLocked ? "Состав команды" : "Редактирование команды"}>
       <div className="confirm-body">
         {!team ? (
           <div className="confirm-text">Команда не выбрана.</div>
@@ -33,12 +35,17 @@ export default function TeamEditModal({
           <>
             <div className="confirm-text">{team.name || "Команда"}</div>
             <div className="planner-team-edit-meta">Участники: {teamEditMembers.length}</div>
+            {isLocked && (
+              <div className="planner-note teams-note">
+                Команда подтверждена. Состав доступен для просмотра, а для изменений сначала снимите подтверждение.
+              </div>
+            )}
             {candidateIds.length === 0 ? (
               <div className="planner-empty-inline">Нет участников для выбора.</div>
             ) : (
               <div className="planner-team-edit-list">
                 {candidateIds.map((id) => (
-                  <label key={`team-edit-${team.id}-${id}`} className="planner-check planner-applicant-row">
+                  <label key={`team-edit-${team.id}-${id}`} className="planner-check planner-applicant-row planner-applicant-row--modal">
                     <AppSwitch checked={teamEditMembers.includes(id)} onChange={() => onToggleMember(id)} compact />
                     <span>{displayAssigneeLabel(id)}</span>
                   </label>
@@ -47,11 +54,13 @@ export default function TeamEditModal({
             )}
             <div className="planner-team-edit-actions">
               <AppButton className="link-btn" onClick={onClose}>
-                Отмена
+                {isLocked ? "Закрыть" : "Отмена"}
               </AppButton>
-              <AppButton className="primary" onClick={onSave}>
-                Сохранить
-              </AppButton>
+              {!isLocked && (
+                <AppButton className="primary" onClick={onSave}>
+                  Сохранить
+                </AppButton>
+              )}
             </div>
           </>
         )}
