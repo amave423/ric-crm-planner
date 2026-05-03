@@ -281,7 +281,7 @@ export default function EventForm() {
       await archiveEvent(Number(eventId));
       setConfirmOpen(false);
       window.dispatchEvent(new CustomEvent("events:archived", { detail: { eventId: Number(eventId) } }));
-      showToast("success", "Мероприятие занесено в архив, данные сохранены");
+      showToast("info", "Мероприятие занесено в архив, данные сохранены");
     } catch {
       showToast("error", "Ошибка при архивировании мероприятия");
     }

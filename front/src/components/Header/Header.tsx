@@ -1,4 +1,4 @@
-﻿import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Badge, Dropdown } from "antd";
 import type { MenuProps } from "antd";
@@ -15,6 +15,7 @@ import {
 import "../../styles/header.scss";
 import { AuthContext } from "../../context/AuthContext";
 import { useNotifications } from "../../context/NotificationsContext";
+import { useToast } from "../Toast/ToastProvider";
 import Modal from "../Modal/Modal";
 import AppButton from "../UI/Button";
 
@@ -55,9 +56,11 @@ export default function Header() {
   const { user, logout } = useContext(AuthContext);
   const { notifications, unreadCount, markAllAsRead, markAsRead, removeNotification, clearNotifications } =
     useNotifications();
+  const { showToast } = useToast();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const unreadNoticeKeyRef = useRef("");
   const isProjectant = isProjectantRole(user?.role);
   const isOrganizer = isOrganizerRole(user?.role);
   const canManageAutomation = Boolean(user && !isProjectant);
@@ -66,6 +69,25 @@ export default function Header() {
     if (!notificationsOpen) return;
     markAllAsRead();
   }, [notificationsOpen, markAllAsRead]);
+
+  useEffect(() => {
+    if (!user || unreadCount <= 0) {
+      unreadNoticeKeyRef.current = "";
+      return;
+    }
+
+    const latestUnread = notifications.find((notification) => !notification.read);
+    const noticeKey = `${user.id}:${unreadCount}:${latestUnread?.id ?? "none"}`;
+    if (unreadNoticeKeyRef.current === noticeKey) return;
+
+    unreadNoticeKeyRef.current = noticeKey;
+    showToast(
+      "info",
+      unreadCount === 1
+        ? "У вас есть непрочитанное уведомление в центре уведомлений"
+        : `У вас ${unreadCount} непрочитанных уведомлений в центре уведомлений`
+    );
+  }, [notifications, showToast, unreadCount, user]);
 
   const goTo = (path: string) => {
     setMobileMenuOpen(false);
@@ -148,6 +170,7 @@ export default function Header() {
         return;
       }
     } catch {
+      // Fallback to opening the original link below.
     }
     window.open(link, "_blank", "noopener,noreferrer");
   };
