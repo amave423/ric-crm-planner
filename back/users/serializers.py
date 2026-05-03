@@ -32,14 +32,14 @@ from .models import (
 )
 
 
-DEFAULT_APPLICATION_STATUS_NAME = "РџСЂРёСЃР»Р°Р» Р·Р°СЏРІРєСѓ"
+DEFAULT_APPLICATION_STATUS_NAME = "Прислал заявку"
 DEFAULT_APPLICATION_STATUS_NAMES = (
-    "РџСЂРёСЃР»Р°Р» Р·Р°СЏРІРєСѓ",
-    "РџСЂРѕС…РѕР¶РґРµРЅРёРµ С‚РµСЃС‚РёСЂРѕРІР°РЅРёСЏ",
-    "Р”РѕР±Р°РІРёР»СЃСЏ РІ РѕСЂРі С‡Р°С‚",
-    "РџСЂРёСЃС‚СѓРїРёР» Рє РџРЁ",
+    "Прислал заявку",
+    "Прохождение тестирования",
+    "Добавился в орг чат",
+    "Приступил к ПШ",
 )
-TESTING_APPLICATION_STATUS_NAME = "РџСЂРѕС…РѕР¶РґРµРЅРёРµ С‚РµСЃС‚РёСЂРѕРІР°РЅРёСЏ"
+TESTING_APPLICATION_STATUS_NAME = "Прохождение тестирования"
 
 
 def build_user_display_name(user) -> str:
@@ -130,22 +130,30 @@ class FlexibleStatusField(serializers.PrimaryKeyRelatedField):
 
 class UserSerializer(ModelSerializer):
     role = serializers.SerializerMethodField()
+    first_name = serializers.SerializerMethodField()
+    last_name = serializers.SerializerMethodField()
 
     class Meta:
         model = get_user_model()
         fields = ("id", "email", "username", "first_name", "last_name", "role")
 
+    def get_first_name(self, obj):
+        profile = getattr(obj, "crm_profile", None)
+        return getattr(obj, "first_name", "") or getattr(profile, "name", "")
+
+    def get_last_name(self, obj):
+        profile = getattr(obj, "crm_profile", None)
+        return getattr(obj, "last_name", "") or getattr(profile, "surname", "")
+
     def get_role(self, obj):
         if getattr(obj, "is_superuser", False) or getattr(obj, "is_staff", False):
             return "organizer"
 
-        role_obj = CRMRole.objects.filter(user=obj).first()
-        if not role_obj:
-            return "student"
-        if role_obj.role_type == ROLE_PROJECTANT:
-            return "student"
-        if role_obj.role_type in (ROLE_CURATOR, ROLE_ADMIN):
+        roles = set(CRMRole.objects.filter(user=obj).values_list("role_type", flat=True))
+        if roles.intersection({ROLE_CURATOR, ROLE_ADMIN}):
             return "organizer"
+        if ROLE_PROJECTANT in roles:
+            return "student"
         return "student"
 
 
@@ -175,10 +183,10 @@ class RegisterUserSerializer(ModelSerializer):
         user_model = get_user_model()
 
         if user_model.objects.filter(email__iexact=normalized_email).exists():
-            raise serializers.ValidationError("РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ С‚Р°РєРёРј email СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚.")
+            raise serializers.ValidationError("Пользователь с таким email уже существует.")
 
         if user_model.objects.filter(username__iexact=normalized_email).exists():
-            raise serializers.ValidationError("РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ С‚Р°РєРёРј email СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚.")
+            raise serializers.ValidationError("Пользователь с таким email уже существует.")
 
         return normalized_email
 
@@ -204,7 +212,7 @@ class RegisterUserSerializer(ModelSerializer):
                 user = get_user_model().objects.create_user(**validated_data, is_active=True)
         except IntegrityError as exc:
             raise serializers.ValidationError(
-                {"email": "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ С‚Р°РєРёРј email СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚."}
+                {"email": "Пользователь с таким email уже существует."}
             ) from exc
         return user
 

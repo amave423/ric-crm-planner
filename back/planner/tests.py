@@ -1,10 +1,14 @@
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from planner.models import PlannerWorkspaceState, TeamPlannerDesk
+from django.utils import timezone
+
+from users.models import Application, CRMRole, Event, Profile, ROLE_CURATOR, Specialization
 
 
 @override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
@@ -109,7 +113,14 @@ class PlannerDeskViewTests(TestCase):
         self.assertEqual(PlannerWorkspaceState.objects.count(), 1)
 
     def test_frontend_contract_put_users_planner_syncs_team_desks(self):
-        self.authenticate()
+        staff_user = get_user_model().objects.create_user(
+            email="planner-admin@example.com",
+            username="planner-admin@example.com",
+            password="StrongPass123",
+            is_active=True,
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=staff_user)
         payload = {
             "enrollment_closed": True,
             "participants": [{"id": 11, "full_name": "A"}],
@@ -163,15 +174,106 @@ class PlannerDeskViewTests(TestCase):
         self.assertEqual(len(desk18.parent_tasks), 1)
         self.assertEqual(len(desk18.subtasks), 1)
 
-    def test_projectant_get_users_planner_sees_only_own_subtasks(self):
+    def test_projectant_get_users_planner_sees_team_subtasks(self):
         self.authenticate()
+        PlannerWorkspaceState.objects.create(
+            enrollment_closed=False,
+            participants=[],
+            teams=[
+                {"id": 10, "name": "Own team", "memberIds": [self.user.id, self.user.id + 1]},
+                {"id": 20, "name": "Foreign team", "memberIds": [self.user.id + 2]},
+            ],
+            parent_tasks=[
+                {"id": 1, "teamId": 10, "title": "Own team parent"},
+                {"id": 2, "teamId": 20, "title": "Foreign parent"},
+            ],
+            subtasks=[
+                {"id": 1, "teamId": 10, "assigneeId": self.user.id, "title": "Mine"},
+                {"id": 2, "teamId": 10, "assigneeId": self.user.id + 1, "title": "Teammate"},
+                {"id": 3, "teamId": 20, "assigneeId": self.user.id + 2, "title": "Foreign"},
+            ],
+            columns=["A"],
+        )
+
+        response = self.client.get(reverse("planner-state"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([team["id"] for team in response.data.get("teams", [])], [10])
+        self.assertEqual([task["id"] for task in response.data.get("parent_tasks", [])], [1])
+        self.assertEqual([subtask["id"] for subtask in response.data.get("subtasks", [])], [1, 2])
+
+    def test_projectant_get_users_planner_returns_teammate_roles(self):
+        teammate = get_user_model().objects.create_user(
+            email="planner-teammate@example.com",
+            username="planner-teammate@example.com",
+            password="StrongPass123",
+            is_active=True,
+        )
+        backend = Specialization.objects.create(name="Backend")
+        frontend = Specialization.objects.create(name="Frontend")
+        event = Event.objects.create(
+            name="Planner event",
+            description="",
+            stage="active",
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            end_app_date=timezone.now(),
+        )
+        own_application = Application.objects.create(
+            user=self.user,
+            event=event,
+            specialization=backend,
+            date_sub=timezone.now(),
+            date_end=event.end_app_date,
+        )
+        teammate_application = Application.objects.create(
+            user=teammate,
+            event=event,
+            specialization=frontend,
+            date_sub=timezone.now(),
+            date_end=event.end_app_date,
+        )
+        PlannerWorkspaceState.objects.create(
+            enrollment_closed=False,
+            participants=[],
+            teams=[
+                {
+                    "id": 10,
+                    "name": "Own team",
+                    "memberIds": [self.user.id, teammate.id],
+                    "eventId": event.id,
+                    "sourceRequestIds": [own_application.id, teammate_application.id],
+                },
+            ],
+            parent_tasks=[],
+            subtasks=[],
+            columns=["A"],
+        )
+        self.authenticate()
+
+        response = self.client.get(reverse("planner-state"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        team = response.data["teams"][0]
+        self.assertEqual(team["memberRoles"][str(self.user.id)], "Backend")
+        self.assertEqual(team["memberRoles"][str(teammate.id)], "Frontend")
+
+    def test_staff_get_users_planner_sees_all_subtasks(self):
+        staff_user = get_user_model().objects.create_user(
+            email="staff-planner@example.com",
+            username="staff-planner@example.com",
+            password="StrongPass123",
+            is_active=True,
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=staff_user)
         PlannerWorkspaceState.objects.create(
             enrollment_closed=False,
             participants=[],
             teams=[],
             parent_tasks=[],
             subtasks=[
-                {"id": 1, "assigneeId": self.user.id, "title": "Mine"},
+                {"id": 1, "assigneeId": self.user.id, "title": "Assigned"},
                 {"id": 2, "assigneeId": self.user.id + 1, "title": "Other"},
                 {"id": 3, "title": "No assignee"},
             ],
@@ -181,20 +283,51 @@ class PlannerDeskViewTests(TestCase):
         response = self.client.get(reverse("planner-state"))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        subtasks = response.data.get("subtasks", [])
-        self.assertEqual(len(subtasks), 1)
-        self.assertEqual(subtasks[0]["id"], 1)
+        self.assertEqual(len(response.data.get("subtasks", [])), 3)
+
+    def test_curator_get_users_planner_sees_all_subtasks(self):
+        CRMRole.objects.create(
+            user=self.user,
+            role_type=ROLE_CURATOR,
+            content_type=ContentType.objects.get_for_model(Profile),
+            object_id=self.user.crm_profile.pk,
+        )
+        self.authenticate()
+        PlannerWorkspaceState.objects.create(
+            enrollment_closed=False,
+            participants=[],
+            teams=[],
+            parent_tasks=[],
+            subtasks=[
+                {"id": 1, "assigneeId": self.user.id, "title": "Assigned"},
+                {"id": 2, "assigneeId": self.user.id + 1, "title": "Other"},
+                {"id": 3, "title": "No assignee"},
+            ],
+            columns=["A"],
+        )
+
+        response = self.client.get(reverse("planner-state"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data.get("subtasks", [])), 3)
 
     def test_projectant_put_users_planner_preserves_foreign_subtasks(self):
         self.authenticate()
         state = PlannerWorkspaceState.objects.create(
             enrollment_closed=False,
             participants=[],
-            teams=[],
-            parent_tasks=[],
+            teams=[
+                {"id": 10, "name": "Own team", "memberIds": [self.user.id, self.user.id + 1]},
+                {"id": 20, "name": "Foreign team", "memberIds": [self.user.id + 2]},
+            ],
+            parent_tasks=[
+                {"id": 1, "teamId": 10, "title": "Own parent old"},
+                {"id": 2, "teamId": 20, "title": "Foreign keep"},
+            ],
             subtasks=[
-                {"id": 1, "assigneeId": self.user.id, "title": "Mine old"},
-                {"id": 2, "assigneeId": self.user.id + 1, "title": "Other keep"},
+                {"id": 1, "teamId": 10, "assigneeId": self.user.id, "title": "Mine old"},
+                {"id": 2, "teamId": 10, "assigneeId": self.user.id + 1, "title": "Teammate old"},
+                {"id": 3, "teamId": 20, "assigneeId": self.user.id + 2, "title": "Foreign keep"},
             ],
             columns=["A"],
         )
@@ -202,15 +335,24 @@ class PlannerDeskViewTests(TestCase):
         payload = {
             "enrollment_closed": False,
             "participants": [],
-            "teams": [],
-            "parent_tasks": [],
-            "subtasks": [{"id": 1, "assigneeId": self.user.id, "title": "Mine new"}],
+            "teams": [{"id": 10, "name": "Own changed", "memberIds": [self.user.id]}],
+            "parent_tasks": [{"id": 1, "teamId": 10, "title": "Own parent new"}],
+            "subtasks": [
+                {"id": 1, "teamId": 10, "assigneeId": self.user.id + 1, "title": "Assigned to teammate"},
+                {"id": 2, "teamId": 10, "assigneeId": self.user.id, "title": "Teammate task changed"},
+            ],
             "columns": ["A"],
         }
         response = self.client.put(reverse("planner-state"), payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         state.refresh_from_db()
+        self.assertEqual(state.teams[0]["name"], "Own team")
+        parent_tasks_by_id = {item["id"]: item for item in state.parent_tasks}
+        self.assertEqual(parent_tasks_by_id[1]["title"], "Own parent new")
+        self.assertEqual(parent_tasks_by_id[2]["title"], "Foreign keep")
         subtasks_by_id = {item["id"]: item for item in state.subtasks}
-        self.assertEqual(subtasks_by_id[1]["title"], "Mine new")
-        self.assertEqual(subtasks_by_id[2]["title"], "Other keep")
+        self.assertEqual(subtasks_by_id[1]["title"], "Assigned to teammate")
+        self.assertEqual(subtasks_by_id[1]["assigneeId"], self.user.id + 1)
+        self.assertEqual(subtasks_by_id[2]["title"], "Teammate task changed")
+        self.assertEqual(subtasks_by_id[3]["title"], "Foreign keep")
