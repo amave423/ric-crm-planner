@@ -1,4 +1,5 @@
-﻿import type { Request as RequestType } from "../../types/request";
+import type { RequestTransitionSource } from "../../constants/requestProgress";
+import type { Request as RequestType } from "../../types/request";
 
 export type RequestRecord = RequestType & {
   eventName?: string;
@@ -18,6 +19,7 @@ export type RequestTableRow = {
 export type PendingTransition = {
   requestId: number;
   targetStatus: string;
+  source: RequestTransitionSource;
   title: string;
   message: string;
 };
@@ -35,4 +37,3 @@ export type AnalyticsStatus = {
   students: RequestRecord[];
   showStatus?: boolean;
 };
-

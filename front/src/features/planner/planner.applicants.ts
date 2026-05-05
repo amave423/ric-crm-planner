@@ -93,8 +93,12 @@ function mapApplicants(applicantsByOwner: Map<number, ApplicantAccumulator>) {
     .sort((a, b) => a.name.localeCompare(b.name, "ru"));
 }
 
-function hasStartedWork(status?: string) {
-  return String(status || "").trim().toLowerCase() === REQUEST_STATUS.STARTED.toLowerCase();
+function hasPlannerAccessStatus(status?: string) {
+  const normalizedStatus = String(status || "").trim().toLowerCase();
+  return (
+    normalizedStatus === REQUEST_STATUS.STARTED.toLowerCase() ||
+    normalizedStatus === REQUEST_STATUS.JOINED_CHAT.toLowerCase()
+  );
 }
 
 export function buildProjectApplicantGroups({
@@ -111,7 +115,7 @@ export function buildProjectApplicantGroups({
     const eventId = Number(request.eventId);
     const ownerId = Number(request.ownerId);
     if (!Number.isFinite(eventId) || !Number.isFinite(ownerId)) return;
-    if (closedEventIds.includes(eventId) && !hasStartedWork(request.status)) return;
+    if (closedEventIds.includes(eventId) && !hasPlannerAccessStatus(request.status)) return;
 
     if (!applicantsByEvent.has(eventId)) applicantsByEvent.set(eventId, new Map());
     const eventApplicants = applicantsByEvent.get(eventId);

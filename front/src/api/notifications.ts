@@ -37,6 +37,7 @@ export async function getNotifications(): Promise<NotificationItem[]> {
 
 export async function createNotification(input: CreateNotificationInput): Promise<NotificationItem> {
   const created = await client.post<BackendNotification>("/api/users/notifications/", {
+    userId: input.userId,
     title: input.title,
     message: input.message ?? "",
     link: input.link ?? "",
