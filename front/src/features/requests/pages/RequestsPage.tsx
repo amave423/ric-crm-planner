@@ -126,6 +126,7 @@ export default function RequestsPage() {
     setPendingTransition({
       requestId,
       targetStatus,
+      source,
       title: copy.title,
       message: copy.message,
     });
@@ -170,6 +171,24 @@ export default function RequestsPage() {
     }
 
     try {
+      const latestRequests = await getRequests({ ownerId: user?.id, role: user?.role }).catch(() => requests);
+      const currentRequest = latestRequests.find((request) => Number(request.id) === Number(pendingTransition.requestId));
+      const currentStatus = currentRequest?.status;
+      const requiredStatus =
+        pendingTransition.source === "testing" && pendingTransition.targetStatus === REQUEST_STATUS.CHAT_LINK_SENT
+          ? REQUEST_STATUS.TESTING
+          : pendingTransition.source === "chat" && pendingTransition.targetStatus === REQUEST_STATUS.JOINED_CHAT
+            ? REQUEST_STATUS.CHAT_LINK_SENT
+            : pendingTransition.source === "start" && pendingTransition.targetStatus === REQUEST_STATUS.STARTED
+              ? REQUEST_STATUS.JOINED_CHAT
+              : undefined;
+
+      if (requiredStatus && currentStatus !== requiredStatus) {
+        showToast("error", `Переход недоступен: текущий статус заявки "${currentStatus || "-"}".`);
+        await load();
+        return;
+      }
+
       await updateRequestStatus(pendingTransition.requestId, pendingTransition.targetStatus);
       await load();
     } finally {
