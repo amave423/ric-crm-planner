@@ -4,6 +4,7 @@ import type { AutomationConfig } from "../types";
 const REQUEST_STAGE_IDS = [
   "application-submitted",
   "application-testing",
+  "application-chat-link-sent",
   "application-joined-chat",
   "application-started",
 ] as const;
@@ -11,6 +12,7 @@ const REQUEST_STAGE_IDS = [
 const STAGE_STATUS: Record<(typeof REQUEST_STAGE_IDS)[number], string> = {
   "application-submitted": REQUEST_STATUS.SUBMITTED,
   "application-testing": REQUEST_STATUS.TESTING,
+  "application-chat-link-sent": REQUEST_STATUS.CHAT_LINK_SENT,
   "application-joined-chat": REQUEST_STATUS.JOINED_CHAT,
   "application-started": REQUEST_STATUS.STARTED,
 };

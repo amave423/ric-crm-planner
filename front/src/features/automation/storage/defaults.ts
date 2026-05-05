@@ -29,6 +29,11 @@ const APPLICATION_STAGES: AutomationStage[] = [
     description: "Проектанту отправлено тестирование или заявка ожидает проверки.",
   },
   {
+    id: "application-chat-link-sent",
+    title: REQUEST_STATUS.CHAT_LINK_SENT,
+    description: "Проектанту отправлена индивидуальная ссылка на организационный чат.",
+  },
+  {
     id: "application-joined-chat",
     title: REQUEST_STATUS.JOINED_CHAT,
     description: "Проектант перешел в организационный чат мероприятия.",
@@ -99,10 +104,10 @@ export const ROBOT_TEMPLATES: Record<AutomationScope, Array<Omit<AutomationRobot
     },
     {
       id: "crm-send-chat-link",
-      stageId: "application-joined-chat",
+      stageId: "application-chat-link-sent",
       title: "Отправить ссылку на орг.чат",
       description: "Отправляет проектанту уведомление или сообщение VK со ссылкой на организационный чат.",
-      action: "message.vk_or_notification",
+      action: "chat.link.vk",
       subject: "Ссылка на организационный чат",
       message: "Перейдите по ссылке и присоединитесь к организационному чату мероприятия.",
     },
@@ -166,10 +171,10 @@ export const ROBOT_TEMPLATES: Record<AutomationScope, Array<Omit<AutomationRobot
     },
     {
       id: "request-send-chat-link",
-      stageId: "application-joined-chat",
+      stageId: "application-chat-link-sent",
       title: "Отправить ссылку на орг.чат",
       description: "Отправляет проектанту ссылку на организационный чат.",
-      action: "message.vk_or_notification",
+      action: "chat.link.vk",
       subject: "Ссылка на организационный чат",
       message: "Перейдите по ссылке и присоединитесь к организационному чату мероприятия.",
     },
@@ -199,7 +204,7 @@ export const TRIGGER_TEMPLATES: Record<
     },
     {
       id: "crm-chat-link-opened",
-      stageId: "application-joined-chat",
+      stageId: "application-chat-link-sent",
       title: "Переход по ссылке на орг.чат",
       description: "Срабатывает, когда проектант переходит по индивидуальной ссылке на орг.чат.",
       eventCode: "notification.chat_link_opened",
@@ -267,7 +272,7 @@ export const TRIGGER_TEMPLATES: Record<
     },
     {
       id: "request-chat-link-opened",
-      stageId: "application-joined-chat",
+      stageId: "application-chat-link-sent",
       title: "Переход по ссылке на орг.чат",
       description: "Когда проектант открыл ссылку на орг.чат, карточка переходит на стадию подтверждения.",
       eventCode: "notification.chat_link_opened",

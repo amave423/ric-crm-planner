@@ -5,7 +5,11 @@ import { getEvents } from "../../../api/events";
 import { useToast } from "../../../components/Toast/ToastProvider";
 import AppButton from "../../../components/UI/Button";
 import AppSelect from "../../../components/UI/Select";
-import { createDefaultAutomationConfig, readAutomationConfig, writeAutomationConfig } from "../storage/automationStorage";
+import {
+  createDefaultAutomationConfig,
+  readAutomationConfigAsync,
+  writeAutomationConfigAsync,
+} from "../storage/automationStorage";
 import { SCOPE_TEXT, TEXT } from "../config/text";
 import type {
   AutomationConfig,
@@ -85,12 +89,27 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
       return;
     }
 
-    const nextConfig = readAutomationConfig(scope, selectedEventId);
-    setConfig(nextConfig);
-    setSelectedStageId(readStoredStageId(scope, selectedEventId, nextConfig) || nextConfig.stages[0]?.id || "");
-    setSelectedRule(null);
-    setCatalogState(null);
-  }, [scope, selectedEventId]);
+    let mounted = true;
+    setLoading(true);
+    readAutomationConfigAsync(scope, selectedEventId)
+      .then((nextConfig) => {
+        if (!mounted) return;
+        setConfig(nextConfig);
+        setSelectedStageId(readStoredStageId(scope, selectedEventId, nextConfig) || nextConfig.stages[0]?.id || "");
+        setSelectedRule(null);
+        setCatalogState(null);
+      })
+      .catch(() => {
+        if (mounted) showToast("error", TEXT.loadError);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [scope, selectedEventId, showToast]);
 
   useEffect(() => {
     if (!selectedEventId || !selectedStageId) return;
@@ -180,7 +199,7 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
     setCatalogState(null);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!config || !selectedEventId) return;
     const nextConfig = {
       ...config,
@@ -188,9 +207,16 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
       eventId: selectedEventId,
       stages: config.stages.length > 0 ? config.stages : createDefaultAutomationConfig(scope, selectedEventId).stages,
     };
-    const normalized = writeAutomationConfig(nextConfig);
-    setConfig(normalized);
-    showToast("success", TEXT.saved);
+    setLoading(true);
+    try {
+      const normalized = await writeAutomationConfigAsync(nextConfig);
+      setConfig(normalized);
+      showToast("success", TEXT.saved);
+    } catch {
+      showToast("error", TEXT.saveError);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openCatalog = (kind: RuleKind, stageId: string) => {
@@ -247,7 +273,7 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
             )}
           </label>
 
-          <AppButton className="automation-panel__save" onClick={handleSave} disabled={!config}>
+          <AppButton className="automation-panel__save" onClick={handleSave} disabled={!config || loading}>
             <SaveOutlined />
             <span>{TEXT.save}</span>
           </AppButton>

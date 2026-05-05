@@ -1,4 +1,5 @@
 import client from "../../../api/client";
+import { createNotification } from "../../../api/notifications";
 import { buildMockRequestTransitionUrl, REQUEST_STATUS } from "../../../constants/requestProgress";
 import { pushNotifications } from "../../../storage/notifications";
 import { getAllUsers } from "../../../storage/storage";
@@ -47,19 +48,39 @@ async function getOrganizerIds(event?: Event) {
 
 function buildStudentLink(robot: AutomationRobot, request: ReqType) {
   if (robot.action === "testing.link") {
-    return buildMockRequestTransitionUrl(request.id, REQUEST_STATUS.JOINED_CHAT, "testing");
+    return buildMockRequestTransitionUrl(request.id, REQUEST_STATUS.CHAT_LINK_SENT, "testing");
   }
 
-  if (robot.action === "message.vk_or_notification" || robot.action === "notification.user") {
+  if (isChatLinkAction(robot)) {
     return buildMockRequestTransitionUrl(request.id, REQUEST_STATUS.JOINED_CHAT, "chat");
   }
 
   return "/requests";
 }
 
+function isChatLinkAction(robot: AutomationRobot) {
+  return robot.action === "message.vk_or_notification" || robot.action === "chat.link.vk";
+}
+
+function isBackendVkAction(robot: AutomationRobot) {
+  return robot.action === "message.vk" || isChatLinkAction(robot);
+}
+
+function buildNotificationTitle(robot: AutomationRobot, request: ReqType, event?: Event) {
+  const title = renderTemplate(robot.subject || robot.title, request, event).trim();
+  const isGenericUserNotificationTitle = !title || title === "Уведомление" || title === "Отправить уведомление";
+
+  if (robot.action !== "notification.user" || !isGenericUserNotificationTitle) {
+    return title || "Уведомление";
+  }
+
+  const eventTitle = request.eventTitle || event?.title;
+  return eventTitle ? `Обновление по заявке: ${eventTitle}` : "Обновление по заявке";
+}
+
 async function buildRobotNotifications(robot: AutomationRobot, request: ReqType, event?: Event) {
-  const title = renderTemplate(robot.subject || robot.title, request, event);
-  const message = renderTemplate(robot.message || robot.description, request, event);
+  const title = buildNotificationTitle(robot, request, event);
+  let message = renderTemplate(robot.message || robot.description, request, event);
 
   if (robot.action === "notification.organizer" || robot.action === "notification.curator" || robot.action === "task.review") {
     const organizerIds = await getOrganizerIds(event);
@@ -73,12 +94,13 @@ async function buildRobotNotifications(robot: AutomationRobot, request: ReqType,
 
   if (
     robot.action === "testing.link" ||
-    robot.action === "message.vk_or_notification" ||
+    isChatLinkAction(robot) ||
     robot.action === "message.vk" ||
     robot.action === "notification.user" ||
     robot.action === "notification.assignee"
   ) {
     if (!request.ownerId) return [];
+    message = message.replace(/\{chat_link\}/g, buildStudentLink(robot, request));
     return [
       {
         userId: Number(request.ownerId),
@@ -114,11 +136,23 @@ async function sendBackendApplicationVkMessage(robot: AutomationRobot, request: 
   if (!request.id || client.USE_MOCK) return false;
 
   await client.post(`/api/integrations/vk/applications/${request.id}/message/`, {
-    subject: renderTemplate(robot.subject || robot.title, request, event),
+    subject: "",
     message: renderTemplate(robot.message || robot.description, request, event),
+    include_chat_link: isChatLinkAction(robot),
   });
 
   return true;
+}
+
+async function sendNotifications(notifications: CreateNotificationInput[]) {
+  if (notifications.length === 0) return;
+
+  if (client.USE_MOCK) {
+    pushNotifications(notifications);
+    return;
+  }
+
+  await Promise.all(notifications.map((notification) => createNotification(notification)));
 }
 
 export async function executeRobot(
@@ -141,7 +175,7 @@ export async function executeRobot(
   rememberExecution(key);
 
   await runWithTiming(robot, async () => {
-    if (robot.action === "message.vk" && !client.USE_MOCK) {
+    if (isBackendVkAction(robot) && !client.USE_MOCK) {
       try {
         await sendBackendApplicationVkMessage(robot, eventItem.request, event);
       } catch {
@@ -151,6 +185,6 @@ export async function executeRobot(
     }
 
     const notifications = await buildRobotNotifications(robot, eventItem.request, event);
-    pushNotifications(notifications);
+    await sendNotifications(notifications);
   });
 }

@@ -8,6 +8,7 @@
   AutomationStage,
   AutomationTrigger,
 } from "../types";
+import client from "../../../api/client";
 import { DEFAULT_SETTINGS, ROBOT_TEMPLATES, STAGE_TEMPLATES, TRIGGER_TEMPLATES } from "./defaults";
 
 const STORAGE_KEY = "ric_crm_automation_configs_v4";
@@ -105,9 +106,15 @@ function normalizeStage(stage: AutomationStage): AutomationStage {
 }
 
 function normalizeRobot(robot: AutomationRobot, fallbackStageId: string): AutomationRobot {
+  const id = String(robot.id);
+  const stageId =
+    (id === "crm-send-chat-link" || id === "request-send-chat-link") && robot.stageId === "application-joined-chat"
+      ? "application-chat-link-sent"
+      : String(robot.stageId || fallbackStageId);
+
   return {
-    id: String(robot.id),
-    stageId: String(robot.stageId || fallbackStageId),
+    id,
+    stageId,
     title: String(robot.title || "Робот"),
     description: String(robot.description || ""),
     action: String(robot.action || "notification.organizer"),
@@ -120,9 +127,15 @@ function normalizeRobot(robot: AutomationRobot, fallbackStageId: string): Automa
 }
 
 function normalizeTrigger(trigger: AutomationTrigger, fallbackStageId: string): AutomationTrigger {
+  const id = String(trigger.id);
+  const stageId =
+    (id === "crm-chat-link-opened" || id === "request-chat-link-opened") && trigger.stageId === "application-joined-chat"
+      ? "application-chat-link-sent"
+      : String(trigger.stageId || fallbackStageId);
+
   return {
-    id: String(trigger.id),
-    stageId: String(trigger.stageId || fallbackStageId),
+    id,
+    stageId,
     title: String(trigger.title || "Триггер"),
     description: String(trigger.description || ""),
     eventCode: String(trigger.eventCode || "field.changed"),
@@ -225,4 +238,34 @@ export function writeAutomationConfig(config: AutomationConfig) {
   return normalized;
 }
 
+export async function readAutomationConfigAsync(scope: AutomationScope, eventId: number): Promise<AutomationConfig> {
+  if (client.USE_MOCK || scope === "requests") {
+    return readAutomationConfig(scope, eventId);
+  }
 
+  const endpoint = scope === "planner" ? `/api/planner/automation/${eventId}/` : `/api/users/automation/${eventId}/`;
+  const config = await client.get<AutomationConfig>(endpoint);
+  return mergeConfigWithDefaults({
+    ...config,
+    scope,
+    eventId,
+  });
+}
+
+export async function writeAutomationConfigAsync(config: AutomationConfig): Promise<AutomationConfig> {
+  const normalized = mergeConfigWithDefaults({ ...config, updatedAt: nowIso() });
+  if (client.USE_MOCK || normalized.scope === "requests") {
+    return writeAutomationConfig(normalized);
+  }
+
+  const endpoint =
+    normalized.scope === "planner"
+      ? `/api/planner/automation/${normalized.eventId}/`
+      : `/api/users/automation/${normalized.eventId}/`;
+  const saved = await client.put<AutomationConfig>(endpoint, normalized);
+  return mergeConfigWithDefaults({
+    ...saved,
+    scope: normalized.scope,
+    eventId: normalized.eventId,
+  });
+}

@@ -11,7 +11,7 @@ import {
   updateRequestStatus as _updateRequestStatus,
 } from "../storage/requests";
 import { getArchivedEventIds, getEventById as _getMockEventById } from "../../../storage/storage";
-import { runRequestAutomation, runRequestAutomationEvents, runRequestStageRobots } from "../../../services/automationEngine";
+import { runRequestAutomation, runRequestAutomationEvents } from "../../../services/automationEngine";
 
 const USE_MOCK = client.USE_MOCK;
 
@@ -28,8 +28,11 @@ type BackendStatus = {
 const LEGACY_STATUS_MAP: Record<string, string> = {
   "Прислал заявку": REQUEST_STATUS.SUBMITTED,
   "Прохождение тестирования": REQUEST_STATUS.TESTING,
+  "Отправлена ссылка на орг. чат": REQUEST_STATUS.CHAT_LINK_SENT,
   "Добавился в орг чат": REQUEST_STATUS.JOINED_CHAT,
+  "Добавился в орг. чат": REQUEST_STATUS.JOINED_CHAT,
   "Присутствует на ПШ": REQUEST_STATUS.STARTED,
+  "Удален с ПШ": REQUEST_STATUS.REMOVED_FROM_PSH,
 };
 
 let statusCache: BackendStatus[] | null = null;
@@ -350,16 +353,10 @@ export async function updateRequestStatus(id: number, status: string) {
   const normalizedStatus = normalizeLegacyStatus(status) ?? status;
   const found = statuses.find((s) => s.name === normalizedStatus);
   const payload = found ? { status: found.id } : { status: normalizedStatus };
-  const previousStatus = getBackendRequestCache().find((request) => Number(request.id) === Number(id))?.status;
 
   const updated = await client.patch<BackendRequest>(`/api/users/applications/${id}/`, payload);
   const mapped = mapBackendRequest(updated, statuses);
   cacheBackendRequest(mapped);
-  await runRequestStageRobots({
-    code: "request.status_changed",
-    request: mapped,
-    previousStatus,
-  });
   return mapped;
 }
 
