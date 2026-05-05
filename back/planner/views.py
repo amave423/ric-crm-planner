@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from django.db import transaction
 from django.utils.decorators import method_decorator
 from drf_yasg.utils import swagger_auto_schema
@@ -5,11 +7,21 @@ from drf_yasg import openapi
 from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from planner.models import PlannerWorkspaceState, TeamPlannerDesk
-from planner.serializers import PlannerWorkspaceStateSerializer, TeamPlannerDeskSerializer
+from planner.automation_defaults import create_default_planner_automation_config
+from planner.automation_engine import run_due_planner_automation, run_planner_automation, scan_planner_deadlines
+from planner.models import PlannerAutomationConfig, PlannerAutomationExecutionLog, PlannerWorkspaceState, TeamPlannerDesk
+from planner.serializers import (
+    PlannerAutomationConfigPayloadSerializer,
+    PlannerAutomationConfigSerializer,
+    PlannerAutomationExecutionLogSerializer,
+    PlannerWorkspaceStateSerializer,
+    TeamPlannerDeskSerializer,
+)
 from users.models import Application
 from users.models import CRMRole, ROLE_ADMIN, ROLE_CURATOR, ROLE_PROJECTANT
+from users.permissions import CuratorOrAdminPermission
 
 TAG_PLANNER = "Planner"
 
@@ -49,7 +61,11 @@ def _team_ids_for_user(teams, user_id):
     return {
         _to_int(team.get("id"))
         for team in teams
-        if isinstance(team, dict) and user_id in _member_ids_from_team(team)
+        if isinstance(team, dict)
+        and (
+            user_id in _member_ids_from_team(team)
+            or user_id == _to_int(team.get("curatorId", team.get("curator_id")))
+        )
     } - {None}
 
 
@@ -221,20 +237,26 @@ class PlannerStateCompatView(RetrieveUpdateAPIView):
 
     def perform_update(self, serializer):
         previous_teams = (
-            list(serializer.instance.teams)
+            deepcopy(serializer.instance.teams)
             if serializer.instance and isinstance(serializer.instance.teams, list)
             else []
         )
         previous_parent_tasks = (
-            list(serializer.instance.parent_tasks)
+            deepcopy(serializer.instance.parent_tasks)
             if serializer.instance and isinstance(serializer.instance.parent_tasks, list)
             else []
         )
         previous_subtasks = (
-            list(serializer.instance.subtasks)
+            deepcopy(serializer.instance.subtasks)
             if serializer.instance and isinstance(serializer.instance.subtasks, list)
             else []
         )
+        previous_state = {
+            "teams": previous_teams,
+            "parent_tasks": previous_parent_tasks,
+            "subtasks": previous_subtasks,
+            "columns": deepcopy(serializer.instance.columns) if serializer.instance and isinstance(serializer.instance.columns, list) else [],
+        }
         workspace = serializer.save()
 
         if _is_projectant_user(self.request.user):
@@ -257,6 +279,8 @@ class PlannerStateCompatView(RetrieveUpdateAPIView):
             workspace.subtasks = foreign_subtasks + editable_subtasks
             workspace.save(update_fields=["teams", "parent_tasks", "subtasks", "updated_at"])
 
+        run_planner_automation(previous_state, workspace)
+        workspace.refresh_from_db()
         _sync_team_desks_from_workspace(workspace)
 
 
@@ -313,3 +337,73 @@ class TeamPlannerDeskDetailView(RetrieveUpdateAPIView):
         team_id = self.kwargs.get(self.lookup_url_kwarg)
         desk, _ = TeamPlannerDesk.objects.get_or_create(team_id=team_id)
         return desk
+
+
+class PlannerAutomationConfigView(RetrieveUpdateAPIView):
+    permission_classes = (CuratorOrAdminPermission,)
+    serializer_class = PlannerAutomationConfigSerializer
+
+    def get_object(self):
+        event_id = int(self.kwargs["event_id"])
+        config = PlannerAutomationConfig.objects.filter(
+            scope=PlannerAutomationConfig.SCOPE_PLANNER,
+            event_id=event_id,
+        ).first()
+        if config:
+            return config
+        defaults = create_default_planner_automation_config(event_id)
+        return PlannerAutomationConfig.objects.create(
+            scope=PlannerAutomationConfig.SCOPE_PLANNER,
+            event_id=event_id,
+            stages=defaults["stages"],
+            triggers=defaults["triggers"],
+            robots=defaults["robots"],
+        )
+
+    def put(self, request, *args, **kwargs):
+        return self._save_config(request)
+
+    def patch(self, request, *args, **kwargs):
+        return self._save_config(request, partial=True)
+
+    def _save_config(self, request, partial=False):
+        event_id = int(self.kwargs["event_id"])
+        config = self.get_object()
+        serializer = PlannerAutomationConfigPayloadSerializer(data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        config.scope = PlannerAutomationConfig.SCOPE_PLANNER
+        config.event_id = event_id
+        if "stages" in data:
+            config.stages = data["stages"]
+        if "triggers" in data:
+            config.triggers = data["triggers"]
+        if "robots" in data:
+            config.robots = data["robots"]
+        config.save()
+        return Response(PlannerAutomationConfigSerializer(config).data)
+
+
+class PlannerAutomationExecutionLogListView(ListAPIView):
+    permission_classes = (CuratorOrAdminPermission,)
+    serializer_class = PlannerAutomationExecutionLogSerializer
+
+    def get_queryset(self):
+        return PlannerAutomationExecutionLog.objects.filter(
+            event_id=self.kwargs["event_id"],
+            config__scope=PlannerAutomationConfig.SCOPE_PLANNER,
+        ).select_related("config")
+
+
+class PlannerAutomationDeadlineScanView(APIView):
+    permission_classes = (CuratorOrAdminPermission,)
+
+    def post(self, request, *args, **kwargs):
+        return Response(scan_planner_deadlines())
+
+
+class PlannerAutomationPendingRunView(APIView):
+    permission_classes = (CuratorOrAdminPermission,)
+
+    def post(self, request, *args, **kwargs):
+        return Response(run_due_planner_automation())

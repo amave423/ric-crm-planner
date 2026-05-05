@@ -5,10 +5,10 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from planner.models import PlannerWorkspaceState, TeamPlannerDesk
+from planner.models import PlannerAutomationConfig, PlannerAutomationExecutionLog, PlannerWorkspaceState, TeamPlannerDesk
 from django.utils import timezone
 
-from users.models import Application, CRMRole, Event, Profile, ROLE_CURATOR, Specialization
+from users.models import Application, CRMRole, Event, Notification, Profile, ROLE_CURATOR, Specialization
 
 
 @override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
@@ -98,6 +98,130 @@ class PlannerDeskViewTests(TestCase):
             reverse("planner-team-desk-detail", kwargs={"team_id": 17})
         )
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_planner_automation_get_returns_default_config(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.authenticate()
+
+        response = self.client.get(reverse("planner-automation-config", kwargs={"event_id": 44}))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["scope"], "planner")
+        self.assertEqual(response.data["eventId"], 44)
+        self.assertTrue(response.data["stages"])
+        self.assertTrue(response.data["triggers"])
+        self.assertTrue(response.data["robots"])
+        self.assertTrue(PlannerAutomationConfig.objects.filter(event_id=44, scope="planner").exists())
+
+    def test_planner_automation_put_updates_config(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.authenticate()
+        payload = {
+            "scope": "planner",
+            "eventId": 44,
+            "stages": [{"id": "planned", "title": "Запланировано", "description": ""}],
+            "triggers": [],
+            "robots": [],
+        }
+
+        response = self.client.put(reverse("planner-automation-config", kwargs={"event_id": 44}), payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        config = PlannerAutomationConfig.objects.get(event_id=44, scope="planner")
+        self.assertEqual(config.stages, payload["stages"])
+        self.assertEqual(config.triggers, [])
+        self.assertEqual(config.robots, [])
+
+    def test_planner_automation_runs_on_subtask_sprint_added(self):
+        self.authenticate()
+        assignee = get_user_model().objects.create_user(
+            email="assignee@example.com",
+            username="assignee@example.com",
+            password="StrongPass123",
+            is_active=True,
+        )
+        event = Event.objects.create(
+            name="Automation event",
+            description="",
+            stage="active",
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            end_app_date=timezone.now(),
+        )
+        PlannerWorkspaceState.objects.create(
+            teams=[
+                {
+                    "id": 17,
+                    "name": "Team",
+                    "curatorId": self.user.id,
+                    "memberIds": [assignee.id],
+                    "confirmed": True,
+                    "eventId": event.id,
+                }
+            ],
+            parent_tasks=[],
+            subtasks=[
+                {
+                    "id": 10,
+                    "teamId": 17,
+                    "parentTaskId": 1,
+                    "title": "API",
+                    "role": "Backend",
+                    "assigneeId": assignee.id,
+                    "startDate": timezone.now().date().isoformat(),
+                    "endDate": timezone.now().date().isoformat(),
+                    "inSprint": False,
+                    "status": "Бэклог",
+                }
+            ],
+        )
+        payload = {
+            "enrollment_closed": False,
+            "participants": [],
+            "teams": [
+                {
+                    "id": 17,
+                    "name": "Team",
+                    "curatorId": self.user.id,
+                    "memberIds": [assignee.id],
+                    "confirmed": True,
+                    "eventId": event.id,
+                }
+            ],
+            "parent_tasks": [],
+            "subtasks": [
+                {
+                    "id": 10,
+                    "teamId": 17,
+                    "parentTaskId": 1,
+                    "title": "API",
+                    "role": "Backend",
+                    "assigneeId": assignee.id,
+                    "startDate": timezone.now().date().isoformat(),
+                    "endDate": timezone.now().date().isoformat(),
+                    "inSprint": True,
+                    "status": "Бэклог",
+                }
+            ],
+            "columns": ["Бэклог", "Запланировано", "В работе", "На проверке", "Готово"],
+        }
+
+        response = self.client.put(reverse("planner-state"), payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        workspace = PlannerWorkspaceState.objects.first()
+        self.assertEqual(workspace.subtasks[0]["status"], "Запланировано")
+        self.assertTrue(Notification.objects.filter(user=assignee, title__icontains="назначена").exists())
+        self.assertTrue(
+            PlannerAutomationExecutionLog.objects.filter(
+                event_id=event.id,
+                rule_kind="trigger",
+                event_code="task.sprint_added",
+                status=PlannerAutomationExecutionLog.STATUS_SUCCESS,
+            ).exists()
+        )
 
     def test_frontend_contract_get_users_planner(self):
         self.authenticate()
