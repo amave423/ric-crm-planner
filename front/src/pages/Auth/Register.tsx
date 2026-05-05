@@ -29,16 +29,17 @@ export default function Register() {
       return;
     }
 
-    const ok = await register({
+    const result = await register({
       email: form.email.trim(),
       name: form.name.trim(),
       surname: form.surname.trim(),
       role: form.role,
       password: form.password,
+      confirm: form.confirm,
     });
 
-    if (!ok) {
-      showToast("error", "Не удалось зарегистрироваться");
+    if (!result.ok) {
+      showToast("error", result.error || "Не удалось зарегистрироваться");
       return;
     }
 

@@ -9,9 +9,11 @@ export interface Request {
   eventId?: number;
   eventTitle?: string;
   directionId?: number;
+  directionTitle?: string;
   specializationId?: number;
   specialization?: string;
   about?: string;
+  customFields?: Record<string, string>;
   status?: string;
   statusId?: number;
   ownerId?: number;

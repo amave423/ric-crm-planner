@@ -1,35 +1,44 @@
-import React, { createContext, useContext, useState } from "react";
+import { createContext, useCallback, useContext } from "react";
+import type { ReactNode } from "react";
+import { notification } from "antd";
 import "../../styles/toast.scss";
 
-type ToastType = "success" | "error";
-interface Toast { id: number; type: ToastType; message: string; hiding?: boolean; }
+export type ToastType = "success" | "error" | "info";
 
-const ToastContext = createContext<{ showToast: (type: ToastType, message: string) => void }>({ showToast: () => {} });
-
-export function useToast() {
-  return useContext(ToastContext) as { showToast: (t: ToastType, m: string) => void };
+interface ToastContextValue {
+  showToast: (type: ToastType, message: string) => void;
 }
 
-export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+const ToastContext = createContext<ToastContextValue>({ showToast: () => {} });
 
-  const showToast = (type: ToastType, message: string) => {
-    const id = Date.now() + Math.floor(Math.random() * 1000);
-    setToasts((s) => [...s, { id, type, message }]);
-    setTimeout(() => setToasts((s) => s.map(t => t.id === id ? { ...t, hiding: true } : t)), 2600);
-    setTimeout(() => setToasts((s) => s.filter(t => t.id !== id)), 3000);
-  };
+export function useToast() {
+  return useContext(ToastContext);
+}
+
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [api, contextHolder] = notification.useNotification();
+
+  const showToast = useCallback(
+    (type: ToastType, message: string) => {
+      const normalizedMessage = message.trim();
+      if (!normalizedMessage) return;
+
+      api[type]({
+        message: normalizedMessage,
+        placement: "topRight",
+        duration: 2,
+        showProgress: true,
+        pauseOnHover: false,
+        className: `app-notification app-notification--${type}`,
+      });
+    },
+    [api]
+  );
 
   return (
     <ToastContext.Provider value={{ showToast }}>
+      {contextHolder}
       {children}
-      <div className="toast-root" aria-live="polite">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast ${t.type} ${t.hiding ? "hiding" : ""}`}>
-            {t.message}
-          </div>
-        ))}
-      </div>
     </ToastContext.Provider>
   );
 }

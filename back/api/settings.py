@@ -18,6 +18,46 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def load_local_env(env_path: Path) -> None:
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            os.environ.setdefault(key, value)
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name: str, default: list[str] | None = None) -> list[str]:
+    value = os.getenv(name)
+    if not value:
+        return default or []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+load_local_env(BASE_DIR / ".env")
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
@@ -27,7 +67,10 @@ SECRET_KEY = 'django-insecure-ov)xl3oc)_k3b+fa^o&e61h#%yp2rk-y4mb8zeuh5o*gl_z(_n
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env_list(
+    "DJANGO_ALLOWED_HOSTS",
+    ["localhost", "127.0.0.1", "testserver", ".ngrok-free.app", ".loca.lt"],
+)
 
 
 # Application definition
@@ -41,6 +84,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'users.apps.UsersConfig',
     'planner.apps.PlannerConfig',
+    'integrations.apps.IntegrationsConfig',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -90,7 +134,7 @@ DATABASES = {
         "USER": os.getenv("DB_USER", "crm_user"),
         "PASSWORD": os.getenv("DB_PASSWORD", "strong_password_here"),
         "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "5433"),
+        "PORT": os.getenv("DB_PORT", "5432"),
     }
 }
 
@@ -127,7 +171,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ru'
 
 TIME_ZONE = 'UTC'
 
@@ -170,6 +214,21 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
 }
+
+TESTING_SERVICE_TOKEN = os.getenv("TESTING_SERVICE_TOKEN", "")
+
+VK_ENABLED = env_bool("VK_ENABLED", False)
+VK_GROUP_ID = os.getenv("VK_GROUP_ID", "")
+VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "")
+VK_API_VERSION = os.getenv("VK_API_VERSION", "") or "5.199"
+VK_CALLBACK_SECRET = os.getenv("VK_CALLBACK_SECRET", "")
+VK_CONFIRMATION_CODE = os.getenv("VK_CONFIRMATION_CODE", "")
+VK_API_BASE_URL = os.getenv("VK_API_BASE_URL", "https://api.vk.com/method")
+VK_REQUEST_TIMEOUT_SECONDS = env_int("VK_REQUEST_TIMEOUT_SECONDS", 5)
+VK_CHAT_LINK_BASE_URL = os.getenv("VK_CHAT_LINK_BASE_URL", "")
+VK_ORG_CHAT_URL = os.getenv("VK_ORG_CHAT_URL", "")
+VK_CHAT_LINK_MAX_AGE_SECONDS = env_int("VK_CHAT_LINK_MAX_AGE_SECONDS", 60 * 60 * 24 * 30)
+VK_BOT_FRONTEND_URL = os.getenv("VK_BOT_FRONTEND_URL", "http://localhost:5173")
 
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True

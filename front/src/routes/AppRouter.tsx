@@ -11,6 +11,7 @@ import ProjectsPage from "../pages/Projects/ProjectsPage";
 
 import RequestsPage from "../pages/Requests/RequestsPage";
 import PlannerPage from "../pages/Planner/PlannerPage";
+import AutomationPage from "../pages/Automation/AutomationPage";
 import ProfilePage from "../pages/Profile/ProfilePage";
 
 import LoginPage from "../pages/Auth/Login";
@@ -48,6 +49,7 @@ export default function AppRouter() {
 
             {/* Только авторизованные */}
             <Route path="/planner" element={<PlannerPage />} />
+            <Route path="/automation" element={<AutomationPage />} />
             <Route path="/profile" element={<ProfilePage />} />
 
             <Route path="/requests" element={<RequestsPage />} />

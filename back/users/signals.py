@@ -21,6 +21,9 @@ def create_user_profile(sender, instance, created, **kwargs):
                 "university": "",
                 "vk": "",
                 "job": "",
+                "workplace": "",
+                "specialty": "",
+                "about": "",
                 "password_reset_token": "",
             },
         )

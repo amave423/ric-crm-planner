@@ -3,6 +3,18 @@ export interface Specialization {
   title: string;
 }
 
+export type ApplicationFormFieldType = "text" | "textarea" | "select";
+
+export interface ApplicationFormField {
+  id: string;
+  label: string;
+  type: ApplicationFormFieldType;
+  options?: string[];
+  required?: boolean;
+  locked?: boolean;
+  system?: boolean;
+}
+
 export interface Event {
   id: number;
   title?: string;
@@ -11,7 +23,12 @@ export interface Event {
   endDate?: string;
   applyDeadline?: string;
   leader?: number | string;
+  organizerIds?: Array<number | string>;
   organizer?: string;
   specializations?: Specialization[];
   status?: string;
+  archived?: boolean;
+  archivedAt?: string;
+  orgChatUrl?: string;
+  applicationFormFields?: ApplicationFormField[];
 }

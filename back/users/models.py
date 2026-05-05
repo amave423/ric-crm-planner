@@ -52,6 +52,9 @@ class Profile(models.Model):
     university = models.CharField(max_length=255, blank=True)
     vk = models.CharField(max_length=255, blank=True)
     job = models.CharField(max_length=255, blank=True)
+    workplace = models.CharField(max_length=255, blank=True)
+    specialty = models.CharField(max_length=255, blank=True)
+    about = models.TextField(blank=True)
     password_reset_token = models.CharField(max_length=255, blank=True, null=True)
     password_reset_token_created = models.DateTimeField(blank=True, null=True)
 
@@ -141,12 +144,28 @@ class Event(models.Model):
         blank=True,
         related_name="events",
     )
+    leader = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lead_events",
+    )
+    organizers = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="organized_events",
+    )
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     stage = models.CharField(max_length=100)
     start_date = models.DateField()
     end_date = models.DateField()
     end_app_date = models.DateTimeField()
+    is_archived = models.BooleanField(default=False)
+    archived_at = models.DateTimeField(blank=True, null=True)
+    org_chat_url = models.URLField(max_length=500, blank=True)
+    application_form_fields = models.JSONField(default=list, blank=True)
 
     class Meta:
         db_table = "CRM_EVENT"
@@ -287,6 +306,7 @@ class Application(models.Model):
         Status, on_delete=models.SET_NULL, null=True, blank=True, related_name="applications"
     )
     team_id = models.BigIntegerField(null=True, blank=True)
+    custom_fields = models.JSONField(default=dict, blank=True)
 
     tests_assigned = models.BooleanField(default=False)
     tests_assigned_at = models.DateTimeField(blank=True, null=True)
@@ -304,6 +324,106 @@ class Application(models.Model):
 
     def __str__(self):
         return f"Заявка #{self.id} — {self.user}"
+
+
+class Notification(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="crm_notifications",
+    )
+    title = models.CharField(max_length=255)
+    message = models.TextField(blank=True)
+    link = models.CharField(max_length=500, blank=True)
+    read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "CRM_NOTIFICATION"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"Уведомление #{self.id} для {self.user}"
+
+
+class CRMAutomationConfig(models.Model):
+    SCOPE_CRM = "crm"
+
+    id = models.BigAutoField(primary_key=True)
+    scope = models.CharField(max_length=32, default=SCOPE_CRM)
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name="crm_automation_configs",
+    )
+    stages = models.JSONField(default=list)
+    triggers = models.JSONField(default=list)
+    robots = models.JSONField(default=list)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "CRM_AUTOMATION_CONFIG"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["scope", "event"],
+                name="unique_crm_automation_config_scope_event",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.scope}:{self.event_id}"
+
+
+class CRMAutomationExecutionLog(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_SUCCESS = "success"
+    STATUS_SKIPPED = "skipped"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = (
+        (STATUS_PENDING, "Pending"),
+        (STATUS_SUCCESS, "Success"),
+        (STATUS_SKIPPED, "Skipped"),
+        (STATUS_FAILED, "Failed"),
+    )
+
+    id = models.BigAutoField(primary_key=True)
+    config = models.ForeignKey(
+        CRMAutomationConfig,
+        on_delete=models.CASCADE,
+        related_name="execution_logs",
+    )
+    application = models.ForeignKey(
+        Application,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="automation_logs",
+    )
+    event_id = models.BigIntegerField()
+    entity_type = models.CharField(max_length=32, default="application")
+    entity_id = models.CharField(max_length=64)
+    event_code = models.CharField(max_length=100)
+    rule_kind = models.CharField(max_length=16)
+    rule_id = models.CharField(max_length=120)
+    run_key = models.CharField(max_length=64, unique=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    message = models.TextField(blank=True)
+    context = models.JSONField(default=dict)
+    scheduled_for = models.DateTimeField(null=True, blank=True)
+    executed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "CRM_AUTOMATION_EXECUTION_LOG"
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["event_id", "created_at"]),
+            models.Index(fields=["scheduled_for", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.rule_kind}:{self.rule_id}:{self.status}"
 
 
 class Test(models.Model):
@@ -357,6 +477,13 @@ class TestResult(models.Model):
     completed_at = models.DateTimeField()
     started_at = models.DateTimeField()
     application = models.ForeignKey(Application, on_delete=models.CASCADE, related_name="test_results")
+    session = models.OneToOneField(
+        TestSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="result",
+    )
     test = models.ForeignKey(Test, on_delete=models.CASCADE, related_name="results")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="test_results")
     correct_answers = models.IntegerField()

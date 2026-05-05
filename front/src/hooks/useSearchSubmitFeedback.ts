@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type ToastType = "success" | "error";
+type ToastType = "success" | "error" | "info";
 
 type SearchSubmitFeedbackOptions<T> = {
   getMatches: (query: string) => T[];

@@ -2,7 +2,9 @@ from django.conf import settings
 import secrets
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import status
 from drf_yasg import openapi
@@ -18,22 +20,35 @@ from rest_framework.generics import (
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.mixins import CreateModelMixin
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from users.permissions import (
     CuratorOrAdminPermission,
+    PublicReadCuratorAdminWritePermission,
     ProjectantOnlyPermission,
-    ProjectantReadCuratorAdminWritePermission,
+    TestingServicePermission,
 )
 from users.serializers import (
     ApplicationCreateSerializer,
     ApplicationSerializer,
+    CRMAutomationConfigPayloadSerializer,
+    CRMAutomationConfigSerializer,
+    CRMAutomationExecutionLogSerializer,
     DirectionSerializer,
     EmailConfirmationSerializer,
     EventSerializer,
+    IntegrationApplicationTestingContextSerializer,
+    IntegrationTestExportSerializer,
+    IntegrationTestResultCallbackSerializer,
+    IntegrationTestResultSerializer,
+    IntegrationTestSessionSerializer,
+    IntegrationTestSessionUpsertSerializer,
     LoginUserSerializer,
+    NotificationCreateSerializer,
+    NotificationSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     ProfileSerializer,
@@ -45,13 +60,24 @@ from users.serializers import (
 )
 from users.models import (
     Application,
+    Answer,
+    CRMAutomationConfig,
+    CRMAutomationExecutionLog,
     Direction,
     Event,
+    Notification,
     Profile,
     Project,
+    Question,
     Specialization,
     Status,
+    Test,
+    TestResult,
+    TestSession,
+    TrueAnswer,
 )
+from users.automation_defaults import create_default_crm_automation_config
+from users.automation_engine import run_crm_automation, run_due_crm_automation
 
 TAG_AUTH = "Auth"
 TAG_USERS = "Users"
@@ -60,7 +86,9 @@ TAG_EVENTS = "Events"
 TAG_DIRECTIONS = "Directions"
 TAG_PROJECTS = "Projects"
 TAG_APPLICATIONS = "Applications"
+TAG_NOTIFICATIONS = "Уведомления"
 TAG_REFERENCE = "Reference"
+TAG_INTEGRATION = "Integration"
 
 MESSAGE_RESPONSE_SCHEMA = openapi.Schema(
     type=openapi.TYPE_OBJECT,
@@ -84,6 +112,56 @@ REFRESH_RESPONSE_SCHEMA = openapi.Schema(
         "refresh": openapi.Schema(type=openapi.TYPE_STRING),
     },
 )
+
+INTEGRATION_TOKEN_PARAMETER = openapi.Parameter(
+    "X-Service-Token",
+    openapi.IN_HEADER,
+    description="Shared token for CRM and testing service integration.",
+    type=openapi.TYPE_STRING,
+    required=True,
+)
+
+
+def _get_available_tests_for_application(application: Application):
+    queryset = Test.objects.filter(is_active=True)
+
+    if application.event_id:
+        queryset = queryset.filter(
+            Q(event__isnull=True) | Q(event_id=application.event_id)
+        )
+
+    if application.specialization_id:
+        queryset = queryset.filter(
+            Q(specialization__isnull=True)
+            | Q(specialization_id=application.specialization_id)
+        )
+
+    return queryset.select_related("event", "specialization").order_by("entry", "name")
+
+
+def _get_application_current_session(application: Application):
+    session_queryset = application.test_sessions.select_related("test", "user").order_by(
+        "-created_at"
+    )
+    if application.test_session_id:
+        current_session = session_queryset.filter(
+            session_id=application.test_session_id
+        ).first()
+        if current_session:
+            return current_session
+    return session_queryset.first()
+
+
+def _get_application_latest_result(
+    application: Application, current_session: TestSession | None
+):
+    if current_session and hasattr(current_session, "result"):
+        return current_session.result
+
+    return application.test_results.select_related("test", "user", "session").order_by(
+        "-completed_at",
+        "-id",
+    ).first()
 
 
 @method_decorator(
@@ -403,6 +481,9 @@ class ProfileView(RetrieveUpdateAPIView):
                 "university": "",
                 "vk": "",
                 "job": "",
+                "workplace": "",
+                "specialty": "",
+                "about": "",
             },
         )
         return profile
@@ -428,10 +509,14 @@ class ProfileView(RetrieveUpdateAPIView):
     ),
 )
 class EventListCreateView(ListCreateAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = EventSerializer
-    queryset = Event.objects.all()
+    queryset = Event.objects.all().select_related("leader", "specialization").prefetch_related("organizers")
     lookup_url_kwarg = "event_id"
+
+    def get_queryset(self):
+        archived = str(self.request.query_params.get("archived", "")).lower() in ("1", "true", "yes")
+        return self.queryset.filter(is_archived=archived)
 
 
 @method_decorator(
@@ -473,10 +558,15 @@ class EventListCreateView(ListCreateAPIView):
     ),
 )
 class EventDetailView(RetrieveUpdateDestroyAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = EventSerializer
-    queryset = Event.objects.all()
+    queryset = Event.objects.all().select_related("leader", "specialization").prefetch_related("organizers")
     lookup_url_kwarg = "event_id"
+
+    def perform_destroy(self, instance):
+        instance.is_archived = True
+        instance.archived_at = timezone.now()
+        instance.save(update_fields=("is_archived", "archived_at"))
 
 @method_decorator(
     name="get",
@@ -527,16 +617,16 @@ class SpecializationListView(ListAPIView):
     ),
 )
 class DirectionListCreateView(ListCreateAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = DirectionSerializer
 
     def get_queryset(self):
-        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
-        return Direction.objects.filter(event=event)
+        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"), is_archived=False)
+        return Direction.objects.filter(event=event).select_related("event", "leader")
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["event"] = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
+        context["event"] = get_object_or_404(Event, pk=self.kwargs.get("event_id"), is_archived=False)
         return context
 
 
@@ -579,13 +669,13 @@ class DirectionListCreateView(ListCreateAPIView):
     ),
 )
 class DirectionDetailView(RetrieveUpdateDestroyAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = DirectionSerializer
     lookup_url_kwarg = "direction_id"
 
     def get_queryset(self):
-        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
-        return Direction.objects.filter(event=event)
+        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"), is_archived=False)
+        return Direction.objects.filter(event=event).select_related("event", "leader")
 
 @method_decorator(
     name="get",
@@ -607,19 +697,22 @@ class DirectionDetailView(RetrieveUpdateDestroyAPIView):
     ),
 )
 class ProjectListCreateView(ListCreateAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = ProjectSerializer
 
     def get_queryset(self):
-        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
+        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"), is_archived=False)
         direction = get_object_or_404(
             Direction, pk=self.kwargs.get("direction_id"), event=event
         )
-        return Project.objects.filter(direction=direction)
+        return Project.objects.filter(direction=direction).select_related(
+            "direction", "curator", "direction__event"
+        )
+        
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
+        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"), is_archived=False)
         direction = get_object_or_404(
             Direction, pk=self.kwargs.get("direction_id"), event=event
         )
@@ -666,10 +759,10 @@ class ProjectListCreateView(ListCreateAPIView):
     ),
 )
 class ProjectDetailView(RetrieveUpdateDestroyAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = ProjectSerializer
     lookup_url_kwarg = "project_id"
-    queryset = Project.objects.select_related("direction", "curator", "direction__event")
+    queryset = Project.objects.filter(direction__event__is_archived=False).select_related("direction", "curator", "direction__event")
 
 @method_decorator(
     name="get",
@@ -691,9 +784,9 @@ class ProjectDetailView(RetrieveUpdateDestroyAPIView):
     ),
 )
 class UserProjectListCreateView(ListCreateAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = ProjectSerializer
-    queryset = Project.objects.select_related("direction", "curator", "direction__event")
+    queryset = Project.objects.filter(direction__event__is_archived=False).select_related("direction", "curator", "direction__event")
 
 
 @method_decorator(
@@ -706,9 +799,9 @@ class UserProjectListCreateView(ListCreateAPIView):
     ),
 )
 class UserDirectionListView(ListAPIView):
-    permission_classes = (ProjectantReadCuratorAdminWritePermission,)
+    permission_classes = (PublicReadCuratorAdminWritePermission,)
     serializer_class = DirectionSerializer
-    queryset = Direction.objects.select_related("event", "leader")
+    queryset = Direction.objects.filter(event__is_archived=False).select_related("event", "leader")
 
 class ApplicationListView(ListCreateAPIView):
     """List and create applications."""
@@ -788,10 +881,19 @@ class ApplicationListView(ListCreateAPIView):
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        run_crm_automation(instance, "application.created", request=request)
+        output = ApplicationSerializer(instance, context=self.get_serializer_context())
+        headers = self.get_success_headers(output.data)
+        return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
+
     def get_queryset(self):
         queryset = Application.objects.select_related(
-            "user", "direction", "event", "specialization", "status"
-        ).order_by("-date_sub")
+            "user", "direction", "event", "project", "specialization", "status"
+        ).filter(Q(event__is_archived=False) | Q(event__isnull=True)).order_by("-date_sub")
         
         if not CuratorOrAdminPermission().has_permission(self.request, self):
             queryset = queryset.filter(user=self.request.user)
@@ -824,11 +926,11 @@ class ApplicationListView(ListCreateAPIView):
     def get_serializer_context(self):
         context = super().get_serializer_context()
         if self.request.method.lower() == "post":
-            event_id = self.request.data.get("event")
-            direction_id = self.request.data.get("direction")
+            event_id = self.request.data.get("event") or self.request.data.get("event_id")
+            direction_id = self.request.data.get("direction") or self.request.data.get("direction_id")
 
             if event_id:
-                context["event"] = get_object_or_404(Event, pk=event_id)
+                context["event"] = get_object_or_404(Event, pk=event_id, is_archived=False)
             if direction_id:
                 context["direction"] = get_object_or_404(Direction, pk=direction_id)
 
@@ -842,8 +944,8 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
     def get_permissions(self):
         if self.request.method.lower() == "get":
             permissions = (IsAuthenticated,)
-        elif self.request.method.lower() in {"patch", "delete"}:
-            permissions = (CuratorOrAdminPermission,)
+        elif self.request.method.lower() in {"put", "patch"}:
+            permissions = (IsAuthenticated,)
         else:
             permissions = (IsAuthenticated,)
         return [permission() for permission in permissions]
@@ -874,17 +976,355 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
         responses={204: "No content", 401: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
     )
     def delete(self, request, *args, **kwargs):
-        return super().delete(request, *args, **kwargs)
+        application = self.get_object()
+        is_curator_or_admin = CuratorOrAdminPermission().has_permission(request, self)
+        is_owner = application.user_id == request.user.id
+
+        if not (is_curator_or_admin or is_owner):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        self.perform_destroy(application)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def perform_update(self, serializer):
+        previous_status = serializer.instance.status.name if serializer.instance.status_id else ""
+        instance = serializer.save()
+        current_status = instance.status.name if instance.status_id else ""
+        if previous_status == current_status:
+            return
+
+        run_crm_automation(
+            instance,
+            "request.status_changed",
+            previous_status=previous_status,
+            request=self.request,
+        )
+        if current_status == "Прохождение тестирования":
+            run_crm_automation(
+                instance,
+                "testing.started",
+                previous_status=previous_status,
+                request=self.request,
+            )
+        if current_status == "Добавился в орг. чат":
+            run_crm_automation(
+                instance,
+                "notification.chat_link_opened",
+                previous_status=previous_status,
+                request=self.request,
+            )
 
     def get_queryset(self):
         queryset = Application.objects.select_related(
-            "user", "direction", "event", "specialization", "status"
+            "user", "direction", "event", "project", "specialization", "status"
         )
 
         if CuratorOrAdminPermission().has_permission(self.request, self):
             return queryset
 
         return queryset.filter(user=self.request.user)
+
+
+class CRMAutomationConfigView(RetrieveUpdateAPIView):
+    permission_classes = (CuratorOrAdminPermission,)
+    serializer_class = CRMAutomationConfigSerializer
+
+    def get_object(self):
+        event_id = int(self.kwargs["event_id"])
+        config = CRMAutomationConfig.objects.filter(
+            scope=CRMAutomationConfig.SCOPE_CRM,
+            event_id=event_id,
+        ).first()
+        if config:
+            return config
+        event = get_object_or_404(Event, pk=event_id, is_archived=False)
+        defaults = create_default_crm_automation_config(event_id)
+        return CRMAutomationConfig.objects.create(
+            scope=CRMAutomationConfig.SCOPE_CRM,
+            event=event,
+            stages=defaults["stages"],
+            triggers=defaults["triggers"],
+            robots=defaults["robots"],
+        )
+
+    def put(self, request, *args, **kwargs):
+        return self._save_config(request)
+
+    def patch(self, request, *args, **kwargs):
+        return self._save_config(request, partial=True)
+
+    def _save_config(self, request, partial=False):
+        event_id = int(self.kwargs["event_id"])
+        event = get_object_or_404(Event, pk=event_id, is_archived=False)
+        config = self.get_object()
+        serializer = CRMAutomationConfigPayloadSerializer(data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        config.scope = CRMAutomationConfig.SCOPE_CRM
+        config.event = event
+        if "stages" in data:
+            config.stages = data["stages"]
+        if "triggers" in data:
+            config.triggers = data["triggers"]
+        if "robots" in data:
+            config.robots = data["robots"]
+        config.save()
+        return Response(CRMAutomationConfigSerializer(config).data)
+
+
+class CRMAutomationExecutionLogListView(ListAPIView):
+    permission_classes = (CuratorOrAdminPermission,)
+    serializer_class = CRMAutomationExecutionLogSerializer
+
+    def get_queryset(self):
+        return CRMAutomationExecutionLog.objects.filter(
+            event_id=self.kwargs["event_id"],
+            config__scope=CRMAutomationConfig.SCOPE_CRM,
+        ).select_related("config", "application")
+
+
+class CRMAutomationPendingRunView(APIView):
+    permission_classes = (CuratorOrAdminPermission,)
+
+    def post(self, request, *args, **kwargs):
+        return Response(run_due_crm_automation())
+
+
+class IntegrationApplicationMixin:
+    authentication_classes = ()
+    permission_classes = (TestingServicePermission,)
+
+    def get_application(self):
+        return get_object_or_404(
+            Application.objects.select_related(
+                "user",
+                "event",
+                "direction",
+                "project",
+                "specialization",
+                "status",
+            ),
+            pk=self.kwargs.get("application_id"),
+        )
+
+
+class IntegrationApplicationTestingContextView(IntegrationApplicationMixin, APIView):
+    @swagger_auto_schema(
+        tags=[TAG_INTEGRATION],
+        operation_summary="Get testing context for application",
+        operation_description="Returns CRM context required by the testing backend.",
+        manual_parameters=[INTEGRATION_TOKEN_PARAMETER],
+        responses={
+            200: IntegrationApplicationTestingContextSerializer,
+            403: ERROR_RESPONSE_SCHEMA,
+            404: ERROR_RESPONSE_SCHEMA,
+        },
+    )
+    def get(self, request, *args, **kwargs):
+        application = self.get_application()
+        available_tests = list(_get_available_tests_for_application(application))
+        current_session = _get_application_current_session(application)
+        latest_result = _get_application_latest_result(application, current_session)
+        serializer = IntegrationApplicationTestingContextSerializer(
+            application,
+            context={
+                "request": request,
+                "available_tests": available_tests,
+                "current_session": current_session,
+                "latest_result": latest_result,
+            },
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class IntegrationTestExportView(APIView):
+    authentication_classes = ()
+    permission_classes = (TestingServicePermission,)
+
+    @swagger_auto_schema(
+        tags=[TAG_INTEGRATION],
+        operation_summary="Export test definition",
+        operation_description="Returns full test structure, questions and answers for the testing backend.",
+        manual_parameters=[INTEGRATION_TOKEN_PARAMETER],
+        responses={
+            200: IntegrationTestExportSerializer,
+            403: ERROR_RESPONSE_SCHEMA,
+            404: ERROR_RESPONSE_SCHEMA,
+        },
+    )
+    def get(self, request, *args, **kwargs):
+        test = get_object_or_404(
+            Test.objects.select_related("event", "specialization").prefetch_related(
+                "questions__answers",
+                "questions__true_answers",
+            ),
+            pk=self.kwargs.get("test_id"),
+        )
+        serializer = IntegrationTestExportSerializer(test)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class IntegrationApplicationTestSessionView(IntegrationApplicationMixin, APIView):
+    @swagger_auto_schema(
+        tags=[TAG_INTEGRATION],
+        operation_summary="Assign or sync test session",
+        operation_description="Creates or updates a test session for the given application.",
+        manual_parameters=[INTEGRATION_TOKEN_PARAMETER],
+        request_body=IntegrationTestSessionUpsertSerializer,
+        responses={
+            200: IntegrationTestSessionSerializer,
+            201: IntegrationTestSessionSerializer,
+            400: ERROR_RESPONSE_SCHEMA,
+            403: ERROR_RESPONSE_SCHEMA,
+            404: ERROR_RESPONSE_SCHEMA,
+        },
+    )
+    def post(self, request, *args, **kwargs):
+        application = self.get_application()
+        serializer = IntegrationTestSessionUpsertSerializer(
+            data=request.data,
+            context={"request": request, "application": application},
+        )
+        serializer.is_valid(raise_exception=True)
+        session = serializer.save()
+        response_serializer = IntegrationTestSessionSerializer(session)
+        created = bool(serializer.context.get("created"))
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class IntegrationApplicationTestResultView(IntegrationApplicationMixin, APIView):
+    @swagger_auto_schema(
+        tags=[TAG_INTEGRATION],
+        operation_summary="Submit test result callback",
+        operation_description="Accepts final test result from the testing backend and syncs it into CRM.",
+        manual_parameters=[INTEGRATION_TOKEN_PARAMETER],
+        request_body=IntegrationTestResultCallbackSerializer,
+        responses={
+            200: IntegrationTestResultSerializer,
+            201: IntegrationTestResultSerializer,
+            400: ERROR_RESPONSE_SCHEMA,
+            403: ERROR_RESPONSE_SCHEMA,
+            404: ERROR_RESPONSE_SCHEMA,
+        },
+    )
+    def post(self, request, *args, **kwargs):
+        application = self.get_application()
+        serializer = IntegrationTestResultCallbackSerializer(
+            data=request.data,
+            context={"request": request, "application": application},
+        )
+        serializer.is_valid(raise_exception=True)
+        result = serializer.save()
+        response_serializer = IntegrationTestResultSerializer(result)
+        created = bool(serializer.context.get("created"))
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+@method_decorator(
+    name="get",
+    decorator=swagger_auto_schema(
+        tags=[TAG_NOTIFICATIONS],
+        operation_summary="Список уведомлений",
+        operation_description="Получение уведомлений текущего пользователя",
+        responses={200: NotificationSerializer(many=True), 401: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="post",
+    decorator=swagger_auto_schema(
+        tags=[TAG_NOTIFICATIONS],
+        operation_summary="Создать уведомление",
+        operation_description="Создание уведомления для текущего пользователя",
+        request_body=NotificationCreateSerializer,
+        responses={201: NotificationSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+class NotificationListCreateView(ListCreateAPIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user).select_related("user")
+
+    def get_serializer_class(self):
+        if self.request.method.lower() == "post":
+            return NotificationCreateSerializer
+        return NotificationSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        output = NotificationSerializer(instance, context=self.get_serializer_context())
+        headers = self.get_success_headers(output.data)
+        return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+@method_decorator(
+    name="patch",
+    decorator=swagger_auto_schema(
+        tags=[TAG_NOTIFICATIONS],
+        operation_summary="Обновить уведомление",
+        operation_description="Обновление уведомления текущего пользователя",
+        request_body=NotificationSerializer,
+        responses={200: NotificationSerializer, 400: ERROR_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+@method_decorator(
+    name="delete",
+    decorator=swagger_auto_schema(
+        tags=[TAG_NOTIFICATIONS],
+        operation_summary="Удалить уведомление",
+        operation_description="Удаление уведомления текущего пользователя",
+        responses={204: "No content", 401: ERROR_RESPONSE_SCHEMA, 404: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+class NotificationDetailView(RetrieveUpdateDestroyAPIView):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = NotificationSerializer
+    lookup_url_kwarg = "notification_id"
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user).select_related("user")
+
+
+@method_decorator(
+    name="post",
+    decorator=swagger_auto_schema(
+        tags=[TAG_NOTIFICATIONS],
+        operation_summary="Отметить все как прочитанные",
+        operation_description="Отметить все уведомления текущего пользователя как прочитанные",
+        responses={200: MESSAGE_RESPONSE_SCHEMA, 401: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+class NotificationMarkAllReadView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request, *args, **kwargs):
+        Notification.objects.filter(user=request.user, read=False).update(read=True)
+        return Response({"message": "Все уведомления отмечены как прочитанные."}, status=status.HTTP_200_OK)
+
+
+@method_decorator(
+    name="delete",
+    decorator=swagger_auto_schema(
+        tags=[TAG_NOTIFICATIONS],
+        operation_summary="Удалить все уведомления",
+        operation_description="Удаление всех уведомлений текущего пользователя",
+        responses={204: "No content", 401: ERROR_RESPONSE_SCHEMA},
+    ),
+)
+class NotificationClearView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def delete(self, request, *args, **kwargs):
+        Notification.objects.filter(user=request.user).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @method_decorator(
@@ -903,9 +1343,17 @@ class DirectionApplicationCreateView(CreateAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"))
+        event = get_object_or_404(Event, pk=self.kwargs.get("event_id"), is_archived=False)
         direction = get_object_or_404(
             Direction, pk=self.kwargs.get("direction_id"), event=event
         )
         context.update({"event": event, "direction": direction})
         return context
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        output = ApplicationSerializer(instance, context=self.get_serializer_context())
+        headers = self.get_success_headers(output.data)
+        return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)

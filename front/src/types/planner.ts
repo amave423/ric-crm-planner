@@ -8,6 +8,7 @@ export interface PlannerTeam {
   name: string;
   curatorId?: number;
   memberIds: number[];
+  memberRoles?: Record<string, string>;
   confirmed: boolean;
   eventId?: number;
   directionId?: number;
@@ -20,6 +21,7 @@ export interface PlannerParentTask {
   teamId: number;
   title: string;
   description?: string;
+  assigneeId?: number;
   startDate: string;
   endDate: string;
 }

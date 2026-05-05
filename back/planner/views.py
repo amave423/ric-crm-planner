@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from django.db import transaction
 from django.utils.decorators import method_decorator
 from drf_yasg.utils import swagger_auto_schema
@@ -5,10 +7,21 @@ from drf_yasg import openapi
 from rest_framework.generics import ListAPIView, RetrieveUpdateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from planner.models import PlannerWorkspaceState, TeamPlannerDesk
-from planner.serializers import PlannerWorkspaceStateSerializer, TeamPlannerDeskSerializer
-from users.models import CRMRole, ROLE_ADMIN, ROLE_CURATOR
+from planner.automation_defaults import create_default_planner_automation_config
+from planner.automation_engine import run_due_planner_automation, run_planner_automation, scan_planner_deadlines
+from planner.models import PlannerAutomationConfig, PlannerAutomationExecutionLog, PlannerWorkspaceState, TeamPlannerDesk
+from planner.serializers import (
+    PlannerAutomationConfigPayloadSerializer,
+    PlannerAutomationConfigSerializer,
+    PlannerAutomationExecutionLogSerializer,
+    PlannerWorkspaceStateSerializer,
+    TeamPlannerDeskSerializer,
+)
+from users.models import Application
+from users.models import CRMRole, ROLE_ADMIN, ROLE_CURATOR, ROLE_PROJECTANT
+from users.permissions import CuratorOrAdminPermission
 
 TAG_PLANNER = "Planner"
 
@@ -33,18 +46,109 @@ def _team_id_from_item(item):
     return _to_int(item.get("teamId", item.get("team_id")))
 
 
+def _member_ids_from_team(team):
+    if not isinstance(team, dict):
+        return []
+    member_ids = team.get("memberIds", team.get("member_ids", []))
+    if not isinstance(member_ids, list):
+        return []
+    return [_to_int(member_id) for member_id in member_ids]
+
+
+def _team_ids_for_user(teams, user_id):
+    if not isinstance(teams, list):
+        return set()
+    return {
+        _to_int(team.get("id"))
+        for team in teams
+        if isinstance(team, dict)
+        and (
+            user_id in _member_ids_from_team(team)
+            or user_id == _to_int(team.get("curatorId", team.get("curator_id")))
+        )
+    } - {None}
+
+
 def _assignee_id_from_item(item):
     if not isinstance(item, dict):
         return None
     return _to_int(item.get("assigneeId", item.get("assignee_id")))
 
 
+def _has_assignee_field(item):
+    return isinstance(item, dict) and (
+        "assigneeId" in item or "assignee_id" in item
+    )
+
+
 def _is_projectant_user(user):
-    if getattr(user, "is_superuser", False):
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
         return False
     roles = set(CRMRole.objects.filter(user=user).values_list("role_type", flat=True))
-    # In this project, non-curator/non-admin users are treated as projectants (students).
-    return ROLE_ADMIN not in roles and ROLE_CURATOR not in roles
+    if ROLE_ADMIN in roles or ROLE_CURATOR in roles:
+        return False
+    return ROLE_PROJECTANT in roles
+
+
+def _filter_items_by_team(items, team_ids):
+    if not isinstance(items, list):
+        return []
+    return [item for item in items if _team_id_from_item(item) in team_ids]
+
+
+def _team_member_roles(team):
+    if not isinstance(team, dict):
+        return {}
+    member_roles = team.get("memberRoles", team.get("member_roles", {}))
+    if isinstance(member_roles, dict):
+        return {
+            str(user_id): str(role)
+            for user_id, role in member_roles.items()
+            if str(role).strip()
+        }
+    return {}
+
+
+def _enrich_team_member_roles(teams):
+    if not isinstance(teams, list):
+        return teams
+
+    enriched = []
+    for team in teams:
+        if not isinstance(team, dict):
+            enriched.append(team)
+            continue
+
+        member_ids = [member_id for member_id in _member_ids_from_team(team) if member_id is not None]
+        member_roles = _team_member_roles(team)
+        if member_ids:
+            applications = (
+                Application.objects.filter(user_id__in=member_ids)
+                .select_related("specialization")
+                .order_by("-date_sub", "-id")
+            )
+            source_request_ids = team.get("sourceRequestIds", team.get("source_request_ids", []))
+            if isinstance(source_request_ids, list) and source_request_ids:
+                applications = applications.filter(id__in=source_request_ids)
+            else:
+                event_id = _to_int(team.get("eventId", team.get("event_id")))
+                direction_id = _to_int(team.get("directionId", team.get("direction_id")))
+                project_id = _to_int(team.get("projectId", team.get("project_id")))
+                if event_id is not None:
+                    applications = applications.filter(event_id=event_id)
+                if direction_id is not None:
+                    applications = applications.filter(direction_id=direction_id)
+                if project_id is not None:
+                    applications = applications.filter(project_id=project_id)
+
+            for application in applications:
+                if not application.specialization_id:
+                    continue
+                member_roles.setdefault(str(application.user_id), application.specialization.name)
+
+        enriched.append({**team, "memberRoles": member_roles})
+
+    return enriched
 
 
 def _sync_team_desks_from_workspace(workspace: PlannerWorkspaceState):
@@ -120,35 +224,63 @@ class PlannerStateCompatView(RetrieveUpdateAPIView):
     def get(self, request, *args, **kwargs):
         workspace = self.get_object()
         data = self.get_serializer(workspace).data
+        data["teams"] = _enrich_team_member_roles(data.get("teams", []))
         if _is_projectant_user(request.user):
             user_id = _to_int(request.user.id)
-            data["subtasks"] = [
-                item
-                for item in data.get("subtasks", [])
-                if _assignee_id_from_item(item) == user_id
+            team_ids = _team_ids_for_user(data.get("teams", []), user_id)
+            data["teams"] = [
+                team for team in data.get("teams", []) if _to_int(team.get("id")) in team_ids
             ]
+            data["parent_tasks"] = _filter_items_by_team(data.get("parent_tasks", []), team_ids)
+            data["subtasks"] = _filter_items_by_team(data.get("subtasks", []), team_ids)
         return Response(data)
 
     def perform_update(self, serializer):
+        previous_teams = (
+            deepcopy(serializer.instance.teams)
+            if serializer.instance and isinstance(serializer.instance.teams, list)
+            else []
+        )
+        previous_parent_tasks = (
+            deepcopy(serializer.instance.parent_tasks)
+            if serializer.instance and isinstance(serializer.instance.parent_tasks, list)
+            else []
+        )
         previous_subtasks = (
-            list(serializer.instance.subtasks)
+            deepcopy(serializer.instance.subtasks)
             if serializer.instance and isinstance(serializer.instance.subtasks, list)
             else []
         )
+        previous_state = {
+            "teams": previous_teams,
+            "parent_tasks": previous_parent_tasks,
+            "subtasks": previous_subtasks,
+            "columns": deepcopy(serializer.instance.columns) if serializer.instance and isinstance(serializer.instance.columns, list) else [],
+        }
         workspace = serializer.save()
 
         if _is_projectant_user(self.request.user):
             user_id = _to_int(self.request.user.id)
+            allowed_team_ids = _team_ids_for_user(previous_teams, user_id)
+            incoming_parent_tasks = workspace.parent_tasks if isinstance(workspace.parent_tasks, list) else []
             incoming_subtasks = workspace.subtasks if isinstance(workspace.subtasks, list) else []
-            own_subtasks = [
-                item for item in incoming_subtasks if _assignee_id_from_item(item) == user_id
-            ]
-            foreign_subtasks = [
-                item for item in previous_subtasks if _assignee_id_from_item(item) != user_id
-            ]
-            workspace.subtasks = foreign_subtasks + own_subtasks
-            workspace.save(update_fields=["subtasks", "updated_at"])
 
+            editable_parent_tasks = _filter_items_by_team(incoming_parent_tasks, allowed_team_ids)
+            foreign_parent_tasks = [
+                item for item in previous_parent_tasks if _team_id_from_item(item) not in allowed_team_ids
+            ]
+            editable_subtasks = _filter_items_by_team(incoming_subtasks, allowed_team_ids)
+            foreign_subtasks = [
+                item for item in previous_subtasks if _team_id_from_item(item) not in allowed_team_ids
+            ]
+
+            workspace.teams = previous_teams
+            workspace.parent_tasks = foreign_parent_tasks + editable_parent_tasks
+            workspace.subtasks = foreign_subtasks + editable_subtasks
+            workspace.save(update_fields=["teams", "parent_tasks", "subtasks", "updated_at"])
+
+        run_planner_automation(previous_state, workspace)
+        workspace.refresh_from_db()
         _sync_team_desks_from_workspace(workspace)
 
 
@@ -205,3 +337,73 @@ class TeamPlannerDeskDetailView(RetrieveUpdateAPIView):
         team_id = self.kwargs.get(self.lookup_url_kwarg)
         desk, _ = TeamPlannerDesk.objects.get_or_create(team_id=team_id)
         return desk
+
+
+class PlannerAutomationConfigView(RetrieveUpdateAPIView):
+    permission_classes = (CuratorOrAdminPermission,)
+    serializer_class = PlannerAutomationConfigSerializer
+
+    def get_object(self):
+        event_id = int(self.kwargs["event_id"])
+        config = PlannerAutomationConfig.objects.filter(
+            scope=PlannerAutomationConfig.SCOPE_PLANNER,
+            event_id=event_id,
+        ).first()
+        if config:
+            return config
+        defaults = create_default_planner_automation_config(event_id)
+        return PlannerAutomationConfig.objects.create(
+            scope=PlannerAutomationConfig.SCOPE_PLANNER,
+            event_id=event_id,
+            stages=defaults["stages"],
+            triggers=defaults["triggers"],
+            robots=defaults["robots"],
+        )
+
+    def put(self, request, *args, **kwargs):
+        return self._save_config(request)
+
+    def patch(self, request, *args, **kwargs):
+        return self._save_config(request, partial=True)
+
+    def _save_config(self, request, partial=False):
+        event_id = int(self.kwargs["event_id"])
+        config = self.get_object()
+        serializer = PlannerAutomationConfigPayloadSerializer(data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        config.scope = PlannerAutomationConfig.SCOPE_PLANNER
+        config.event_id = event_id
+        if "stages" in data:
+            config.stages = data["stages"]
+        if "triggers" in data:
+            config.triggers = data["triggers"]
+        if "robots" in data:
+            config.robots = data["robots"]
+        config.save()
+        return Response(PlannerAutomationConfigSerializer(config).data)
+
+
+class PlannerAutomationExecutionLogListView(ListAPIView):
+    permission_classes = (CuratorOrAdminPermission,)
+    serializer_class = PlannerAutomationExecutionLogSerializer
+
+    def get_queryset(self):
+        return PlannerAutomationExecutionLog.objects.filter(
+            event_id=self.kwargs["event_id"],
+            config__scope=PlannerAutomationConfig.SCOPE_PLANNER,
+        ).select_related("config")
+
+
+class PlannerAutomationDeadlineScanView(APIView):
+    permission_classes = (CuratorOrAdminPermission,)
+
+    def post(self, request, *args, **kwargs):
+        return Response(scan_planner_deadlines())
+
+
+class PlannerAutomationPendingRunView(APIView):
+    permission_classes = (CuratorOrAdminPermission,)
+
+    def post(self, request, *args, **kwargs):
+        return Response(run_due_planner_automation())

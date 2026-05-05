@@ -1,4 +1,4 @@
-@use "../../styles/variables.scss" as *;
+﻿@use "../../../../styles/variables.scss" as *;
 
 .wizard-tab--event {
   --wizard-accent: var(--event-color, #6495ed);
@@ -22,6 +22,14 @@
   --wizard-soft-border: rgba(183, 123, 220, 0.22);
   --wizard-focus-shadow: rgba(183, 123, 220, 0.18);
   --wizard-select-bg: linear-gradient(180deg, #ffffff 0%, #fdf7ff 100%);
+}
+
+.wizard-tab--form {
+  --wizard-accent: #3b82f6;
+  --wizard-soft-bg: rgba(59, 130, 246, 0.055);
+  --wizard-soft-border: rgba(59, 130, 246, 0.22);
+  --wizard-focus-shadow: rgba(59, 130, 246, 0.18);
+  --wizard-select-bg: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
 }
 
 .wizard-overlay {
@@ -83,6 +91,23 @@
   border-color: transparent !important;
   color: #fff !important;
   box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+  transform: translateX(4px);
+}
+
+.wizard-nav .wizard-nav-btn--automation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  border: 1px solid var(--wizard-soft-border);
+  color: var(--wizard-accent);
+}
+
+.wizard-nav .wizard-nav-btn--automation:hover,
+.wizard-nav .wizard-nav-btn--automation:focus {
+  background: var(--wizard-accent) !important;
+  color: #fff !important;
+  border-color: var(--wizard-accent) !important;
   transform: translateX(4px);
 }
 
@@ -162,8 +187,60 @@
   outline: none !important;
 }
 
-.wizard-form > .text-small {
+.wizard-form label.text-small {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  line-height: 1.25;
+}
+
+.wizard-field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.wizard-field-label {
   display: block;
+  margin: 0;
+  padding: 0;
+  line-height: 16px;
+}
+
+.wizard-form > .text-small {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wizard-form-list {
+  display: grid;
+  gap: 12px;
+}
+
+.wizard-item-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--wizard-soft-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.wizard-item-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.wizard-item-card__badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--wizard-soft-bg);
+  color: var(--wizard-accent);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .wizard-actions {
@@ -183,11 +260,27 @@
   box-shadow: 0 6px 14px rgba(0,0,0,0.08);
 }
 
+.wizard-actions .primary .anticon {
+  margin-right: 6px;
+}
+
 .wizard-actions .primary:hover,
 .wizard-actions .primary:focus {
   background: var(--wizard-accent) !important;
   color: #fff !important;
   border-color: var(--wizard-accent) !important;
+}
+
+.wizard-actions .primary:disabled,
+.wizard-actions .primary.ant-btn-disabled,
+.wizard-actions .primary.ant-btn-disabled:hover,
+.wizard-actions .primary.ant-btn-disabled:focus {
+  border-color: rgba(100, 149, 237, 0.38) !important;
+  background: rgba(100, 149, 237, 0.08) !important;
+  color: var(--wizard-accent) !important;
+  opacity: 1;
+  cursor: default;
+  box-shadow: none;
 }
 
 .wizard-actions .secondary {
@@ -196,6 +289,39 @@
   border-radius: 10px;
   padding: 10px 14px;
   cursor: pointer;
+}
+
+.wizard-actions .wizard-settings-btn {
+  border-color: var(--wizard-accent) !important;
+  background: #fff !important;
+  color: var(--wizard-accent) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.wizard-actions .wizard-settings-btn:hover,
+.wizard-actions .wizard-settings-btn:focus {
+  background: var(--wizard-accent) !important;
+  color: #fff !important;
+  border-color: var(--wizard-accent) !important;
+}
+
+.automation-settings-modal .ant-modal-content {
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.automation-settings-modal .ant-modal-body {
+  max-height: min(76vh, 760px);
+  overflow: auto;
+  padding: 18px;
+  background: #f5f8fc;
+}
+
+.automation-settings-modal .automation-panel {
+  box-shadow: none;
 }
 
 .wizard-close.app-button.ant-btn {
@@ -492,3 +618,5 @@ select:focus {
     grid-template-columns: 1fr;
   }
 }
+
+

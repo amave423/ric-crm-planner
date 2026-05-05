@@ -248,6 +248,29 @@
   color: #fff;
 }
 
+.head-btn--automation {
+  border-color: #93c5fd !important;
+  background: #f8fbff !important;
+  color: #1d4ed8 !important;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.head-btn--automation .anticon {
+  color: #1d4ed8;
+}
+
+.head-btn--automation:hover,
+.head-btn--automation:focus-visible {
+  background: #1d4ed8 !important;
+  color: #fff !important;
+  border-color: #1d4ed8 !important;
+}
+
+.head-btn--automation:hover .anticon,
+.head-btn--automation:focus-visible .anticon {
+  color: #fff;
+}
+
 .head-btn--danger {
   border-color: #ff3d3d !important;
   background: #fff !important;

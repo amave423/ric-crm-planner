@@ -1,51 +1,26 @@
-.toast-root {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 4000;
+.app-notification {
+  --app-notification-progress-color: #2f6bea;
 }
 
-.toast {
-  min-width: 220px;
-  padding: 12px 16px;
-  border-radius: 10px;
-  color: #fff;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-  transform: translateX(120%);
-  opacity: 0;
-  animation: slideIn .35s forwards;
+.app-notification--success {
+  --app-notification-progress-color: #22c55e;
 }
 
-.toast.hiding {
-  animation: slideOut .35s forwards;
+.app-notification--error {
+  --app-notification-progress-color: #ef4444;
 }
 
-.toast.success { background: #2e7d32; }
-.toast.error { background: #ff4242; }
-
-@keyframes slideIn {
-  from { transform: translateX(120%); opacity: 0; }
-  to   { transform: translateX(0); opacity: 1; }
+.app-notification--info {
+  --app-notification-progress-color: #2f6bea;
 }
 
-@keyframes slideOut {
-  from { transform: translateX(0); opacity: 1; }
-  to   { transform: translateX(120%); opacity: 0; }
+.app-notification .ant-notification-notice-message {
+  color: #13233f;
+  font-weight: 600;
 }
 
-.toast.error:not(.hiding) {
-  animation: slideIn .35s forwards, shake .60s .35s ease-in-out 1;
-}
-
-@keyframes shake {
-  0%   { transform: translateX(0); }
-  10%  { transform: translateX(-8px); }
-  30%  { transform: translateX(6px); }
-  50%  { transform: translateX(-4px); }
-  70%  { transform: translateX(2px); }
-  90%  { transform: translateX(-1px); }
-  100% { transform: translateX(0); }
+.app-notification .ant-notification-notice-progress,
+.app-notification .ant-notification-notice-progress-bar,
+.app-notification .ant-notification-notice-progress > div {
+  background: var(--app-notification-progress-color) !important;
 }

@@ -1,10 +1,11 @@
-import client from "../api/client";
+﻿import client from "../api/client";
 import seedDirections from "../mock-data/directions.json";
 import seedEvents from "../mock-data/events.json";
 import seedProfile from "../mock-data/profile.json";
 import seedProjects from "../mock-data/projects.json";
 import seedUsers from "../mock-data/users.json";
 import { CURRENT_MOCK_SEED_VERSION, LS_MOCK_SEED_VERSION } from "./mockSeed";
+import { readPlannerState, writePlannerState } from "./planner";
 import type { Direction } from "../types/direction";
 import type { Event } from "../types/event";
 import type { Project } from "../types/project";
@@ -19,6 +20,7 @@ const LS_DIRECTIONS = "ric_mock_directions";
 const LS_PROJECTS = "ric_mock_projects";
 const LS_PROFILES = "ric_mock_profiles";
 const LS_USERS = "users";
+const LS_ARCHIVED_EVENT_IDS = "ric_archived_event_ids";
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
@@ -43,6 +45,32 @@ function nextId(items: Array<{ id?: number }>): number {
   return max + 1;
 }
 
+function toNumber(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function mapUserRecord(raw: unknown): User | null {
+  if (!raw || typeof raw !== "object") return null;
+  const record = raw as UnknownRecord;
+  const profile = record.profile && typeof record.profile === "object" ? (record.profile as UnknownRecord) : {};
+  const id = toNumber(record.id ?? record.pk);
+  if (!id) return null;
+
+  const email = String(record.email ?? profile.email ?? "");
+  const name = String(record.name ?? record.firstName ?? record.first_name ?? profile.name ?? "");
+  const surname = String(record.surname ?? record.lastName ?? record.last_name ?? profile.surname ?? "");
+  const role = String(record.role ?? profile.role ?? "");
+
+  return {
+    id,
+    email,
+    name,
+    surname,
+    role: role || "student",
+  };
+}
+
 function ensureMockSeeded() {
   const storedVersion = localStorage.getItem(LS_MOCK_SEED_VERSION);
   if (storedVersion !== CURRENT_MOCK_SEED_VERSION) {
@@ -52,6 +80,7 @@ function ensureMockSeeded() {
     writeLS(LS_PROFILES, seedProfile || {});
     writeLS(LS_USERS, []);
     localStorage.removeItem("currentUser");
+    localStorage.removeItem(LS_ARCHIVED_EVENT_IDS);
     localStorage.setItem(LS_MOCK_SEED_VERSION, CURRENT_MOCK_SEED_VERSION);
     return;
   }
@@ -89,8 +118,114 @@ function writeMockProjects(items: Project[]) {
   writeLS(LS_PROJECTS, items);
 }
 
+function uniqueNumbers(values: unknown[]): number[] {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value > 0)
+    )
+  );
+}
+
+function hideArchivedEventInPlanner(id: number) {
+  const state = readPlannerState(USE_MOCK);
+  writePlannerState({
+    ...state,
+    hiddenEventIds: uniqueNumbers([...state.hiddenEventIds, id]),
+  });
+}
+
+export function getArchivedEventIds(): number[] {
+  const storedIds = readLS<number[]>(LS_ARCHIVED_EVENT_IDS, []);
+  const archivedMockIds = USE_MOCK
+    ? mockEvents()
+        .filter((event) => event.archived)
+        .map((event) => Number(event.id))
+    : [];
+
+  return uniqueNumbers([...storedIds, ...archivedMockIds]);
+}
+
+export function isEventArchived(id: number): boolean {
+  return getArchivedEventIds().includes(Number(id));
+}
+
+export function rememberArchivedEventId(id: number) {
+  const eventId = Number(id);
+  if (!Number.isFinite(eventId) || eventId <= 0) return;
+
+  writeLS(LS_ARCHIVED_EVENT_IDS, uniqueNumbers([...getArchivedEventIds(), eventId]));
+  hideArchivedEventInPlanner(eventId);
+}
+
+export function forgetArchivedEventId(id: number) {
+  const eventId = Number(id);
+  if (!Number.isFinite(eventId) || eventId <= 0) return;
+
+  writeLS(
+    LS_ARCHIVED_EVENT_IDS,
+    getArchivedEventIds().filter((archivedId) => Number(archivedId) !== eventId)
+  );
+
+  const state = readPlannerState(USE_MOCK);
+  writePlannerState({
+    ...state,
+    hiddenEventIds: state.hiddenEventIds.filter((hiddenId) => Number(hiddenId) !== eventId),
+  });
+}
+
+export async function archiveEvent(id: number): Promise<Event | undefined> {
+  const eventId = Number(id);
+  const events = mockEvents();
+  const idx = events.findIndex((event) => Number(event.id) === eventId);
+
+  rememberArchivedEventId(eventId);
+
+  if (idx < 0) return undefined;
+
+  const archivedEvent: Event = {
+    ...events[idx],
+    archived: true,
+    archivedAt: new Date().toISOString(),
+  };
+
+  events[idx] = archivedEvent;
+  writeMockEvents(events);
+  return archivedEvent;
+}
+
+export async function getArchivedEvents(): Promise<Event[]> {
+  const archivedIds = new Set(getArchivedEventIds());
+  return mockEvents().filter((event) => event.archived || archivedIds.has(Number(event.id)));
+}
+
+export async function restoreEvent(id: number): Promise<Event | undefined> {
+  const eventId = Number(id);
+  const events = mockEvents();
+  const idx = events.findIndex((event) => Number(event.id) === eventId);
+
+  forgetArchivedEventId(eventId);
+
+  if (idx < 0) return undefined;
+
+  const restoredEvent: Event = {
+    ...events[idx],
+    archived: false,
+    archivedAt: undefined,
+  };
+
+  events[idx] = restoredEvent;
+  writeMockEvents(events);
+
+  return restoredEvent;
+}
+
 export async function getEvents(): Promise<Event[]> {
-  if (USE_MOCK) return mockEvents();
+  if (USE_MOCK) {
+    const archivedIds = new Set(getArchivedEventIds());
+    return mockEvents().filter((event) => !event.archived && !archivedIds.has(Number(event.id)));
+  }
   return client.get("/api/users/events/");
 }
 
@@ -129,18 +264,12 @@ export async function saveEvent(ev: Event): Promise<Event> {
 
 export async function removeEvent(id: number): Promise<{ ok: true }> {
   if (!USE_MOCK) {
-    await client.del(`/api/users/events/${id}/`);
+    rememberArchivedEventId(id);
+    await client.patch(`/api/users/events/${id}/`, { archived: true, is_archived: true });
     return { ok: true };
   }
 
-  const events = mockEvents().filter((x) => Number(x.id) !== Number(id));
-  const directions = mockDirections().filter((x) => Number(x.eventId) !== Number(id));
-  const directionIds = new Set(directions.map((x) => Number(x.id)));
-  const projects = mockProjects().filter((x) => directionIds.has(Number(x.directionId)));
-
-  writeMockEvents(events);
-  writeMockDirections(directions);
-  writeMockProjects(projects);
+  await archiveEvent(id);
   return { ok: true };
 }
 
@@ -243,8 +372,11 @@ export async function saveProjectsForDirection(directionId: number, projects: Pr
 
 export async function getAllUsers(): Promise<User[]> {
   if (!USE_MOCK) {
+    if (!localStorage.getItem("currentUser")) return [];
     try {
-      return await client.get("/api/users/");
+      const raw = await client.get<unknown[]>("/api/users/");
+      if (!Array.isArray(raw)) return [];
+      return raw.map(mapUserRecord).filter((user): user is User => Boolean(user));
     } catch {
       return [];
     }
@@ -273,6 +405,7 @@ export async function saveUser(user: User): Promise<User> {
 
 export async function getProfile(userId: number): Promise<UnknownRecord | undefined> {
   if (!USE_MOCK) {
+    if (!localStorage.getItem("currentUser")) return undefined;
     try {
       return await client.get("/api/users/profile/");
     } catch {
@@ -292,3 +425,6 @@ export async function saveProfile(userId: number, profile: UnknownRecord) {
   writeLS(LS_PROFILES, profiles);
   return profiles[String(userId)];
 }
+
+
+

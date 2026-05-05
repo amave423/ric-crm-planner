@@ -48,21 +48,27 @@
   justify-content: flex-end;
 }
 
-.close-btn {
+.close-btn,
+.close-btn.ant-btn,
+.close-btn.app-button.ant-btn {
   padding: 8px 14px;
-  background: #fff;
-  color: $primary;
-  border: 1px solid $primary;
+  background: #fff !important;
+  color: $primary !important;
+  border: 1px solid $primary !important;
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .close-btn:hover,
-.close-btn:focus {
-  background: $primary;
-  color: #fff;
-  border-color: $primary;
+.close-btn:focus,
+.close-btn.ant-btn:hover,
+.close-btn.ant-btn:focus,
+.close-btn.app-button.ant-btn:hover,
+.close-btn.app-button.ant-btn:focus {
+  background: $primary !important;
+  color: #fff !important;
+  border-color: $primary !important;
 }
 
 .apply-form {
@@ -208,22 +214,28 @@
   cursor: not-allowed;
 }
 
-.btn-send {
+.btn-send,
+.btn-send.ant-btn,
+.btn-send.app-button.ant-btn {
   padding: 10px 16px;
   border-radius: 10px;
-  background: #fff;
-  color: var(--event-color, #6495ed);
-  border: 1px solid var(--event-color, #6495ed);
+  background: #fff !important;
+  color: var(--event-color, #6495ed) !important;
+  border: 1px solid var(--event-color, #6495ed) !important;
   cursor: pointer;
   font-weight: 600;
   transition: background .12s ease, color .12s ease, border-color .12s ease;
 }
 
 .btn-send:hover,
-.btn-send:focus {
-  background: var(--event-color, #6495ed);
-  color: #fff;
-  border-color: var(--event-color, #6495ed);
+.btn-send:focus,
+.btn-send.ant-btn:hover,
+.btn-send.ant-btn:focus,
+.btn-send.app-button.ant-btn:hover,
+.btn-send.app-button.ant-btn:focus {
+  background: var(--event-color, #6495ed) !important;
+  color: #fff !important;
+  border-color: var(--event-color, #6495ed) !important;
 }
 
 .btn-send:disabled {

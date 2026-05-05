@@ -1,4 +1,4 @@
-﻿import { createContext, useState, useEffect, type ReactNode } from "react";
+﻿import { createContext, useEffect, useRef, useState, type ReactNode } from "react";
 import client from "../api/client";
 import baseUsers from "../mock-data/users.json";
 import { CURRENT_MOCK_SEED_VERSION, LS_MOCK_SEED_VERSION } from "../storage/mockSeed";
@@ -11,6 +11,11 @@ interface User {
   role: string;
   password?: string;
 }
+
+type AuthActionResult = {
+  ok: boolean;
+  error?: string;
+};
 
 type BackendUserRecord = Record<string, unknown>;
 type MockUser = User & { password?: string; confirm?: string };
@@ -29,7 +34,7 @@ type ProfileUpdate = Partial<User> &
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (u: Omit<User, "id"> & { confirm?: string }) => Promise<boolean>;
+  register: (u: Omit<User, "id"> & { confirm?: string }) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
   updateProfile: (u: ProfileUpdate) => Promise<void>;
 }
@@ -93,7 +98,87 @@ function readStoredMockUsers() {
   return JSON.parse(localStorage.getItem(LS_USERS) || "[]") as MockUser[];
 }
 
+function translateBackendMessage(message: string): string {
+  const normalized = message.trim();
+
+  if (!normalized) return message;
+
+  if (normalized === "Passwords do not match.") {
+    return "Пароли не совпадают.";
+  }
+
+  if (normalized === "Invalid credentials.") {
+    return "Неверный email или пароль.";
+  }
+
+  if (normalized === "This password is too common.") {
+    return "Этот пароль слишком простой.";
+  }
+
+  if (normalized === "This password is entirely numeric.") {
+    return "Пароль не должен состоять только из цифр.";
+  }
+
+  const tooShortMatch = normalized.match(
+    /^This password is too short\. It must contain at least (\d+) characters\.$/i
+  );
+  if (tooShortMatch) {
+    return `Пароль слишком короткий. Он должен содержать не менее ${tooShortMatch[1]} символов.`;
+  }
+
+  const tooSimilarMatch = normalized.match(/^The password is too similar to the (.+)\.$/i);
+  if (tooSimilarMatch) {
+    return `Пароль слишком похож на поле "${tooSimilarMatch[1]}".`;
+  }
+
+  return message;
+}
+
+function extractErrorMessage(error: unknown): string | undefined {
+  if (!error) return undefined;
+  if (typeof error === "string") return translateBackendMessage(error);
+
+  if (Array.isArray(error)) {
+    const firstText = error.find((item) => typeof item === "string" && item.trim());
+    return typeof firstText === "string" ? translateBackendMessage(firstText) : undefined;
+  }
+
+  if (typeof error !== "object") return undefined;
+
+  const record = error as Record<string, unknown>;
+  const preferredKeys = [
+    "detail",
+    "message",
+    "password",
+    "passwordConfirmation",
+    "password_confirmation",
+    "email",
+    "nonFieldErrors",
+    "non_field_errors",
+  ];
+
+  for (const key of preferredKeys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return translateBackendMessage(value);
+    if (Array.isArray(value)) {
+      const firstText = value.find((item) => typeof item === "string" && item.trim());
+      if (typeof firstText === "string") return translateBackendMessage(firstText);
+    }
+  }
+
+  for (const value of Object.values(record)) {
+    if (typeof value === "string" && value.trim()) return translateBackendMessage(value);
+    if (Array.isArray(value)) {
+      const firstText = value.find((item) => typeof item === "string" && item.trim());
+      if (typeof firstText === "string") return translateBackendMessage(firstText);
+    }
+  }
+
+  return undefined;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const didBootstrapBackendRef = useRef(false);
   const [user, setUser] = useState<User | null>(() => {
     if (USE_MOCK) {
       ensureMockAuthSeeded();
@@ -115,6 +200,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (USE_MOCK) return;
+    if (didBootstrapBackendRef.current) return;
+    didBootstrapBackendRef.current = true;
+    if (!localStorage.getItem(LS_CURRENT_USER)) {
+      setUser(null);
+      return;
+    }
     (async () => {
       try {
         const info = await client.get("/api/users/user-info/");
@@ -158,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  const registerMock = async (u: Omit<User, "id"> & { confirm?: string }) => {
+  const registerMock = async (u: Omit<User, "id"> & { confirm?: string }): Promise<AuthActionResult> => {
     ensureMockAuthSeeded();
     const newUser: MockUser = { ...u, id: Date.now() };
     const stored = readStoredMockUsers();
@@ -166,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(LS_USERS, JSON.stringify(stored));
     localStorage.setItem(LS_CURRENT_USER, JSON.stringify(newUser));
     setUser(newUser);
-    return true;
+    return { ok: true };
   };
 
   const updateProfileMock = async (u: ProfileUpdate) => {
@@ -200,7 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const registerBackend = async (u: Omit<User, "id"> & { confirm?: string }) => {
+  const registerBackend = async (u: Omit<User, "id"> & { confirm?: string }): Promise<AuthActionResult> => {
     try {
       const payload = {
         email: u.email,
@@ -210,9 +301,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password_confirmation: u.confirm || u.password || "",
       };
       await client.post("/api/users/register/", payload);
-      return await loginBackend(payload.email, payload.password);
-    } catch {
-      return false;
+      const loggedIn = await loginBackend(payload.email, payload.password);
+      return loggedIn ? { ok: true } : { ok: false, error: "Регистрация прошла, но не удалось автоматически войти в аккаунт." };
+    } catch (error) {
+      return {
+        ok: false,
+        error: extractErrorMessage(error) || "Не удалось зарегистрироваться",
+      };
     }
   };
 
@@ -228,6 +323,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         "university",
         "vk",
         "job",
+        "workplace",
+        "specialty",
+        "about",
       ];
       const payload: Record<string, unknown> = {};
       allowed.forEach((k) => {
@@ -282,3 +380,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
+
+

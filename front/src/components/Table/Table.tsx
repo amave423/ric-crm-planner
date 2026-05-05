@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useRef } from "react";
 import { FormOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { Tooltip } from "antd";
 import { AuthContext } from "../../context/AuthContext";
 import "./table.scss";
 import AppButton from "../UI/Button";
@@ -18,6 +19,8 @@ interface Props<T> {
   selectedId?: number;
   gridColumns?: string;
   renderCell?: (row: T, colKey: string) => React.ReactNode | undefined;
+  editIcon?: React.ReactNode;
+  editTooltip?: string;
 }
 
 function buildGridTemplate(columns: Column[], hasActionColumn: boolean, gridColumns?: string) {
@@ -40,6 +43,11 @@ function toDisplay(value: unknown): string {
   return String(value);
 }
 
+function canUseOrganizerActions(role?: string) {
+  const normalized = String(role || "").toLowerCase();
+  return normalized === "organizer" || normalized.includes("admin") || normalized.includes("curator");
+}
+
 export default function Table<T>({
   columns,
   data,
@@ -51,9 +59,11 @@ export default function Table<T>({
   selectedId,
   gridColumns = "",
   renderCell,
+  editIcon,
+  editTooltip,
 }: Props<T>) {
   const { user } = useContext(AuthContext);
-  const isOrganizer = user?.role === "organizer";
+  const isOrganizer = canUseOrganizerActions(user?.role);
   const hasActionColumn = Boolean((isOrganizer && onEdit) || (!isOrganizer && onInfoClick));
   const columnKeys = columns.map((column) => column.key);
   const isEventMobileLayout = ["title", "startDate", "endDate", "organizer", "status"].every((key) => columnKeys.includes(key));
@@ -117,7 +127,7 @@ export default function Table<T>({
             const statusCustom = renderCell?.(row, "status");
 	            const eventApplyCustom = hasApplyColumn ? renderCell?.(row, "apply") : undefined;
 
-            const actionButton =
+            const editActionButton =
               isOrganizer && onEdit ? (
                 <AppButton
                   className="edit-btn-icon"
@@ -126,9 +136,17 @@ export default function Table<T>({
                     onEdit(row);
                   }}
                 >
-                  <FormOutlined />
+                  {editIcon ?? <FormOutlined />}
                 </AppButton>
-              ) : !isOrganizer && onInfoClick ? (
+              ) : null;
+
+            const actionButton = editActionButton ? (
+              editTooltip ? (
+                <Tooltip title={editTooltip}>{editActionButton}</Tooltip>
+              ) : (
+                editActionButton
+              )
+            ) : !isOrganizer && onInfoClick ? (
                 <AppButton
                   className="info-btn"
                   onClick={(event) => {

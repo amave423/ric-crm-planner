@@ -1,13 +1,26 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { AuthContext } from "./AuthContext";
+import {
+  clearNotifications as clearBackendNotifications,
+  createNotification as createBackendNotification,
+  deleteNotification as deleteBackendNotification,
+  getNotifications as getBackendNotifications,
+  markAllNotificationsAsRead as markAllBackendNotificationsAsRead,
+  markNotificationAsRead as markBackendNotificationAsRead,
+} from "../api/notifications";
+import client from "../api/client";
+import {
+  LS_NOTIFICATIONS,
+  NOTIFICATIONS_CHANGED_EVENT,
+  pushNotification,
+  readNotifications,
+} from "../storage/notifications";
 import type { CreateNotificationInput, NotificationItem } from "../types/notification";
-
-const LS_NOTIFICATIONS = "ric_notifications_v1";
+import { AuthContext } from "./AuthContext";
 
 interface NotificationsContextType {
   notifications: NotificationItem[];
   unreadCount: number;
-  addNotification: (input: CreateNotificationInput) => NotificationItem;
+  addNotification: (input: CreateNotificationInput) => void;
   markAllAsRead: () => void;
   markAsRead: (id: string) => void;
   removeNotification: (id: string) => void;
@@ -16,27 +29,49 @@ interface NotificationsContextType {
 
 const NotificationsContext = createContext<NotificationsContextType | null>(null);
 
-function readLS<T>(key: string, fallback: T): T {
-  const raw = localStorage.getItem(key);
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function nextId() {
-  return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+function shouldUseBackendNotifications(isAuthenticated: boolean) {
+  return isAuthenticated && !client.USE_MOCK;
 }
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { user } = useContext(AuthContext);
-  const [items, setItems] = useState<NotificationItem[]>(() => readLS<NotificationItem[]>(LS_NOTIFICATIONS, []));
+  const [items, setItems] = useState<NotificationItem[]>(() => readNotifications());
 
   useEffect(() => {
     localStorage.setItem(LS_NOTIFICATIONS, JSON.stringify(items));
   }, [items]);
+
+  useEffect(() => {
+    if (!client.USE_MOCK) return;
+
+    const syncNotifications = () => {
+      setItems(readNotifications());
+    };
+
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, syncNotifications);
+    window.addEventListener("storage", syncNotifications);
+    return () => {
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, syncNotifications);
+      window.removeEventListener("storage", syncNotifications);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user || !shouldUseBackendNotifications(Boolean(user))) return;
+
+    let cancelled = false;
+    void getBackendNotifications()
+      .then((loaded) => {
+        if (!cancelled) setItems(loaded);
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const notifications = useMemo(() => {
     if (!user) return [];
@@ -48,41 +83,59 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const unreadCount = useMemo(() => notifications.filter((x) => !x.read).length, [notifications]);
 
   const addNotification = useCallback(
-    (input: CreateNotificationInput): NotificationItem => {
-      const created: NotificationItem = {
-        id: nextId(),
-        userId: input.userId ?? user?.id,
-        title: input.title,
-        message: input.message,
-        link: input.link,
-        createdAt: new Date().toISOString(),
-        read: false,
-      };
-      setItems((prev) => [created, ...prev]);
-      return created;
+    (input: CreateNotificationInput) => {
+      if (!user) return;
+
+      if (shouldUseBackendNotifications(Boolean(user))) {
+        void createBackendNotification(input)
+          .then((created) => {
+            setItems((prev) => [created, ...prev.filter((item) => item.id !== created.id)]);
+          })
+          .catch(() => {
+            // Keep the UI stable if the backend is temporarily unavailable.
+          });
+        return;
+      }
+
+      pushNotification({ ...input, userId: input.userId ?? user.id });
+      setItems(readNotifications());
     },
-    [user?.id]
+    [user]
   );
 
   const markAllAsRead = useCallback(() => {
     if (!user) return;
+
     setItems((prev) =>
       prev.map((x) => {
         const belongsToCurrent = typeof x.userId === "undefined" || Number(x.userId) === Number(user.id);
         return belongsToCurrent && !x.read ? { ...x, read: true } : x;
       })
     );
+
+    if (shouldUseBackendNotifications(Boolean(user))) {
+      void markAllBackendNotificationsAsRead().catch(() => {
+        // No-op, optimistic UI already updated.
+      });
+    }
   }, [user]);
 
   const markAsRead = useCallback(
     (id: string) => {
       if (!user) return;
+
       setItems((prev) =>
         prev.map((x) => {
           const belongsToCurrent = typeof x.userId === "undefined" || Number(x.userId) === Number(user.id);
           return x.id === id && belongsToCurrent && !x.read ? { ...x, read: true } : x;
         })
       );
+
+      if (shouldUseBackendNotifications(Boolean(user)) && /^\d+$/.test(id)) {
+        void markBackendNotificationAsRead(id).catch(() => {
+          // No-op, optimistic UI already updated.
+        });
+      }
     },
     [user]
   );
@@ -90,16 +143,30 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const removeNotification = useCallback(
     (id: string) => {
       if (!user) return;
+
       setItems((prev) => prev.filter((x) => x.id !== id));
+
+      if (shouldUseBackendNotifications(Boolean(user)) && /^\d+$/.test(id)) {
+        void deleteBackendNotification(id).catch(() => {
+          // No-op, optimistic UI already updated.
+        });
+      }
     },
     [user]
   );
 
-  const clearNotifications = useCallback(() => {
+  const clearNotificationsHandler = useCallback(() => {
     if (!user) return;
+
     setItems((prev) =>
       prev.filter((x) => typeof x.userId !== "undefined" && Number(x.userId) !== Number(user.id))
     );
+
+    if (shouldUseBackendNotifications(Boolean(user))) {
+      void clearBackendNotifications().catch(() => {
+        // No-op, optimistic UI already updated.
+      });
+    }
   }, [user]);
 
   const value = useMemo<NotificationsContextType>(
@@ -110,9 +177,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       markAllAsRead,
       markAsRead,
       removeNotification,
-      clearNotifications,
+      clearNotifications: clearNotificationsHandler,
     }),
-    [notifications, unreadCount, addNotification, markAllAsRead, markAsRead, removeNotification, clearNotifications]
+    [notifications, unreadCount, addNotification, markAllAsRead, markAsRead, removeNotification, clearNotificationsHandler]
   );
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
@@ -121,7 +188,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 export function useNotifications() {
   const ctx = useContext(NotificationsContext);
   if (!ctx) {
-    throw new Error("useNotifications must be used inside NotificationsProvider");
+    throw new Error("useNotifications должен использоваться внутри NotificationsProvider");
   }
   return ctx;
 }
