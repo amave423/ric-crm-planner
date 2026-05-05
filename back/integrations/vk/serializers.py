@@ -15,6 +15,8 @@ class VKSendTestSerializer(serializers.Serializer):
 class VKApplicationMessageSerializer(serializers.Serializer):
     subject = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
     message = serializers.CharField(required=True, allow_blank=False, trim_whitespace=True)
+    include_chat_link = serializers.BooleanField(required=False, default=False)
+    chat_url = serializers.URLField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         subject = attrs.get("subject", "").strip()

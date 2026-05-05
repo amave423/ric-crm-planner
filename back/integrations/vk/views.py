@@ -1,7 +1,9 @@
+import logging
 import secrets
 
 from django.conf import settings
-from django.shortcuts import get_object_or_404
+from django.core import signing
+from django.shortcuts import get_object_or_404, redirect
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -15,9 +17,19 @@ from rest_framework.views import APIView
 from users.models import Application
 from users.permissions import CuratorOrAdminPermission
 
-from .crm_notifications import notify_organizers_about_vk_error, send_application_vk_message
+from .crm_notifications import (
+    CHAT_LINK_PLACEHOLDER,
+    inject_application_chat_link,
+    mark_application_chat_link_opened,
+    notify_organizers_about_vk_error,
+    send_application_vk_message,
+)
+from .planner_invites import handle_vk_message_event, handle_vk_message_new_event, send_planner_invites_for_event
 from .serializers import VKApplicationMessageSerializer, VKSendTestSerializer
 from .services import VKAPIError, VKConfigurationError, normalize_vk_group_id, send_vk_message
+
+
+logger = logging.getLogger(__name__)
 
 
 def plain_response(text: str, status_code: int = status.HTTP_200_OK) -> HttpResponse:
@@ -56,6 +68,20 @@ class VKCallbackView(APIView):
             received_secret = str(payload.get("secret", ""))
             if not secrets.compare_digest(received_secret, expected_secret):
                 return Response({"detail": "Invalid VK callback secret."}, status=status.HTTP_403_FORBIDDEN)
+
+        if event_type == "message_new":
+            try:
+                handle_vk_message_new_event(payload)
+            except (VKConfigurationError, VKAPIError, ValueError) as exc:
+                # VK must receive "ok"; business errors are handled by follow-up bot messages when possible.
+                logger.warning("VK message_new handling failed: %s", exc, exc_info=True)
+                pass
+        elif event_type == "message_event":
+            try:
+                handle_vk_message_event(payload)
+            except (VKConfigurationError, VKAPIError, ValueError) as exc:
+                logger.warning("VK message_event handling failed: %s", exc, exc_info=True)
+                pass
 
         return plain_response("ok")
 
@@ -102,11 +128,67 @@ class VKApplicationMessageView(APIView):
         )
         serializer = VKApplicationMessageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        message = serializer.validated_data["text"]
+        if serializer.validated_data.get("include_chat_link") or CHAT_LINK_PLACEHOLDER in message:
+            message = inject_application_chat_link(
+                message,
+                application,
+                request,
+                chat_url=serializer.validated_data.get("chat_url", ""),
+            )
 
         try:
-            message_id = send_application_vk_message(application, serializer.validated_data["text"])
+            message_id = send_application_vk_message(application, message)
         except (VKConfigurationError, VKAPIError, ValueError) as exc:
             notify_organizers_about_vk_error(application, str(exc))
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({"message_id": message_id}, status=status.HTTP_200_OK)
+
+
+class VKPlannerInviteView(APIView):
+    permission_classes = (CuratorOrAdminPermission,)
+
+    @swagger_auto_schema(
+        operation_summary="Send planner invite VK messages",
+        operation_description=(
+            "Sends planner readiness VK messages with Accept/Decline buttons "
+            "to applications in status Добавился в орг. чат for the event."
+        ),
+        responses={200: openapi.Response("VK planner invite result"), 503: "VK is disabled or not configured"},
+    )
+    def post(self, request, event_id: int):
+        try:
+            result = send_planner_invites_for_event(event_id)
+        except VKConfigurationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class VKChatLinkRedirectView(APIView):
+    authentication_classes = ()
+    permission_classes = (AllowAny,)
+
+    @swagger_auto_schema(
+        operation_summary="Open individual VK chat link",
+        operation_description=(
+            "Marks application as joined to org chat by signed token and redirects projectant to VK chat."
+        ),
+        responses={302: "Redirect to VK chat", 400: "Invalid or expired token", 503: "VK chat url is not configured"},
+    )
+    def get(self, request, token: str):
+        try:
+            _, redirect_url = mark_application_chat_link_opened(token)
+        except signing.SignatureExpired:
+            return Response({"detail": "VK chat link has expired."}, status=status.HTTP_400_BAD_REQUEST)
+        except (signing.BadSignature, KeyError, Application.DoesNotExist):
+            return Response({"detail": "Invalid VK chat link."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not redirect_url:
+            return Response(
+                {"detail": "VK org chat url is not configured."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        return redirect(redirect_url)

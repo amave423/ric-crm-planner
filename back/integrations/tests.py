@@ -2,12 +2,19 @@ import json
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core import signing
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from integrations.vk.crm_notifications import notify_application_testing_started
+from integrations.vk.crm_notifications import CHAT_LINK_SALT, notify_application_testing_started
+from integrations.vk.planner_invites import (
+    build_welcome_keyboard,
+    handle_planner_invite_payload,
+    handle_vk_start_message,
+    send_planner_invites_for_event,
+)
 from integrations.vk.services import VKAPIError, extract_vk_screen_name, normalize_vk_group_id, send_vk_message
 from users.models import Application, Event, Profile, Status
 
@@ -113,6 +120,8 @@ class VKCRMNotificationTests(TestCase):
         )
         self.default_status = Status.objects.create(name="Прислал заявку")
         self.testing_status = Status.objects.create(name="Прохождение тестирования")
+        self.chat_link_sent_status = Status.objects.create(name="Отправлена ссылка на орг. чат")
+        self.chat_joined_status = Status.objects.create(name="Добавился в орг. чат")
         self.application = Application.objects.create(
             user=self.user,
             event=self.event,
@@ -144,3 +153,188 @@ class VKCRMNotificationTests(TestCase):
         )
 
         send_vk_message_mock.assert_not_called()
+
+    @override_settings(VK_ORG_CHAT_URL="https://vk.com/im?sel=c1", VK_CHAT_LINK_MAX_AGE_SECONDS=3600)
+    def test_chat_link_redirect_updates_application_status(self):
+        self.application.status = self.chat_link_sent_status
+        self.application.save(update_fields=["status"])
+        token = signing.dumps({"application_id": self.application.id}, salt=CHAT_LINK_SALT)
+
+        response = self.client.get(f"/api/integrations/vk/chat-links/{token}/")
+
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.assertEqual(response["Location"], "https://vk.com/im?sel=c1")
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status.name, "Добавился в орг. чат")
+
+    @override_settings(VK_ORG_CHAT_URL="", VK_CHAT_LINK_MAX_AGE_SECONDS=3600)
+    def test_chat_link_redirect_uses_event_org_chat_url(self):
+        self.application.status = self.chat_link_sent_status
+        self.application.save(update_fields=["status"])
+        self.event.org_chat_url = "https://vk.me/join/event-chat"
+        self.event.save(update_fields=["org_chat_url"])
+        token = signing.dumps({"application_id": self.application.id}, salt=CHAT_LINK_SALT)
+
+        response = self.client.get(f"/api/integrations/vk/chat-links/{token}/")
+
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.assertEqual(response["Location"], "https://vk.me/join/event-chat")
+
+    @override_settings(VK_ORG_CHAT_URL="https://vk.com/im?sel=c1", VK_CHAT_LINK_MAX_AGE_SECONDS=3600)
+    def test_chat_link_redirect_does_not_update_wrong_current_status(self):
+        token = signing.dumps({"application_id": self.application.id}, salt=CHAT_LINK_SALT)
+
+        response = self.client.get(f"/api/integrations/vk/chat-links/{token}/")
+
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status.name, "Прохождение тестирования")
+
+    @override_settings(VK_ENABLED=True)
+    @patch("integrations.vk.planner_invites.send_vk_message")
+    def test_send_planner_invites_for_event_sends_joined_chat_applications(self, send_vk_message_mock):
+        send_vk_message_mock.return_value = 9
+        self.application.status = self.chat_joined_status
+        self.application.save(update_fields=["status"])
+
+        result = send_planner_invites_for_event(self.event.id)
+
+        self.assertEqual(result, {"sent": 1, "failed": 0, "skipped": 0})
+        send_vk_message_mock.assert_called_once()
+        self.assertEqual(send_vk_message_mock.call_args.kwargs["user_id"], 123456)
+        keyboard = send_vk_message_mock.call_args.kwargs["keyboard"]
+        self.assertEqual(keyboard["buttons"][0][0]["action"]["type"], "callback")
+
+    @override_settings(VK_ENABLED=True, VK_CALLBACK_SECRET="")
+    @patch("integrations.vk.views.handle_vk_message_event")
+    def test_vk_message_event_callback_routes_to_handler(self, handle_event_mock):
+        response = self.client.post(
+            "/api/integrations/vk/callback/",
+            {
+                "type": "message_event",
+                "object": {
+                    "user_id": 123456,
+                    "peer_id": 123456,
+                    "event_id": "event-id",
+                    "payload": {"type": "planner_invite", "action": "accept", "application_id": self.application.id},
+                },
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        handle_event_mock.assert_called_once()
+
+    @override_settings(VK_ENABLED=True)
+    @patch("integrations.vk.planner_invites.send_vk_message")
+    @patch("integrations.vk.planner_invites.delete_vk_message")
+    @patch("integrations.vk.planner_invites.answer_vk_message_event")
+    def test_vk_message_event_deletes_source_message(self, answer_event_mock, delete_message_mock, send_vk_message_mock):
+        self.application.status = self.chat_joined_status
+        self.application.save(update_fields=["status"])
+
+        from integrations.vk.planner_invites import handle_vk_message_event
+
+        handled = handle_vk_message_event(
+            {
+                "type": "message_event",
+                "object": {
+                    "user_id": 123456,
+                    "peer_id": 123456,
+                    "event_id": "event-id",
+                    "conversation_message_id": 55,
+                    "payload": {"type": "planner_invite", "action": "accept", "application_id": self.application.id},
+                },
+            }
+        )
+
+        self.assertTrue(handled)
+        answer_event_mock.assert_called_once()
+        delete_message_mock.assert_called_once_with(
+            peer_id=123456,
+            message_id=None,
+            conversation_message_id=55,
+        )
+        send_vk_message_mock.assert_called_once()
+
+    @override_settings(VK_ENABLED=True, VK_CALLBACK_SECRET="")
+    @patch("integrations.vk.views.handle_vk_message_new_event")
+    def test_vk_message_new_callback_routes_to_handler(self, handle_new_mock):
+        response = self.client.post(
+            "/api/integrations/vk/callback/",
+            {
+                "type": "message_new",
+                "object": {"message": {"from_id": 123456, "text": "Начать"}},
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        handle_new_mock.assert_called_once()
+
+    @override_settings(VK_ENABLED=True, VK_BOT_FRONTEND_URL="https://crm.example.test")
+    @patch("integrations.vk.planner_invites.send_vk_message")
+    def test_vk_start_message_sends_welcome_keyboard(self, send_vk_message_mock):
+        handled = handle_vk_start_message({"from_id": 123456, "text": "Начать"})
+
+        self.assertTrue(handled)
+        send_vk_message_mock.assert_called_once()
+        self.assertEqual(send_vk_message_mock.call_args.kwargs["user_id"], 123456)
+        keyboard = send_vk_message_mock.call_args.kwargs["keyboard"]
+        self.assertEqual(keyboard["buttons"][0][0]["action"]["type"], "open_link")
+        self.assertEqual(keyboard["buttons"][0][0]["action"]["link"], "https://crm.example.test")
+
+    @override_settings(VK_ENABLED=True, VK_BOT_FRONTEND_URL="https://crm.example.test")
+    @patch("integrations.vk.planner_invites.send_vk_message")
+    def test_vk_start_payload_sends_welcome_keyboard(self, send_vk_message_mock):
+        handled = handle_vk_start_message({"from_id": 123456, "text": "", "payload": '{"command":"start"}'})
+
+        self.assertTrue(handled)
+        send_vk_message_mock.assert_called_once()
+
+    @override_settings(VK_BOT_FRONTEND_URL="http://localhost:5173")
+    def test_vk_welcome_keyboard_skips_invalid_public_link(self):
+        self.assertIsNone(build_welcome_keyboard())
+
+    @override_settings(VK_ENABLED=True, VK_CALLBACK_SECRET="")
+    @patch("integrations.vk.planner_invites.send_vk_message")
+    def test_vk_planner_invite_accept_callback_updates_application_status(self, send_vk_message_mock):
+        self.application.status = self.chat_joined_status
+        self.application.save(update_fields=["status"])
+        handle_planner_invite_payload(
+            from_id=123456,
+            payload={"type": "planner_invite", "action": "accept", "application_id": self.application.id},
+        )
+
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status.name, "Приступил к ПШ")
+        send_vk_message_mock.assert_called_once()
+
+    @override_settings(VK_ENABLED=True, VK_CALLBACK_SECRET="")
+    @patch("integrations.vk.planner_invites.send_vk_message")
+    def test_vk_planner_invite_decline_asks_confirmation(self, send_vk_message_mock):
+        self.application.status = self.chat_joined_status
+        self.application.save(update_fields=["status"])
+        handle_planner_invite_payload(
+            from_id=123456,
+            payload={"type": "planner_invite", "action": "decline", "application_id": self.application.id},
+        )
+
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status.name, "Добавился в орг. чат")
+        send_vk_message_mock.assert_called_once()
+        self.assertIn("Вы уверены", send_vk_message_mock.call_args.kwargs["message"])
+
+    @override_settings(VK_ENABLED=True, VK_CALLBACK_SECRET="")
+    @patch("integrations.vk.planner_invites.send_vk_message")
+    def test_vk_planner_invite_decline_confirm_updates_application_status(self, send_vk_message_mock):
+        self.application.status = self.chat_joined_status
+        self.application.save(update_fields=["status"])
+        handle_planner_invite_payload(
+            from_id=123456,
+            payload={"type": "planner_invite", "action": "decline_confirm", "application_id": self.application.id},
+        )
+
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status.name, "Удален с ПШ")
+        send_vk_message_mock.assert_called_once()

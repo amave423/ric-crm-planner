@@ -3,6 +3,7 @@ import random
 import re
 import urllib.parse
 import urllib.request
+from typing import Any
 from dataclasses import dataclass
 
 from django.conf import settings
@@ -123,20 +124,68 @@ def resolve_vk_user_id(value: str | int | None) -> int | None:
     return int(users[0]["id"])
 
 
-def send_vk_message(*, message: str, user_id: int | None = None, peer_id: int | None = None) -> int:
+def send_vk_message(
+    *,
+    message: str,
+    user_id: int | None = None,
+    peer_id: int | None = None,
+    keyboard: dict[str, Any] | None = None,
+) -> int:
     normalized_message = message.strip()
     if not normalized_message:
         raise ValueError("Message must not be empty.")
     if user_id is None and peer_id is None:
         raise ValueError("Either user_id or peer_id is required.")
 
-    data = call_vk_method(
-        "messages.send",
+    payload: dict[str, str | int] = {
+        **({"peer_id": peer_id} if peer_id is not None else {"user_id": user_id or 0}),
+        "message": normalized_message,
+        "random_id": random.randint(1, 2_147_483_647),
+    }
+    if keyboard:
+        payload["keyboard"] = json.dumps(keyboard, ensure_ascii=False)
+
+    data = call_vk_method("messages.send", payload)
+
+    return int(data.get("response", 0))
+
+
+def answer_vk_message_event(*, event_id: str, user_id: int, peer_id: int, text: str = "Готово") -> None:
+    if not event_id:
+        return
+
+    call_vk_method(
+        "messages.sendMessageEventAnswer",
         {
-            **({"peer_id": peer_id} if peer_id is not None else {"user_id": user_id or 0}),
-            "message": normalized_message,
-            "random_id": random.randint(1, 2_147_483_647),
+            "event_id": event_id,
+            "user_id": user_id,
+            "peer_id": peer_id,
+            "event_data": json.dumps(
+                {
+                    "type": "show_snackbar",
+                    "text": text,
+                },
+                ensure_ascii=False,
+            ),
         },
     )
 
-    return int(data.get("response", 0))
+
+def delete_vk_message(
+    *,
+    peer_id: int,
+    message_id: int | None = None,
+    conversation_message_id: int | None = None,
+) -> None:
+    payload: dict[str, str | int] = {
+        "delete_for_all": 1,
+    }
+    if conversation_message_id:
+        payload["peer_id"] = peer_id
+        payload["cmids"] = conversation_message_id
+    elif message_id:
+        payload["message_ids"] = message_id
+    else:
+        return
+
+    call_vk_method("messages.delete", payload)
