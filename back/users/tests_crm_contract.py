@@ -11,6 +11,8 @@ from rest_framework.test import APIClient
 from users.models import (
     Application,
     CRMRole,
+    CRMAutomationConfig,
+    CRMAutomationExecutionLog,
     Direction,
     Event,
     Notification,
@@ -18,7 +20,9 @@ from users.models import (
     ROLE_CURATOR,
     ROLE_PROJECTANT,
     Specialization,
+    Status,
 )
+from users.automation_engine import run_due_crm_automation
 
 
 @override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
@@ -215,6 +219,113 @@ class CRMContractTests(TestCase):
 
         mark_all_response = self.client.post(reverse("notification-mark-all-read"))
         self.assertEqual(mark_all_response.status_code, status.HTTP_200_OK)
+
+    def test_curator_can_manage_crm_automation_config(self):
+        self.client.force_authenticate(user=self.curator)
+
+        response = self.client.get(reverse("crm-automation-config", kwargs={"event_id": self.event.id}))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["scope"], "crm")
+        self.assertEqual(response.data["eventId"], self.event.id)
+        self.assertTrue(response.data["stages"])
+        self.assertTrue(response.data["triggers"])
+        self.assertTrue(response.data["robots"])
+
+    def test_crm_delayed_robot_runs_from_backend_queue(self):
+        submitted_status = Status.objects.get_or_create(name="Прислал заявку")[0]
+        testing_status = Status.objects.get_or_create(name="Прохождение тестирования")[0]
+        application = Application.objects.create(
+            user=self.projectant,
+            event=self.event,
+            direction=self.direction,
+            message="Ready",
+            date_sub=timezone.now(),
+            date_end=self.event.end_app_date,
+            status=submitted_status,
+        )
+        config = CRMAutomationConfig.objects.create(
+            scope="crm",
+            event=self.event,
+            stages=[
+                {"id": "application-submitted", "title": "Прислал заявку", "description": ""},
+                {"id": "application-testing", "title": "Прохождение тестирования", "description": ""},
+            ],
+            triggers=[],
+            robots=[
+                {
+                    "id": "delayed-test-notification",
+                    "stageId": "application-testing",
+                    "title": "Отложенное уведомление",
+                    "description": "",
+                    "action": "notification.user",
+                    "enabled": True,
+                    "settings": {
+                        "runMode": "queue",
+                        "timing": "delayed",
+                        "delayMinutes": 1,
+                        "condition": {"mode": "all", "rules": []},
+                    },
+                    "subject": "Тестирование",
+                    "message": "Откройте тестирование.",
+                }
+            ],
+        )
+        self.client.force_authenticate(user=self.curator)
+
+        response = self.client.patch(
+            reverse("application-detail", kwargs={"application_id": application.id}),
+            {"status": testing_status.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        log = CRMAutomationExecutionLog.objects.get(config=config, rule_id="delayed-test-notification")
+        self.assertEqual(log.status, CRMAutomationExecutionLog.STATUS_PENDING)
+        self.assertFalse(Notification.objects.filter(user=self.projectant, title="Тестирование").exists())
+
+        log.scheduled_for = timezone.now() - timedelta(minutes=1)
+        log.save(update_fields=["scheduled_for"])
+        result = run_due_crm_automation()
+
+        self.assertEqual(result["processed"], 1)
+        self.assertEqual(result["changed"], 1)
+        self.assertTrue(Notification.objects.filter(user=self.projectant, title="Тестирование").exists())
+
+    def test_curator_can_create_notification_for_projectant(self):
+        self.client.force_authenticate(user=self.curator)
+
+        response = self.client.post(
+            reverse("notification-list"),
+            {
+                "userId": self.projectant.id,
+                "title": "Системное уведомление",
+                "message": "Проверьте следующий шаг.",
+                "link": "/requests",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        notification = Notification.objects.get(user=self.projectant, title="Системное уведомление")
+        self.assertEqual(notification.message, "Проверьте следующий шаг.")
+
+    def test_projectant_cannot_create_notification_for_other_user(self):
+        self.client.force_authenticate(user=self.projectant)
+
+        response = self.client.post(
+            reverse("notification-list"),
+            {
+                "userId": self.curator.id,
+                "title": "Недоступно",
+                "message": "Нет прав.",
+                "link": "/requests",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Notification.objects.filter(user=self.curator, title="Недоступно").exists())
 
     def test_projectant_can_delete_own_application(self):
         application = Application.objects.create(

@@ -6,6 +6,8 @@ from .models import (
     Answer,
     Application,
     Contact,
+    CRMAutomationConfig,
+    CRMAutomationExecutionLog,
     Direction,
     Event,
     EventSpecialization,
@@ -54,6 +56,8 @@ admin.site.register(EventSpecialization)
 admin.site.register(Direction)
 admin.site.register(Status)
 admin.site.register(Application)
+admin.site.register(CRMAutomationConfig)
+admin.site.register(CRMAutomationExecutionLog)
 admin.site.register(Test)
 admin.site.register(Question)
 admin.site.register(Answer)

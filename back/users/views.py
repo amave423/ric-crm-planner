@@ -34,6 +34,9 @@ from users.permissions import (
 from users.serializers import (
     ApplicationCreateSerializer,
     ApplicationSerializer,
+    CRMAutomationConfigPayloadSerializer,
+    CRMAutomationConfigSerializer,
+    CRMAutomationExecutionLogSerializer,
     DirectionSerializer,
     EmailConfirmationSerializer,
     EventSerializer,
@@ -58,6 +61,8 @@ from users.serializers import (
 from users.models import (
     Application,
     Answer,
+    CRMAutomationConfig,
+    CRMAutomationExecutionLog,
     Direction,
     Event,
     Notification,
@@ -71,6 +76,8 @@ from users.models import (
     TestSession,
     TrueAnswer,
 )
+from users.automation_defaults import create_default_crm_automation_config
+from users.automation_engine import run_crm_automation, run_due_crm_automation
 
 TAG_AUTH = "Auth"
 TAG_USERS = "Users"
@@ -878,6 +885,7 @@ class ApplicationListView(ListCreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
+        run_crm_automation(instance, "application.created", request=request)
         output = ApplicationSerializer(instance, context=self.get_serializer_context())
         headers = self.get_success_headers(output.data)
         return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
@@ -978,6 +986,34 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
         self.perform_destroy(application)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def perform_update(self, serializer):
+        previous_status = serializer.instance.status.name if serializer.instance.status_id else ""
+        instance = serializer.save()
+        current_status = instance.status.name if instance.status_id else ""
+        if previous_status == current_status:
+            return
+
+        run_crm_automation(
+            instance,
+            "request.status_changed",
+            previous_status=previous_status,
+            request=self.request,
+        )
+        if current_status == "Прохождение тестирования":
+            run_crm_automation(
+                instance,
+                "testing.started",
+                previous_status=previous_status,
+                request=self.request,
+            )
+        if current_status == "Добавился в орг. чат":
+            run_crm_automation(
+                instance,
+                "notification.chat_link_opened",
+                previous_status=previous_status,
+                request=self.request,
+            )
+
     def get_queryset(self):
         queryset = Application.objects.select_related(
             "user", "direction", "event", "project", "specialization", "status"
@@ -987,6 +1023,71 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
             return queryset
 
         return queryset.filter(user=self.request.user)
+
+
+class CRMAutomationConfigView(RetrieveUpdateAPIView):
+    permission_classes = (CuratorOrAdminPermission,)
+    serializer_class = CRMAutomationConfigSerializer
+
+    def get_object(self):
+        event_id = int(self.kwargs["event_id"])
+        config = CRMAutomationConfig.objects.filter(
+            scope=CRMAutomationConfig.SCOPE_CRM,
+            event_id=event_id,
+        ).first()
+        if config:
+            return config
+        event = get_object_or_404(Event, pk=event_id, is_archived=False)
+        defaults = create_default_crm_automation_config(event_id)
+        return CRMAutomationConfig.objects.create(
+            scope=CRMAutomationConfig.SCOPE_CRM,
+            event=event,
+            stages=defaults["stages"],
+            triggers=defaults["triggers"],
+            robots=defaults["robots"],
+        )
+
+    def put(self, request, *args, **kwargs):
+        return self._save_config(request)
+
+    def patch(self, request, *args, **kwargs):
+        return self._save_config(request, partial=True)
+
+    def _save_config(self, request, partial=False):
+        event_id = int(self.kwargs["event_id"])
+        event = get_object_or_404(Event, pk=event_id, is_archived=False)
+        config = self.get_object()
+        serializer = CRMAutomationConfigPayloadSerializer(data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        config.scope = CRMAutomationConfig.SCOPE_CRM
+        config.event = event
+        if "stages" in data:
+            config.stages = data["stages"]
+        if "triggers" in data:
+            config.triggers = data["triggers"]
+        if "robots" in data:
+            config.robots = data["robots"]
+        config.save()
+        return Response(CRMAutomationConfigSerializer(config).data)
+
+
+class CRMAutomationExecutionLogListView(ListAPIView):
+    permission_classes = (CuratorOrAdminPermission,)
+    serializer_class = CRMAutomationExecutionLogSerializer
+
+    def get_queryset(self):
+        return CRMAutomationExecutionLog.objects.filter(
+            event_id=self.kwargs["event_id"],
+            config__scope=CRMAutomationConfig.SCOPE_CRM,
+        ).select_related("config", "application")
+
+
+class CRMAutomationPendingRunView(APIView):
+    permission_classes = (CuratorOrAdminPermission,)
+
+    def post(self, request, *args, **kwargs):
+        return Response(run_due_crm_automation())
 
 
 class IntegrationApplicationMixin:

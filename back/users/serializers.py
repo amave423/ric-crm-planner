@@ -14,10 +14,14 @@ from rest_framework.serializers import ModelSerializer, Serializer
 
 from integrations.vk.crm_notifications import notify_application_testing_started
 
+from users.automation_defaults import create_default_crm_automation_config
+
 from .models import CRMRole, ROLE_PROJECTANT, ROLE_CURATOR, ROLE_ADMIN
 from .models import (
     Answer,
     Application,
+    CRMAutomationConfig,
+    CRMAutomationExecutionLog,
     Direction,
     Event,
     EventSpecialization,
@@ -38,8 +42,10 @@ DEFAULT_APPLICATION_STATUS_NAME = "Прислал заявку"
 DEFAULT_APPLICATION_STATUS_NAMES = (
     "Прислал заявку",
     "Прохождение тестирования",
-    "Добавился в орг чат",
+    "Отправлена ссылка на орг. чат",
+    "Добавился в орг. чат",
     "Приступил к ПШ",
+    "Удален с ПШ",
 )
 TESTING_APPLICATION_STATUS_NAME = "Прохождение тестирования"
 
@@ -359,6 +365,7 @@ class EventSerializer(ModelSerializer):
     organizerName = serializers.SerializerMethodField()
     archived = serializers.BooleanField(source="is_archived", required=False)
     archivedAt = serializers.DateTimeField(source="archived_at", read_only=True)
+    orgChatUrl = serializers.URLField(source="org_chat_url", required=False, allow_blank=True)
     applicationFormFields = serializers.JSONField(source="application_form_fields", required=False)
     specializations = serializers.PrimaryKeyRelatedField(
         queryset=Specialization.objects.all(),
@@ -391,6 +398,8 @@ class EventSerializer(ModelSerializer):
             "archived",
             "archived_at",
             "archivedAt",
+            "org_chat_url",
+            "orgChatUrl",
             "application_form_fields",
             "applicationFormFields",
         )
@@ -803,15 +812,122 @@ class NotificationSerializer(ModelSerializer):
 
 
 class NotificationCreateSerializer(ModelSerializer):
+    userId = serializers.PrimaryKeyRelatedField(
+        source="user",
+        queryset=get_user_model().objects.all(),
+        required=False,
+        write_only=True,
+    )
+
     class Meta:
         model = Notification
-        fields = ("title", "message", "link")
+        fields = ("userId", "title", "message", "link")
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        current_user = getattr(request, "user", None)
+        target_user = attrs.get("user") or current_user
+
+        if target_user != current_user:
+            can_notify_others = (
+                getattr(current_user, "is_superuser", False)
+                or getattr(current_user, "is_staff", False)
+                or CRMRole.objects.filter(user=current_user, role_type__in=(ROLE_CURATOR, ROLE_ADMIN)).exists()
+            )
+            if not can_notify_others:
+                raise serializers.ValidationError({"userId": "Недостаточно прав для создания уведомления другому пользователю."})
+
+        attrs["user"] = target_user
+        return attrs
 
     def create(self, validated_data):
         return Notification.objects.create(
-            user=self.context["request"].user,
             **validated_data,
         )
+
+
+class CRMAutomationConfigSerializer(ModelSerializer):
+    eventId = serializers.IntegerField(source="event_id")
+    updatedAt = serializers.DateTimeField(source="updated_at", read_only=True)
+
+    class Meta:
+        model = CRMAutomationConfig
+        fields = (
+            "id",
+            "scope",
+            "eventId",
+            "updatedAt",
+            "stages",
+            "triggers",
+            "robots",
+        )
+        read_only_fields = ("id", "updatedAt")
+
+    def validate_scope(self, value):
+        if value != CRMAutomationConfig.SCOPE_CRM:
+            raise serializers.ValidationError("Для CRM поддерживается только scope=crm.")
+        return value
+
+    def validate(self, attrs):
+        attrs["scope"] = CRMAutomationConfig.SCOPE_CRM
+        return attrs
+
+
+class CRMAutomationConfigPayloadSerializer(Serializer):
+    scope = serializers.CharField(required=False, default=CRMAutomationConfig.SCOPE_CRM)
+    eventId = serializers.IntegerField(required=False)
+    stages = serializers.ListField(child=serializers.DictField(), required=False)
+    triggers = serializers.ListField(child=serializers.DictField(), required=False)
+    robots = serializers.ListField(child=serializers.DictField(), required=False)
+
+    def validate_scope(self, value):
+        if value != CRMAutomationConfig.SCOPE_CRM:
+            raise serializers.ValidationError("Для CRM поддерживается только scope=crm.")
+        return value
+
+    def to_representation(self, instance):
+        if isinstance(instance, CRMAutomationConfig):
+            return CRMAutomationConfigSerializer(instance).data
+        return super().to_representation(instance)
+
+
+class CRMAutomationExecutionLogSerializer(ModelSerializer):
+    eventId = serializers.IntegerField(source="event_id", read_only=True)
+    applicationId = serializers.IntegerField(source="application_id", read_only=True)
+    entityType = serializers.CharField(source="entity_type", read_only=True)
+    entityId = serializers.CharField(source="entity_id", read_only=True)
+    eventCode = serializers.CharField(source="event_code", read_only=True)
+    ruleKind = serializers.CharField(source="rule_kind", read_only=True)
+    ruleId = serializers.CharField(source="rule_id", read_only=True)
+    runKey = serializers.CharField(source="run_key", read_only=True)
+    scheduledFor = serializers.DateTimeField(source="scheduled_for", read_only=True)
+    executedAt = serializers.DateTimeField(source="executed_at", read_only=True)
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+
+    class Meta:
+        model = CRMAutomationExecutionLog
+        fields = (
+            "id",
+            "eventId",
+            "applicationId",
+            "entityType",
+            "entityId",
+            "eventCode",
+            "ruleKind",
+            "ruleId",
+            "runKey",
+            "status",
+            "message",
+            "context",
+            "scheduledFor",
+            "executedAt",
+            "createdAt",
+        )
+        read_only_fields = fields
+
+
+def serialize_default_crm_automation_config(event_id: int) -> dict:
+    return create_default_crm_automation_config(event_id)
 
 
 class SpecializationSerializer(ModelSerializer):
