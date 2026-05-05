@@ -35,6 +35,7 @@ export default function EventForm() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [applyDeadline, setApplyDeadline] = useState("");
+  const [orgChatUrl, setOrgChatUrl] = useState("");
   const [selectedOrganizerIds, setSelectedOrganizerIds] = useState<string[]>([]);
   const [selectedOrganizerId, setSelectedOrganizerId] = useState("");
   const [specializations, setSpecializations] = useState<SpecializationOption[]>([]);
@@ -57,10 +58,11 @@ export default function EventForm() {
         startDate,
         endDate,
         applyDeadline,
+        orgChatUrl,
         selectedOrganizerIds,
         specializations,
       }),
-    [applyDeadline, description, endDate, selectedOrganizerIds, specializations, startDate, title]
+    [applyDeadline, description, endDate, orgChatUrl, selectedOrganizerIds, specializations, startDate, title]
   );
 
   useEffect(() => {
@@ -99,6 +101,7 @@ export default function EventForm() {
       setStartDate(normalizeDateFieldValue(event.startDate));
       setEndDate(normalizeDateFieldValue(event.endDate));
       setApplyDeadline(normalizeDateFieldValue(event.applyDeadline));
+      setOrgChatUrl(event.orgChatUrl || "");
       setSelectedOrganizerIds((event.organizerIds?.length ? event.organizerIds : event.leader ? [event.leader] : []).map(String));
       setSelectedOrganizerId("");
       setSpecializations((event.specializations || []).map((item) => ({ id: item.id, title: item.title })));
@@ -133,6 +136,7 @@ export default function EventForm() {
         setStartDate(draft?.startDate ?? "");
         setEndDate(draft?.endDate ?? "");
         setApplyDeadline(draft?.applyDeadline ?? "");
+        setOrgChatUrl(draft?.orgChatUrl ?? "");
         setSelectedOrganizerIds(draft?.organizerIds ?? []);
         setSelectedOrganizerId("");
         setSpecializations(draft?.specializations ?? []);
@@ -157,12 +161,13 @@ export default function EventForm() {
       startDate,
       endDate,
       applyDeadline,
+      orgChatUrl,
       organizerIds: selectedOrganizerIds,
       specializations,
     };
 
     localStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify(draft));
-  }, [applyDeadline, description, endDate, initialized, mode, selectedOrganizerIds, specializations, startDate, title]);
+  }, [applyDeadline, description, endDate, initialized, mode, orgChatUrl, selectedOrganizerIds, specializations, startDate, title]);
 
   useEffect(() => {
     if (saveState !== "idle" && savedSnapshot && savedSnapshot !== formSnapshot) {
@@ -246,6 +251,7 @@ export default function EventForm() {
       startDate,
       endDate,
       applyDeadline,
+      orgChatUrl: orgChatUrl.trim(),
       leader: selectedOrganizerIds[0],
       organizerIds: selectedOrganizerIds,
       organizer: selectedOrganizerIds
@@ -311,6 +317,17 @@ export default function EventForm() {
       <label className="text-small">
         <span className="wizard-field-label">Описание</span>
         <AppTextArea value={description} onChange={(event) => setDescription(event.target.value)} />
+      </label>
+
+      <label className="text-small">
+        <span className="wizard-field-label">Ссылка на организационный чат VK</span>
+        <AppInput
+          value={orgChatUrl}
+          onChange={(event) => setOrgChatUrl(event.target.value)}
+          placeholder="https://vk.me/join/..."
+          autoComplete="off"
+          spellCheck={false}
+        />
       </label>
 
       <div className="date-row">

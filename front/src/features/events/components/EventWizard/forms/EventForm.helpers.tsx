@@ -14,6 +14,7 @@ export type EventDraft = {
   startDate: string;
   endDate: string;
   applyDeadline: string;
+  orgChatUrl: string;
   organizerIds: string[];
   specializations: SpecializationOption[];
 };

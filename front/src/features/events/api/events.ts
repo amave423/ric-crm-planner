@@ -45,6 +45,8 @@ type BackendEvent = {
   organizerName?: string;
   archived?: boolean;
   is_archived?: boolean;
+  orgChatUrl?: string;
+  org_chat_url?: string;
   stage?: string;
   specializations?: unknown[];
   specialization?: number | string;
@@ -62,6 +64,7 @@ type BackendEventPayload = {
   stage: string;
   leader?: number;
   organizerIds?: number[];
+  orgChatUrl?: string;
   specialization?: number;
   specializations?: number[];
   applicationFormFields?: ApplicationFormField[];
@@ -186,6 +189,8 @@ function normalizeBackendEvent(data: unknown): BackendEvent {
     organizerName: toStringValue(obj.organizerName ?? obj.organizer_name),
     archived: Boolean(obj.archived),
     is_archived: Boolean(obj.is_archived),
+    orgChatUrl: toStringValue(obj.orgChatUrl),
+    org_chat_url: toStringValue(obj.org_chat_url),
     stage: toStringValue(obj.stage),
     specializations: Array.isArray(obj.specializations) ? obj.specializations : undefined,
     specialization:
@@ -322,6 +327,7 @@ async function mapEventToUi(data: unknown): Promise<Event> {
     status: isEnrollmentClosed ? "Набор завершен" : computeStatus(event.endDate ?? event.end_date),
     organizer: await resolveOrganizer({ ...event, organizerIds }),
     archived: event.archived || event.is_archived || archivedIds.has(eventId),
+    orgChatUrl: event.orgChatUrl ?? event.org_chat_url,
     applicationFormFields: event.applicationFormFields ?? event.application_form_fields,
   };
 
@@ -334,6 +340,7 @@ async function mapEventToUi(data: unknown): Promise<Event> {
     archived: baseEvent.archived || extension.archived,
     organizerIds: extension.organizerIds ?? baseEvent.organizerIds,
     organizer: extension.organizer ?? baseEvent.organizer,
+    orgChatUrl: extension.orgChatUrl ?? baseEvent.orgChatUrl,
     applicationFormFields: extension.applicationFormFields ?? baseEvent.applicationFormFields,
   };
 }
@@ -446,6 +453,7 @@ async function toBackendEvent(data: Event): Promise<BackendEventPayload> {
     .map((id) => toNumber(id))
     .filter((id): id is number => typeof id === "number");
   if (organizerIds.length > 0) payload.organizerIds = organizerIds;
+  if (typeof data.orgChatUrl === "string") payload.orgChatUrl = data.orgChatUrl.trim();
   if (data.applicationFormFields) payload.applicationFormFields = data.applicationFormFields;
 
   const specializationIds = await resolveSpecializationIds(data);
@@ -468,6 +476,7 @@ export async function saveEvent(data: Event): Promise<Event> {
   const extension: Partial<Event> = {
     organizerIds: data.organizerIds ?? mapped.organizerIds,
     organizer: data.organizer ?? mapped.organizer,
+    orgChatUrl: data.orgChatUrl ?? mapped.orgChatUrl,
     applicationFormFields: data.applicationFormFields ?? mapped.applicationFormFields,
   };
   writeEventExtension(Number(mapped.id), extension);

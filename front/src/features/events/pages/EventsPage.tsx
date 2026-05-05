@@ -199,7 +199,7 @@ export default function EventsPage() {
         await updateRequestStatus(Number(pendingRequest.id), REQUEST_STATUS.TESTING);
 
         const link = client.USE_MOCK
-          ? buildMockRequestTransitionUrl(Number(pendingRequest.id), REQUEST_STATUS.JOINED_CHAT, "testing")
+          ? buildMockRequestTransitionUrl(Number(pendingRequest.id), REQUEST_STATUS.CHAT_LINK_SENT, "testing")
           : buildTestingUrl(pendingRequest);
 
       addNotification({

@@ -29,5 +29,6 @@ export interface Event {
   status?: string;
   archived?: boolean;
   archivedAt?: string;
+  orgChatUrl?: string;
   applicationFormFields?: ApplicationFormField[];
 }
