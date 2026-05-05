@@ -1,6 +1,13 @@
 ﻿import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Modal as AntModal } from "antd";
-import { buildParticipantsFromRequests, getPlannerState, hasStartedWork, savePlannerState, syncParticipants } from "../api/planner";
+import {
+  buildParticipantsFromRequests,
+  getPlannerState,
+  hasPlannerAccessStatus,
+  savePlannerState,
+  sendPlannerInviteMessages,
+  syncParticipants,
+} from "../api/planner";
 import { getRequests } from "../../requests/api/requests";
 import { useToast } from "../../../components/Toast/ToastProvider";
 import { AuthContext } from "../../../context/AuthContext";
@@ -105,6 +112,10 @@ export default function PlannerPage() {
 
   const notifySuccess = (message: string) => {
     showToast("success", message);
+  };
+
+  const notifyInfo = (message: string) => {
+    showToast("info", message);
   };
 
   useEffect(() => {
@@ -702,9 +713,10 @@ export default function PlannerPage() {
     notifySuccess("Колонка удалена");
   };
 
-  const confirmCloseEnrollment = () => {
+  const confirmCloseEnrollment = async () => {
     if (!closeEnrollmentTarget) return;
     const eventId = closeEnrollmentTarget.eventId;
+    const eventTitle = closeEnrollmentTarget.eventTitle;
     setState((prev) => ({
       ...prev,
       enrollmentClosed: true,
@@ -712,7 +724,27 @@ export default function PlannerPage() {
       participants: snapshotParticipants(Array.from(new Set([...prev.closedEventIds, eventId]))),
     }));
     setCloseEnrollmentTarget(null);
-    notifySuccess(`Набор по мероприятию «${closeEnrollmentTarget.eventTitle}» завершён`);
+    notifySuccess(`Набор по мероприятию «${eventTitle}» завершён`);
+    await sendPlannerInvites(eventId);
+  };
+
+  const sendPlannerInvites = async (eventId: number) => {
+    try {
+      const result = await sendPlannerInviteMessages(eventId);
+      if (!result) return;
+      if (result.sent > 0 && result.failed > 0) {
+        notifyInfo(`VK-приглашения отправлены: ${result.sent}, ошибок: ${result.failed}`);
+      } else if (result.sent > 0) {
+        notifySuccess(`VK-приглашения отправлены: ${result.sent}`);
+      } else if (result.failed > 0) {
+        notifyError(`Не удалось отправить VK-приглашения: ${result.failed}`);
+      }
+      if (result.sent === 0 && result.failed === 0) {
+        notifyInfo("Нет заявок в статусе «Добавился в орг. чат» для VK-приглашений");
+      }
+    } catch {
+      notifyError("Не удалось отправить VK-приглашения");
+    }
   };
 
   const toggleEventVisibility = (eventId: number, enabled: boolean) => {
@@ -805,7 +837,7 @@ export default function PlannerPage() {
         const ownerId = Number(request.ownerId);
         if (!Number.isFinite(ownerId)) return;
         if (Number(request.eventId) === Number(teamEditTeam.eventId)) {
-          if (state.closedEventIds.includes(Number(teamEditTeam.eventId)) && !hasStartedWork(request.status)) {
+          if (state.closedEventIds.includes(Number(teamEditTeam.eventId)) && !hasPlannerAccessStatus(request.status)) {
             return;
           }
           ids.add(ownerId);
@@ -817,7 +849,7 @@ export default function PlannerPage() {
         const ownerId = Number(request.ownerId);
         if (!Number.isFinite(ownerId)) return;
         if (sourceIds.has(Number(request.id))) {
-          if (teamEditTeam.eventId && state.closedEventIds.includes(Number(teamEditTeam.eventId)) && !hasStartedWork(request.status)) {
+          if (teamEditTeam.eventId && state.closedEventIds.includes(Number(teamEditTeam.eventId)) && !hasPlannerAccessStatus(request.status)) {
             return;
           }
           ids.add(ownerId);
@@ -870,6 +902,7 @@ export default function PlannerPage() {
           visibleTeams={visibleTeams}
           userNameById={userNameById}
           onOpenConfirmCloseEnrollment={openCloseEnrollment}
+          onSendPlannerInvites={sendPlannerInvites}
           onToggleEventVisibility={toggleEventVisibility}
           onSyncParticipants={() => setState((prev) => ({ ...prev, participants: snapshotParticipants(prev.closedEventIds) }))}
           onToggleApplicantForGroup={toggleApplicantForGroup}

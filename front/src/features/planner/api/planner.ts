@@ -60,6 +60,14 @@ export function hasStartedWork(status?: string) {
   return String(status || "").trim().toLowerCase() === REQUEST_STATUS.STARTED.toLowerCase();
 }
 
+export function hasPlannerAccessStatus(status?: string) {
+  const normalizedStatus = String(status || "").trim().toLowerCase();
+  return (
+    normalizedStatus === REQUEST_STATUS.STARTED.toLowerCase() ||
+    normalizedStatus === REQUEST_STATUS.JOINED_CHAT.toLowerCase()
+  );
+}
+
 function mapBackendTeams(teams: unknown, fallback: PlannerState): PlannerState["teams"] {
   if (!Array.isArray(teams)) return fallback.teams;
 
@@ -212,6 +220,17 @@ export async function savePlannerState(state: PlannerState): Promise<PlannerStat
   return state;
 }
 
+export type PlannerInviteResult = {
+  sent: number;
+  failed: number;
+  skipped: number;
+};
+
+export async function sendPlannerInviteMessages(eventId: number): Promise<PlannerInviteResult | null> {
+  if (USE_MOCK) return null;
+  return client.post<PlannerInviteResult>(`/api/integrations/vk/events/${eventId}/planner-invite/`, {});
+}
+
 function isStudent(user: User) {
   const role = String(user.role || "").toLowerCase();
   return role === "student" || role.includes("project");
@@ -236,7 +255,7 @@ export function buildParticipantsFromRequests(users: User[], requests: Request[]
 
   const ids = new Set<number>();
   requests.forEach((request) => {
-    if (!hasStartedWork(request.status)) return;
+    if (!hasPlannerAccessStatus(request.status)) return;
     const ownerId = toNumber(request.ownerId);
     const eventId = toNumber(request.eventId);
     if (typeof ownerId === "undefined") return;
