@@ -8,6 +8,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.urls import reverse
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer, Serializer
@@ -144,10 +145,24 @@ class UserSerializer(ModelSerializer):
     vk = serializers.SerializerMethodField()
     vkConfirmed = serializers.SerializerMethodField()
     vkBotUrl = serializers.SerializerMethodField()
+    isSuperuser = serializers.BooleanField(source="is_superuser", read_only=True)
+    isStaff = serializers.BooleanField(source="is_staff", read_only=True)
 
     class Meta:
         model = get_user_model()
-        fields = ("id", "email", "username", "first_name", "last_name", "role", "vk", "vkConfirmed", "vkBotUrl")
+        fields = (
+            "id",
+            "email",
+            "username",
+            "first_name",
+            "last_name",
+            "role",
+            "vk",
+            "vkConfirmed",
+            "vkBotUrl",
+            "isSuperuser",
+            "isStaff",
+        )
 
     def get_first_name(self, obj):
         profile = getattr(obj, "crm_profile", None)
@@ -163,6 +178,8 @@ class UserSerializer(ModelSerializer):
 
         roles = set(CRMRole.objects.filter(user=obj).values_list("role_type", flat=True))
         if roles.intersection({ROLE_CURATOR, ROLE_ADMIN}):
+            return "organizer"
+        if Event.objects.filter(Q(leader=obj) | Q(organizers=obj)).exists():
             return "organizer"
         if ROLE_PROJECTANT in roles:
             return "student"
@@ -258,7 +275,8 @@ class LoginUserSerializer(Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        user = authenticate(username=data.get("email"), password=data.get("password"))
+        email = str(data.get("email") or "").strip().lower()
+        user = authenticate(username=email, password=data.get("password"))
         if user and user.is_active:
             return user
         raise serializers.ValidationError("Invalid credentials.")
@@ -691,20 +709,6 @@ class ApplicationCreateSerializer(ModelSerializer):
                 date_end=event.end_app_date,
                 status=resolve_application_status(),
             )
-            student_name = build_user_display_name(user) or user.email
-            recipients = list(event.organizers.all())
-            if event.leader_id and all(recipient.id != event.leader_id for recipient in recipients):
-                recipients.append(event.leader)
-
-            for recipient in recipients:
-                if not recipient:
-                    continue
-                Notification.objects.create(
-                    user=recipient,
-                    title=f"Новая заявка: {student_name}"[:255],
-                    message=f"{student_name} подал(а) заявку на мероприятие \"{event.name}\".",
-                    link="/requests",
-                )
             return application
         except IntegrityError:
             raise serializers.ValidationError({"event": "Application for this event already exists."})

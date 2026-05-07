@@ -8,7 +8,7 @@ class EmailBackend(ModelBackend):
             return None
 
         try:
-            user = get_user_model().objects.get(email=username)
+            user = get_user_model().objects.get(email__iexact=str(username).strip())
         except get_user_model().DoesNotExist:
             return None
 
