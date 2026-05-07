@@ -7,31 +7,19 @@
     }
 
     handle /api/* {
-        reverse_proxy backend:8000 {
-            header_up X-Forwarded-Proto {scheme}
-            header_up X-Forwarded-Host {host}
-        }
+        reverse_proxy backend:8000
     }
 
     handle /admin* {
-        reverse_proxy backend:8000 {
-            header_up X-Forwarded-Proto {scheme}
-            header_up X-Forwarded-Host {host}
-        }
+        reverse_proxy backend:8000
     }
 
     handle /swagger* {
-        reverse_proxy backend:8000 {
-            header_up X-Forwarded-Proto {scheme}
-            header_up X-Forwarded-Host {host}
-        }
+        reverse_proxy backend:8000
     }
 
     handle /redoc* {
-        reverse_proxy backend:8000 {
-            header_up X-Forwarded-Proto {scheme}
-            header_up X-Forwarded-Host {host}
-        }
+        reverse_proxy backend:8000
     }
 
     handle {
