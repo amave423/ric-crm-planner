@@ -96,6 +96,19 @@ export async function saveProjectsForDirection(directionId: number, projects: Pr
   if (USE_MOCK) return _saveProjectsForDirection(directionId, projects);
 
   const { userNameById } = await getUserMaps();
+  const existing = await getProjectsByDirection(directionId).catch(() => []);
+  const keepIds = new Set(
+    projects
+      .map((project) => project.id)
+      .filter((id): id is number => typeof id === "number" && !isTempId(id))
+      .map((id) => Number(id))
+  );
+  await Promise.all(
+    existing
+      .filter((project) => project.id && !keepIds.has(Number(project.id)))
+      .map((project) => client.del(`/api/users/projects/${project.id}/`).catch(() => null))
+  );
+
   const results: Project[] = [];
 
   for (const p of projects) {
