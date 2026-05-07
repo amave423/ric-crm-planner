@@ -18,7 +18,7 @@ export default function VKBotConfirmationGuard() {
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
 
-  const shouldCheck = Boolean(user && user.role === "student" && !user.vkConfirmed && localStorage.getItem(VK_BOT_CONFIRMATION_REQUIRED_KEY) === "1");
+  const shouldCheck = Boolean(user && user.role === "student" && user.vk && !user.vkConfirmed);
 
   const refresh = useCallback(async (manual = false) => {
     if (!user || user.role !== "student") return;

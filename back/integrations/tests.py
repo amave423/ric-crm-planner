@@ -295,7 +295,8 @@ class VKCRMNotificationTests(TestCase):
         send_vk_message_mock.assert_called_once()
 
     @override_settings(VK_ENABLED=True)
-    def test_vk_bot_status_confirms_current_duplicate_vk_profile(self):
+    @patch("integrations.vk.planner_invites.send_vk_message")
+    def test_vk_bot_status_requires_start_for_duplicate_vk_profile(self, send_vk_message_mock):
         duplicate_user = get_user_model().objects.create_user(
             username="duplicate@example.com",
             email="duplicate@example.com",
@@ -313,6 +314,12 @@ class VKCRMNotificationTests(TestCase):
         response = api_client.get("/api/integrations/vk/bot-status/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["confirmed"])
+
+        handled = handle_vk_start_message({"from_id": 123456, "text": "Начать"})
+        self.assertTrue(handled)
+
+        response = api_client.get("/api/integrations/vk/bot-status/")
         self.assertTrue(response.data["confirmed"])
         duplicate_profile.refresh_from_db()
         self.assertIsNotNone(duplicate_profile.vk_confirmed_at)
