@@ -14,6 +14,8 @@ export interface PlannerTeam {
   directionId?: number;
   projectId?: number;
   sourceRequestIds?: number[];
+  createdBy?: number;
+  updatedAt?: string;
 }
 
 export interface PlannerParentTask {
@@ -24,6 +26,8 @@ export interface PlannerParentTask {
   assigneeId?: number;
   startDate: string;
   endDate: string;
+  createdBy?: number;
+  updatedAt?: string;
 }
 
 export interface PlannerSubtask {
@@ -37,6 +41,8 @@ export interface PlannerSubtask {
   endDate: string;
   inSprint: boolean;
   status: string;
+  createdBy?: number;
+  updatedAt?: string;
 }
 
 export interface PlannerState {

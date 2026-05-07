@@ -7,16 +7,20 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
-from django.utils.dateparse import parse_date
+from django.utils.dateparse import parse_date, parse_datetime
 
+from integrations.vk.services import VKAPIError, VKConfigurationError, send_vk_message
 from planner.automation_defaults import create_default_planner_automation_config
 from planner.models import PlannerAutomationConfig, PlannerAutomationExecutionLog, PlannerWorkspaceState
-from users.models import Notification
+from users.models import Notification, Profile
+from users.vk_profiles import refresh_profile_vk_user_id
 
 
 DONE_STATUSES = {"готово", "done", "завершено"}
 REVIEW_STATUSES = {"на проверке", "review"}
 STARTED_STATUSES = {"в работе", "in progress", "in-progress"}
+OVERLOADED_ACTIVE_TASK_LIMIT = 5
+STALE_TASK_DAYS = 3
 
 
 @dataclass
@@ -61,12 +65,32 @@ def item_assignee_id(item: dict[str, Any]) -> int | None:
     return to_int(item.get("assigneeId", item.get("assignee_id")))
 
 
+def item_member_id(item: dict[str, Any]) -> int | None:
+    return to_int(item.get("memberId", item.get("member_id")))
+
+
+def item_recipient_id(item: dict[str, Any]) -> int | None:
+    return item_assignee_id(item) or item_member_id(item)
+
+
 def item_status(item: dict[str, Any]) -> str:
     return normalized_text(item.get("status"))
 
 
 def item_end_date(item: dict[str, Any]):
     return parse_date(normalized_text(item.get("endDate", item.get("end_date"))))
+
+
+def item_updated_at(item: dict[str, Any]):
+    raw_value = normalized_text(item.get("updatedAt", item.get("updated_at")))
+    if not raw_value:
+        return None
+    parsed = parse_datetime(raw_value)
+    if not parsed:
+        return None
+    if timezone.is_naive(parsed):
+        return timezone.make_aware(parsed, timezone.get_current_timezone())
+    return parsed
 
 
 def is_done_status(status_value: Any) -> bool:
@@ -79,6 +103,10 @@ def is_review_status(status_value: Any) -> bool:
 
 def is_started_status(status_value: Any) -> bool:
     return lower_text(status_value) in STARTED_STATUSES
+
+
+def is_active_task(item: dict[str, Any]) -> bool:
+    return not is_done_status(item_status(item))
 
 
 def stable_fingerprint(value: Any) -> str:
@@ -174,11 +202,16 @@ def event_context(event: PlannerAutomationEvent) -> dict[str, Any]:
         "teamName": team.get("name", ""),
         "teamConfirmed": bool(team.get("confirmed", False)),
         "curatorId": team_curator_id(team),
-        "assigneeId": item_assignee_id(item),
+        "assigneeId": item_recipient_id(item),
         "status": item_status(item),
         "title": item.get("title", ""),
         "task": item.get("title", ""),
         "daysToDeadline": days_to_deadline,
+        "previousDeadline": (event.previous_item or {}).get("endDate", (event.previous_item or {}).get("end_date", "")),
+        "deadlineChanged": bool(item.get("deadlineChanged", item.get("deadline_changed", False))),
+        "memberId": item.get("memberId", item.get("member_id", "")),
+        "activeTaskCount": item.get("activeTaskCount", item.get("active_task_count", "")),
+        "inactiveDays": item.get("inactiveDays", item.get("inactive_days", "")),
         "isOverdue": days_to_deadline is not None and days_to_deadline < 0 and not is_done_status(item_status(item)),
     }
 
@@ -266,6 +299,19 @@ def create_notification(user_id: int | None, title: str, message: str, link: str
     if not user_model.objects.filter(pk=user_id).exists():
         return False
     Notification.objects.create(user_id=user_id, title=title[:255], message=message, link=link)
+    return True
+
+
+def send_vk_notification(user_id: int | None, message: str) -> bool:
+    if not user_id:
+        return False
+    profile = Profile.objects.filter(user_id=user_id).only("vk", "vk_user_id", "vk_confirmed_at").first()
+    vk_user_id = refresh_profile_vk_user_id(profile) if profile else None
+    if not vk_user_id:
+        raise ValueError("у пользователя не указан корректный VK")
+    if profile and not profile.vk_confirmed_at:
+        raise ValueError("пользователь не подтвердил VK-бота")
+    send_vk_message(user_id=vk_user_id, message=message)
     return True
 
 
@@ -368,11 +414,23 @@ def run_robot_action(
     log_message = ""
 
     if action == "notification.assignee":
-        success = create_notification(item_assignee_id(event.item), title, message)
+        success = create_notification(item_recipient_id(event.item), title, message)
         log_message = "Уведомление отправлено исполнителю." if success else "Исполнитель не найден."
     elif action in {"notification.curator", "notification.deadline", "task.review"}:
         success = create_notification(team_curator_id(event.team), title, message)
         log_message = "Уведомление отправлено куратору." if success else "Куратор команды не найден."
+    elif action == "message.vk.assignee":
+        try:
+            success = send_vk_notification(item_recipient_id(event.item), message)
+            log_message = "VK-сообщение отправлено исполнителю."
+        except (VKConfigurationError, VKAPIError, ValueError) as exc:
+            log_message = str(exc)
+    elif action == "message.vk.curator":
+        try:
+            success = send_vk_notification(team_curator_id(event.team), message)
+            log_message = "VK-сообщение отправлено куратору."
+        except (VKConfigurationError, VKAPIError, ValueError) as exc:
+            log_message = str(exc)
     elif action == "task.create":
         parent_tasks = workspace.parent_tasks if isinstance(workspace.parent_tasks, list) else []
         next_id = max([to_int(task.get("id")) or 0 for task in parent_tasks if isinstance(task, dict)] + [0]) + 1
@@ -469,9 +527,19 @@ def execute_pending_log(log: PlannerAutomationExecutionLog, workspace: PlannerWo
         title = render_template(rule.get("subject") or rule.get("title", ""), event) or "Уведомление планировщика"
         message = render_template(rule.get("message") or rule.get("description", ""), event)
         if action == "notification.assignee":
-            changed = create_notification(item_assignee_id(event.item), title, message)
+            changed = create_notification(item_recipient_id(event.item), title, message)
         elif action in {"notification.curator", "notification.deadline", "task.review"}:
             changed = create_notification(team_curator_id(event.team), title, message)
+        elif action == "message.vk.assignee":
+            try:
+                changed = send_vk_notification(item_recipient_id(event.item), message)
+            except (VKConfigurationError, VKAPIError, ValueError):
+                changed = False
+        elif action == "message.vk.curator":
+            try:
+                changed = send_vk_notification(team_curator_id(event.team), message)
+            except (VKConfigurationError, VKAPIError, ValueError):
+                changed = False
         elif action == "task.create":
             changed = run_robot_action(workspace, log.config, config, rule, event)
         else:
@@ -701,6 +769,34 @@ def config_model_to_dict(config_model: PlannerAutomationConfig) -> dict[str, Any
     }
 
 
+def has_task_data_changed(item: dict[str, Any], previous: dict[str, Any] | None) -> bool:
+    if not previous:
+        return False
+    fields = (
+        ("title",),
+        ("role",),
+        ("assigneeId", "assignee_id"),
+        ("startDate", "start_date"),
+        ("endDate", "end_date"),
+        ("inSprint", "in_sprint"),
+        ("parentTaskId", "parent_task_id"),
+    )
+    for keys in fields:
+        current_value = next((item.get(key) for key in keys if key in item), None)
+        previous_value = next((previous.get(key) for key in keys if key in previous), None)
+        if normalized_text(current_value) != normalized_text(previous_value):
+            return True
+    return False
+
+
+def deadline_changed(item: dict[str, Any], previous: dict[str, Any] | None) -> bool:
+    if not previous:
+        return False
+    return normalized_text(item.get("endDate", item.get("end_date"))) != normalized_text(
+        previous.get("endDate", previous.get("end_date"))
+    )
+
+
 def detect_planner_events(previous_state: dict[str, Any], current_state: dict[str, Any]) -> list[PlannerAutomationEvent]:
     events: list[PlannerAutomationEvent] = []
     previous_teams = team_by_id(previous_state.get("teams"))
@@ -736,6 +832,17 @@ def detect_planner_events(previous_state: dict[str, Any], current_state: dict[st
             build_event("task.created", "parent_task", item)
         elif item_assignee_id(item) != item_assignee_id(previous):
             build_event("task.assignee_changed", "parent_task", item, previous, {"assignee": item_assignee_id(item)})
+        if previous is None or item_assignee_id(item) != item_assignee_id(previous):
+            if item_assignee_id(item) is None and is_active_task(item):
+                build_event("task.unassigned", "parent_task", item, previous, {"assignee": None})
+        if previous is not None and deadline_changed(item, previous):
+            build_event(
+                "task.deadline_changed",
+                "parent_task",
+                {**item, "deadlineChanged": True},
+                previous,
+                {"deadline": item.get("endDate", item.get("end_date"))},
+            )
 
     previous_subtasks = list_by_id(previous_state.get("subtasks"))
     current_subtasks = list_by_id(current_state.get("subtasks"))
@@ -754,6 +861,20 @@ def detect_planner_events(previous_state: dict[str, Any], current_state: dict[st
                 build_event("task.assignee_changed", "subtask", item, previous, {"assignee": item_assignee_id(item)})
             if item_status(item) != item_status(previous):
                 build_event("task.status_changed", "subtask", item, previous, {"status": item_status(item)})
+            if has_task_data_changed(item, previous):
+                build_event("task.subtask_changed", "subtask", item, previous, {"item": item, "previous": previous})
+            if deadline_changed(item, previous):
+                build_event(
+                    "task.deadline_changed",
+                    "subtask",
+                    {**item, "deadlineChanged": True},
+                    previous,
+                    {"deadline": item.get("endDate", item.get("end_date"))},
+                )
+
+        if previous is None or item_assignee_id(item) != item_assignee_id(previous):
+            if item_assignee_id(item) is None and is_active_task(item):
+                build_event("task.unassigned", "subtask", item, previous, {"assignee": None})
 
         if previous is None or item_status(item) != item_status(previous):
             if is_started_status(item_status(item)):
@@ -793,6 +914,117 @@ def detect_planner_events(previous_state: dict[str, Any], current_state: dict[st
     return events
 
 
+def detect_planner_scan_events(current_state: dict[str, Any]) -> list[PlannerAutomationEvent]:
+    events: list[PlannerAutomationEvent] = []
+    teams = team_by_id(current_state.get("teams"))
+    today = timezone.localdate()
+
+    def append_event(code: str, entity_type: str, item: dict[str, Any], team: dict[str, Any] | None, fingerprint_payload: dict[str, Any]):
+        event_id = team_event_id(team)
+        team_id = item_team_id(item) or to_int((team or {}).get("id"))
+        if event_id is None:
+            return
+        events.append(
+            PlannerAutomationEvent(
+                code=code,
+                entity_type=entity_type,
+                entity_id=item_id(item),
+                item=item,
+                previous_item=None,
+                team=team,
+                event_id=event_id,
+                team_id=team_id,
+                fingerprint=stable_fingerprint({"date": today.isoformat(), **fingerprint_payload}),
+            )
+        )
+
+    tasks: list[tuple[str, dict[str, Any]]] = []
+    for item in current_state.get("parent_tasks", []):
+        if isinstance(item, dict):
+            tasks.append(("parent_task", {**item, "type": "parent"}))
+    for item in current_state.get("subtasks", []):
+        if isinstance(item, dict):
+            tasks.append(("subtask", {**item, "type": "subtask"}))
+
+    active_by_user: dict[int, list[dict[str, Any]]] = {}
+    active_by_team_user: dict[tuple[int, int], list[dict[str, Any]]] = {}
+
+    for entity_type, item in tasks:
+        team = teams.get(item_team_id(item) or -1)
+        if not is_active_task(item):
+            continue
+
+        assignee_id = item_assignee_id(item)
+        if assignee_id is None:
+            append_event("task.unassigned", entity_type, item, team, {"code": "task.unassigned", "entity": item_id(item)})
+        else:
+            active_by_user.setdefault(assignee_id, []).append(item)
+            team_id = item_team_id(item)
+            if team_id is not None:
+                active_by_team_user.setdefault((team_id, assignee_id), []).append(item)
+
+        updated_at = item_updated_at(item)
+        if updated_at:
+            inactive_days = (timezone.now() - updated_at).days
+            if inactive_days >= STALE_TASK_DAYS:
+                append_event(
+                    "task.stale",
+                    entity_type,
+                    {**item, "inactiveDays": inactive_days},
+                    team,
+                    {"code": "task.stale", "entity": item_id(item), "inactiveDays": inactive_days},
+                )
+
+    for member_id, items in active_by_user.items():
+        if len(items) < OVERLOADED_ACTIVE_TASK_LIMIT:
+            continue
+        source_item = items[0]
+        team = teams.get(item_team_id(source_item) or -1)
+        append_event(
+            "member.overloaded",
+            "member",
+            {
+                "id": f"member-{member_id}-overloaded",
+                "teamId": item_team_id(source_item),
+                "memberId": member_id,
+                "activeTaskCount": len(items),
+                "title": "Участник перегружен",
+                "type": "member",
+            },
+            team,
+            {"code": "member.overloaded", "memberId": member_id, "count": len(items)},
+        )
+
+    for team_id, team in teams.items():
+        if not isinstance(team, dict) or not team.get("confirmed", False):
+            continue
+        for member_id in _member_ids_from_team_like(team):
+            if not active_by_team_user.get((team_id, member_id)):
+                append_event(
+                    "member.idle",
+                    "member",
+                    {
+                        "id": f"team-{team_id}-member-{member_id}-idle",
+                        "teamId": team_id,
+                        "memberId": member_id,
+                        "activeTaskCount": 0,
+                        "title": "Участник без задач",
+                        "type": "member",
+                    },
+                    team,
+                    {"code": "member.idle", "teamId": team_id, "memberId": member_id},
+                )
+
+    return events
+
+
+def _member_ids_from_team_like(team: dict[str, Any]) -> list[int]:
+    member_ids = team.get("memberIds", team.get("member_ids", []))
+    if not isinstance(member_ids, list):
+        return []
+    return [member_id for member_id in (to_int(value) for value in member_ids) if member_id is not None]
+
+
 def workspace_state_dict(workspace: PlannerWorkspaceState) -> dict[str, Any]:
     return {
         "teams": workspace.teams if isinstance(workspace.teams, list) else [],
@@ -819,7 +1051,7 @@ def get_or_create_config(event_id: int) -> PlannerAutomationConfig:
 @transaction.atomic
 def run_planner_automation(previous_state: dict[str, Any], workspace: PlannerWorkspaceState) -> dict[str, int]:
     current_state = workspace_state_dict(workspace)
-    events = detect_planner_events(previous_state, current_state)
+    events = detect_planner_events(previous_state, current_state) + detect_planner_scan_events(current_state)
     result = {"events": len(events), "changed": 0}
     for event in events:
         config = get_or_create_config(event.event_id)

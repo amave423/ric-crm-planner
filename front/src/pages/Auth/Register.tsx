@@ -13,6 +13,7 @@ export default function Register() {
 
   const [form, setForm] = useState({
     email: "",
+    vk: "",
     name: "",
     surname: "",
     password: "",
@@ -30,7 +31,8 @@ export default function Register() {
     }
 
     const result = await register({
-      email: form.email.trim(),
+      email: form.email.trim().toLowerCase(),
+      vk: form.vk.trim(),
       name: form.name.trim(),
       surname: form.surname.trim(),
       role: form.role,
@@ -53,6 +55,15 @@ export default function Register() {
       <form onSubmit={handleSubmit} className="auth-form">
         <label className="text-small">Email</label>
         <AppInput type="email" required value={form.email} onChange={(e) => update("email", e.target.value)} className="text-regular" />
+
+        <label className="text-small">Аккаунт VK</label>
+        <AppInput
+          required
+          value={form.vk}
+          onChange={(e) => update("vk", e.target.value)}
+          placeholder="https://vk.com/id123456 или @username"
+          className="text-regular"
+        />
 
         <label className="text-small">Имя</label>
         <AppInput required value={form.name} onChange={(e) => update("name", e.target.value)} className="text-regular" />

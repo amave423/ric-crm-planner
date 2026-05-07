@@ -8,6 +8,7 @@ import "./styles/global.scss";
 import { ToastProvider } from "./components/Toast/ToastProvider";
 import { NotificationsProvider } from "./context/NotificationsContext";
 import { antdTheme } from "./theme/antdTheme";
+import VKBotConfirmationGuard from "./components/VKBotConfirmation/VKBotConfirmationGuard";
 
 dayjs.locale("ru");
 
@@ -17,6 +18,7 @@ export default function App() {
       <AuthProvider>
         <NotificationsProvider>
           <ToastProvider>
+            <VKBotConfirmationGuard />
             <AppRouter />
           </ToastProvider>
         </NotificationsProvider>

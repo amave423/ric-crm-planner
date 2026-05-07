@@ -62,10 +62,13 @@ load_local_env(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-ov)xl3oc)_k3b+fa^o&e61h#%yp2rk-y4mb8zeuh5o*gl_z(_n'
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-ov)xl3oc)_k3b+fa^o&e61h#%yp2rk-y4mb8zeuh5o*gl_z(_n",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool("DJANGO_DEBUG", True)
 
 ALLOWED_HOSTS = env_list(
     "DJANGO_ALLOWED_HOSTS",
@@ -183,7 +186,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
@@ -230,13 +234,17 @@ VK_ORG_CHAT_URL = os.getenv("VK_ORG_CHAT_URL", "")
 VK_CHAT_LINK_MAX_AGE_SECONDS = env_int("VK_CHAT_LINK_MAX_AGE_SECONDS", 60 * 60 * 24 * 30)
 VK_BOT_FRONTEND_URL = os.getenv("VK_BOT_FRONTEND_URL", "http://localhost:5173")
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = env_bool("DJANGO_CORS_ALLOW_ALL_ORIGINS", DEBUG)
+CORS_ALLOWED_ORIGINS = env_list("DJANGO_CORS_ALLOWED_ORIGINS", [])
 CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", [])
 
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
 SECURE_HSTS_SECONDS = 0 if DEBUG else 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
 SECURE_HSTS_PRELOAD = not DEBUG

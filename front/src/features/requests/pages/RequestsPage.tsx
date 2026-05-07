@@ -3,7 +3,6 @@ import { Dropdown, Segmented } from "antd";
 import type { MenuProps } from "antd";
 import { DownOutlined } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
-import client from "../../../api/client";
 import { getEvents } from "../../events/api/events";
 import { getRequests, removeRequest, updateRequestStatus } from "../api/requests";
 import Modal from "../../../components/Modal/Modal";
@@ -142,7 +141,6 @@ export default function RequestsPage() {
   };
 
   const handleWithdraw = (id: number) => {
-    if (!client.USE_MOCK) return;
     setToRemoveId(id);
     setConfirmOpen(true);
   };
@@ -151,6 +149,9 @@ export default function RequestsPage() {
     if (toRemoveId == null) return;
     try {
       await removeRequest(toRemoveId);
+      showToast("success", "Заявка отозвана");
+    } catch {
+      showToast("error", "Не удалось отозвать заявку");
     } finally {
       setConfirmOpen(false);
       setToRemoveId(null);

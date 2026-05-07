@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SPECIALIZATION_OPTIONS } from "../../../../../constants/specializations";
 import { getEventById, removeEvent as archiveEvent, saveEvent as persistEvent } from "../../../../../api/events";
+import { getRequests } from "../../../../../api/requests";
 import { getAllUsers } from "../../../../../storage/storage";
 import type { Event } from "../../../../../types/event";
 import type { User } from "../../../../../types/user";
@@ -43,12 +44,24 @@ export default function EventForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [usersList, setUsersList] = useState<User[]>([]);
+  const [applicantUserIds, setApplicantUserIds] = useState<Set<number>>(new Set());
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [initialized, setInitialized] = useState(false);
 
-  const organizers = usersList.filter((user) => user.role === "organizer");
   const editableEventId = mode === "edit" ? eventId : undefined;
+  const organizers = useMemo(() => {
+    const eligible = usersList.filter((user) => {
+      const role = String(user.role || "").toLowerCase();
+      return user.isSuperuser || user.isStaff || role === "organizer" || applicantUserIds.has(Number(user.id));
+    });
+
+    return eligible.sort((a, b) => {
+      if (Boolean(a.isSuperuser) !== Boolean(b.isSuperuser)) return a.isSuperuser ? -1 : 1;
+      if (Boolean(a.isStaff) !== Boolean(b.isStaff)) return a.isStaff ? -1 : 1;
+      return getUserLabel(a).localeCompare(getUserLabel(b), "ru");
+    });
+  }, [applicantUserIds, usersList]);
 
   const formSnapshot = useMemo(
     () =>
@@ -90,6 +103,35 @@ export default function EventForm() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      if (mode !== "edit" || !editableEventId) {
+        setApplicantUserIds(new Set());
+        return;
+      }
+
+      try {
+        const requests = await getRequests();
+        if (!mounted) return;
+        setApplicantUserIds(
+          new Set(
+            requests
+              .filter((request) => Number(request.eventId) === Number(editableEventId) && Number(request.ownerId) > 0)
+              .map((request) => Number(request.ownerId))
+          )
+        );
+      } catch {
+        if (mounted) setApplicantUserIds(new Set());
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [editableEventId, mode]);
 
   useEffect(() => {
     let mounted = true;
@@ -359,6 +401,8 @@ export default function EventForm() {
               tone="event"
               value={selectedOrganizerId}
               onChange={(value) => setSelectedOrganizerId(String(value))}
+              showSearch
+              optionFilterProp="label"
               options={[
                 { value: "", label: "Выберите организатора" },
                 ...organizers.map((organizer) => ({

@@ -8,6 +8,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.urls import reverse
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer, Serializer
@@ -15,6 +16,7 @@ from rest_framework.serializers import ModelSerializer, Serializer
 from integrations.vk.crm_notifications import notify_application_testing_started
 
 from users.automation_defaults import create_default_crm_automation_config
+from users.vk_profiles import get_vk_bot_url, refresh_profile_vk_user_id, reset_profile_vk_confirmation_if_changed
 
 from .models import CRMRole, ROLE_PROJECTANT, ROLE_CURATOR, ROLE_ADMIN
 from .models import (
@@ -140,10 +142,27 @@ class UserSerializer(ModelSerializer):
     role = serializers.SerializerMethodField()
     first_name = serializers.SerializerMethodField()
     last_name = serializers.SerializerMethodField()
+    vk = serializers.SerializerMethodField()
+    vkConfirmed = serializers.SerializerMethodField()
+    vkBotUrl = serializers.SerializerMethodField()
+    isSuperuser = serializers.BooleanField(source="is_superuser", read_only=True)
+    isStaff = serializers.BooleanField(source="is_staff", read_only=True)
 
     class Meta:
         model = get_user_model()
-        fields = ("id", "email", "username", "first_name", "last_name", "role")
+        fields = (
+            "id",
+            "email",
+            "username",
+            "first_name",
+            "last_name",
+            "role",
+            "vk",
+            "vkConfirmed",
+            "vkBotUrl",
+            "isSuperuser",
+            "isStaff",
+        )
 
     def get_first_name(self, obj):
         profile = getattr(obj, "crm_profile", None)
@@ -160,13 +179,27 @@ class UserSerializer(ModelSerializer):
         roles = set(CRMRole.objects.filter(user=obj).values_list("role_type", flat=True))
         if roles.intersection({ROLE_CURATOR, ROLE_ADMIN}):
             return "organizer"
+        if Event.objects.filter(Q(leader=obj) | Q(organizers=obj)).exists():
+            return "organizer"
         if ROLE_PROJECTANT in roles:
             return "student"
         return "student"
 
+    def get_vk(self, obj):
+        profile = getattr(obj, "crm_profile", None)
+        return getattr(profile, "vk", "")
+
+    def get_vkConfirmed(self, obj):
+        profile = getattr(obj, "crm_profile", None)
+        return bool(getattr(profile, "vk_confirmed_at", None))
+
+    def get_vkBotUrl(self, obj):
+        return get_vk_bot_url()
+
 
 class RegisterUserSerializer(ModelSerializer):
     email = serializers.EmailField(required=True)
+    vk = serializers.CharField(required=True, allow_blank=False, write_only=True)
     password = serializers.CharField(write_only=True)
     password_confirmation = serializers.CharField(write_only=True)
     first_name = serializers.CharField(required=True)
@@ -176,6 +209,7 @@ class RegisterUserSerializer(ModelSerializer):
         model = get_user_model()
         fields = (
             "email",
+            "vk",
             "first_name",
             "last_name",
             "password",
@@ -198,6 +232,12 @@ class RegisterUserSerializer(ModelSerializer):
 
         return normalized_email
 
+    def validate_vk(self, value):
+        normalized_vk = value.strip()
+        if not normalized_vk:
+            raise serializers.ValidationError("Укажите аккаунт VK.")
+        return normalized_vk
+
     def validate(self, attrs):
         if attrs.get("password") != attrs.get("password_confirmation"):
             raise serializers.ValidationError({"password_confirmation": "Passwords do not match."})
@@ -215,9 +255,14 @@ class RegisterUserSerializer(ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop("password_confirmation", None)
+        vk_value = validated_data.pop("vk", "")
         try:
             with transaction.atomic():
                 user = get_user_model().objects.create_user(**validated_data, is_active=True)
+                profile = user.crm_profile
+                profile.vk = vk_value
+                profile.vk_user_id = refresh_profile_vk_user_id(profile, force=True)
+                profile.save(update_fields=["vk", "vk_user_id"])
         except IntegrityError as exc:
             raise serializers.ValidationError(
                 {"email": "Пользователь с таким email уже существует."}
@@ -230,7 +275,8 @@ class LoginUserSerializer(Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        user = authenticate(username=data.get("email"), password=data.get("password"))
+        email = str(data.get("email") or "").strip().lower()
+        user = authenticate(username=email, password=data.get("password"))
         if user and user.is_active:
             return user
         raise serializers.ValidationError("Invalid credentials.")
@@ -332,6 +378,9 @@ class EmailConfirmationSerializer(Serializer):
 
 
 class ProfileSerializer(ModelSerializer):
+    vkConfirmed = serializers.SerializerMethodField()
+    vkBotUrl = serializers.SerializerMethodField()
+
     class Meta:
         model = Profile
         fields = (
@@ -343,11 +392,26 @@ class ProfileSerializer(ModelSerializer):
             "course",
             "university",
             "vk",
+            "vkConfirmed",
+            "vkBotUrl",
             "job",
             "workplace",
             "specialty",
             "about",
         )
+        read_only_fields = ("vkConfirmed", "vkBotUrl")
+
+    def get_vkConfirmed(self, obj):
+        return bool(obj.vk_confirmed_at)
+
+    def get_vkBotUrl(self, obj):
+        return get_vk_bot_url()
+
+    def update(self, instance, validated_data):
+        old_vk = instance.vk
+        profile = super().update(instance, validated_data)
+        reset_profile_vk_confirmation_if_changed(profile, old_vk)
+        return profile
 
 
 class EventSerializer(ModelSerializer):
@@ -645,20 +709,6 @@ class ApplicationCreateSerializer(ModelSerializer):
                 date_end=event.end_app_date,
                 status=resolve_application_status(),
             )
-            student_name = build_user_display_name(user) or user.email
-            recipients = list(event.organizers.all())
-            if event.leader_id and all(recipient.id != event.leader_id for recipient in recipients):
-                recipients.append(event.leader)
-
-            for recipient in recipients:
-                if not recipient:
-                    continue
-                Notification.objects.create(
-                    user=recipient,
-                    title="Новая заявка",
-                    message=f"{student_name} подал(а) заявку на мероприятие \"{event.name}\".",
-                    link="/requests",
-                )
             return application
         except IntegrityError:
             raise serializers.ValidationError({"event": "Application for this event already exists."})

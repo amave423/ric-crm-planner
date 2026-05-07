@@ -50,7 +50,7 @@ CRM_ROBOTS = [
         "action": "notification.organizer",
         "enabled": True,
         "settings": deepcopy(DEFAULT_AUTOMATION_SETTINGS),
-        "subject": "Новая заявка в CRM",
+        "subject": "Новая заявка: {student}",
         "message": "Проектант {student} отправил заявку на мероприятие «{event}».",
     },
     {
@@ -74,6 +74,17 @@ CRM_ROBOTS = [
         "settings": deepcopy(DEFAULT_AUTOMATION_SETTINGS),
         "subject": "Ссылка на организационный чат",
         "message": "Перейдите по индивидуальной ссылке и присоединитесь к организационному чату мероприятия.\n\n{chat_link}",
+    },
+    {
+        "id": "crm-send-planner-invite",
+        "stageId": "application-joined-chat",
+        "title": "Отправить VK-приглашение в планировщик",
+        "description": "Отправляет проектанту VK-сообщение с кнопками принятия или отказа от участия в проектной школе.",
+        "action": "planner.invite.vk",
+        "enabled": False,
+        "settings": deepcopy(DEFAULT_AUTOMATION_SETTINGS),
+        "subject": "Переход к работе в планировщике",
+        "message": "Набор завершён. Подтвердите, готовы ли вы приступить к работе в планировщике.",
     },
 ]
 

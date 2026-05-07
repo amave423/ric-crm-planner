@@ -14,8 +14,9 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from users.models import Application
+from users.models import Application, Profile
 from users.permissions import CuratorOrAdminPermission
+from users.vk_profiles import get_vk_bot_url, refresh_profile_vk_user_id
 
 from .crm_notifications import (
     CHAT_LINK_PLACEHOLDER,
@@ -25,7 +26,7 @@ from .crm_notifications import (
     send_application_vk_message,
 )
 from .planner_invites import handle_vk_message_event, handle_vk_message_new_event, send_planner_invites_for_event
-from .serializers import VKApplicationMessageSerializer, VKSendTestSerializer
+from .serializers import VKApplicationMessageSerializer, VKPlannerInviteSerializer, VKSendTestSerializer
 from .services import VKAPIError, VKConfigurationError, normalize_vk_group_id, send_vk_message
 
 
@@ -158,12 +159,34 @@ class VKPlannerInviteView(APIView):
         responses={200: openapi.Response("VK planner invite result"), 503: "VK is disabled or not configured"},
     )
     def post(self, request, event_id: int):
+        serializer = VKPlannerInviteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         try:
-            result = send_planner_invites_for_event(event_id)
+            result = send_planner_invites_for_event(
+                event_id,
+                recipient_mode=serializer.validated_data["recipient_mode"],
+                message=serializer.validated_data.get("message", ""),
+            )
         except VKConfigurationError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         return Response(result, status=status.HTTP_200_OK)
+
+
+class VKBotStatusView(APIView):
+    def get(self, request):
+        profile = Profile.objects.filter(user=request.user).first()
+        if profile:
+            refresh_profile_vk_user_id(profile)
+
+        return Response(
+            {
+                "confirmed": bool(profile and profile.vk_confirmed_at),
+                "vk": profile.vk if profile else "",
+                "vk_user_id": profile.vk_user_id if profile else None,
+                "bot_url": get_vk_bot_url(),
+            }
+        )
 
 
 class VKChatLinkRedirectView(APIView):

@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import transaction
 
 from users.models import Application, Profile, Status
+from users.vk_profiles import confirm_profile_by_vk_user_id, refresh_profile_vk_user_id
 
 from .crm_notifications import notify_organizers_about_vk_error
 from .services import (
@@ -13,7 +14,6 @@ from .services import (
     VKConfigurationError,
     answer_vk_message_event,
     delete_vk_message,
-    resolve_vk_user_id,
     send_vk_message,
 )
 
@@ -22,6 +22,7 @@ PLANNER_INVITE_PAYLOAD_TYPE = "planner_invite"
 JOINED_CHAT_STATUS_NAME = "Добавился в орг. чат"
 STARTED_PSH_STATUS_NAME = "Приступил к ПШ"
 REMOVED_FROM_PSH_STATUS_NAME = "Удален с ПШ"
+PLANNER_INVITE_ACCEPT_ALLOWED_STATUSES = {JOINED_CHAT_STATUS_NAME, REMOVED_FROM_PSH_STATUS_NAME}
 START_COMMANDS = {"начать", "start", "/start", "старт"}
 
 
@@ -37,10 +38,13 @@ def resolve_application_status(name: str, *, description: str = "", is_positive:
     )
 
 
-def resolve_vk_application_user_id(application: Application) -> int | None:
-    profile = Profile.objects.filter(user=application.user).only("vk").first()
-    vk_value = profile.vk if profile else ""
-    return resolve_vk_user_id(vk_value)
+def resolve_vk_application_user_id(application: Application, *, require_confirmed: bool = True) -> int | None:
+    profile = Profile.objects.filter(user=application.user).only("vk", "vk_user_id", "vk_confirmed_at").first()
+    if not profile:
+        return None
+    if require_confirmed and not profile.vk_confirmed_at:
+        return None
+    return refresh_profile_vk_user_id(profile)
 
 
 def vk_button(label: str, color: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -120,32 +124,41 @@ def build_planner_invite_message(application: Application) -> str:
     )
 
 
-def send_planner_invite(application: Application) -> int:
+def send_planner_invite(application: Application, *, message: str = "", keyboard: dict[str, Any] | None = None) -> int:
     vk_user_id = resolve_vk_application_user_id(application)
     if not vk_user_id:
-        raise ValueError("у проектанта не указан корректный VK")
+        raise ValueError("проектант не подтвердил VK-бота или указал некорректный VK")
 
     return send_vk_message(
         user_id=vk_user_id,
-        message=build_planner_invite_message(application),
-        keyboard=build_planner_invite_keyboard(application.id),
+        message=message or build_planner_invite_message(application),
+        keyboard=keyboard or build_planner_invite_keyboard(application.id),
     )
 
 
-def send_planner_invites_for_event(event_id: int) -> dict[str, int]:
+def send_planner_invites_for_event(
+    event_id: int,
+    *,
+    recipient_mode: str = "joined",
+    message: str = "",
+) -> dict[str, int]:
     if not settings.VK_ENABLED:
         return {"sent": 0, "failed": 0, "skipped": 0}
 
     applications = (
         Application.objects.select_related("user", "event", "event__leader", "status")
         .prefetch_related("event__organizers")
-        .filter(event_id=event_id, status__name=JOINED_CHAT_STATUS_NAME)
+        .filter(event_id=event_id)
     )
+    if recipient_mode == "declined":
+        applications = applications.filter(status__name=REMOVED_FROM_PSH_STATUS_NAME)
+    elif recipient_mode == "joined":
+        applications = applications.filter(status__name=JOINED_CHAT_STATUS_NAME)
 
     result = {"sent": 0, "failed": 0, "skipped": 0}
     for application in applications:
         try:
-            send_planner_invite(application)
+            send_planner_invite(application, message=message)
             result["sent"] += 1
         except (VKConfigurationError, VKAPIError, ValueError) as exc:
             result["failed"] += 1
@@ -216,15 +229,20 @@ def handle_vk_start_message(message: dict[str, Any]) -> bool:
     except (TypeError, ValueError):
         return True
 
-    send_vk_message(
-        user_id=from_id,
-        message=(
+    profile = confirm_profile_by_vk_user_id(from_id)
+    if profile:
+        message = (
+            "VK подтвержден. Теперь бот сможет отправлять вам сообщения по заявкам, "
+            "организационному чату и планировщику."
+        )
+    else:
+        message = (
             "Привет! Это бот CRM проектной школы.\n\n"
-            "Здесь будут приходить уведомления по заявкам, организационному чату и переходу к работе в планировщике. "
-            "Чтобы бот связал сообщения с вашей заявкой, укажите ссылку на VK в профиле CRM."
-        ),
-        keyboard=build_welcome_keyboard(),
-    )
+            "Не удалось связать ваш VK с профилем CRM. Проверьте, что в профиле указан именно этот аккаунт VK, "
+            "затем нажмите «Начать» еще раз."
+        )
+
+    send_vk_message(user_id=from_id, message=message, keyboard=build_welcome_keyboard())
     return True
 
 
@@ -336,8 +354,16 @@ def accept_planner_invite(application: Application, vk_user_id: int) -> str:
         send_vk_message(user_id=vk_user_id, message="Вы уже подтвердили готовность. Статус заявки: «Приступил к ПШ».")
         return "Готовность уже подтверждена"
 
-    if not locked_application.status_id or locked_application.status.name != JOINED_CHAT_STATUS_NAME:
-        send_vk_message(user_id=vk_user_id, message="Сейчас статус заявки не позволяет подтвердить участие.")
+    current_status = locked_application.status.name if locked_application.status_id else "без статуса"
+    if current_status not in PLANNER_INVITE_ACCEPT_ALLOWED_STATUSES:
+        send_vk_message(
+            user_id=vk_user_id,
+            message=(
+                f"Не удалось подтвердить участие: текущий статус заявки «{current_status}». "
+                f"Подтверждение доступно только после статуса «{JOINED_CHAT_STATUS_NAME}» "
+                f"или для повторного приглашения после статуса «{REMOVED_FROM_PSH_STATUS_NAME}»."
+            ),
+        )
         return "Статус заявки не позволяет подтвердить участие"
 
     started_status = resolve_application_status(
@@ -361,8 +387,15 @@ def decline_planner_invite(application: Application, vk_user_id: int) -> str:
         send_vk_message(user_id=vk_user_id, message="Отказ уже зафиксирован. Статус заявки: «Удален с ПШ».")
         return "Отказ уже зафиксирован"
 
-    if not locked_application.status_id or locked_application.status.name != JOINED_CHAT_STATUS_NAME:
-        send_vk_message(user_id=vk_user_id, message="Сейчас статус заявки не позволяет отказаться от участия.")
+    current_status = locked_application.status.name if locked_application.status_id else "без статуса"
+    if current_status != JOINED_CHAT_STATUS_NAME:
+        send_vk_message(
+            user_id=vk_user_id,
+            message=(
+                f"Не удалось отказаться от участия: текущий статус заявки «{current_status}». "
+                f"Отказ доступен только после статуса «{JOINED_CHAT_STATUS_NAME}»."
+            ),
+        )
         return "Статус заявки не позволяет отказаться"
 
     removed_status = resolve_application_status(

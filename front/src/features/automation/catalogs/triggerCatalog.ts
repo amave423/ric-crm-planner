@@ -67,6 +67,21 @@ export const TRIGGER_CATALOG: Record<AutomationScope, CatalogGroup[]> = {
           title: "Статус задачи изменен",
           description: "Срабатывает при любой смене статуса задачи в канбане.",
         },
+        {
+          code: "task.unassigned",
+          title: "Задача без исполнителя",
+          description: "Срабатывает, если задача или подзадача находится в работе без назначенного исполнителя.",
+        },
+        {
+          code: "task.subtask_changed",
+          title: "Изменилась подзадача",
+          description: "Срабатывает при изменении названия, исполнителя, сроков или параметров подзадачи.",
+        },
+        {
+          code: "task.deadline_changed",
+          title: "Изменился дедлайн",
+          description: "Срабатывает при изменении крайнего срока задачи или подзадачи.",
+        },
       ],
     },
     {
@@ -88,6 +103,11 @@ export const TRIGGER_CATALOG: Record<AutomationScope, CatalogGroup[]> = {
           description: "Срабатывает при переходе задачи на стадию проверки.",
         },
         {
+          code: "task.stale",
+          title: "Задача долго без движения",
+          description: "Срабатывает, если активная задача несколько дней не обновлялась.",
+        },
+        {
           code: "task.status_done",
           title: "Задача завершена",
           description: "Срабатывает, когда задача переходит в финальный статус.",
@@ -106,6 +126,16 @@ export const TRIGGER_CATALOG: Record<AutomationScope, CatalogGroup[]> = {
           code: "team.curator_assigned",
           title: "Куратор назначен",
           description: "Срабатывает после назначения или смены куратора команды.",
+        },
+        {
+          code: "member.overloaded",
+          title: "Участник перегружен",
+          description: "Срабатывает, когда у участника слишком много активных задач.",
+        },
+        {
+          code: "member.idle",
+          title: "Участник без задач",
+          description: "Срабатывает, когда участник подтвержденной команды не имеет активных задач.",
         },
       ],
     },

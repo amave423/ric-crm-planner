@@ -4,7 +4,8 @@ from django.urls import reverse
 
 from users.models import Application, Notification, Profile, Status
 
-from .services import VKAPIError, VKConfigurationError, resolve_vk_user_id, send_vk_message
+from .services import VKAPIError, VKConfigurationError, send_vk_message
+from users.vk_profiles import refresh_profile_vk_user_id
 
 
 TESTING_STATUS_NAME = "Прохождение тестирования"
@@ -130,15 +131,15 @@ def mark_application_chat_link_opened(token: str) -> tuple[Application, str]:
     return application, redirect_url
 
 
-def send_application_vk_message(application: Application, message: str) -> int:
-    profile = Profile.objects.filter(user=application.user).only("vk").first()
-    vk_value = profile.vk if profile else ""
-
-    vk_user_id = resolve_vk_user_id(vk_value)
+def send_application_vk_message(application: Application, message: str, keyboard: dict | None = None) -> int:
+    profile = Profile.objects.filter(user=application.user).only("vk", "vk_user_id", "vk_confirmed_at").first()
+    vk_user_id = refresh_profile_vk_user_id(profile) if profile else None
     if not vk_user_id:
         raise ValueError("у проектанта не указан корректный VK")
+    if profile and not profile.vk_confirmed_at:
+        raise ValueError("проектант не подтвердил VK-бота")
 
-    return send_vk_message(user_id=vk_user_id, message=message)
+    return send_vk_message(user_id=vk_user_id, message=message, keyboard=keyboard)
 
 
 def notify_application_testing_started(application: Application, previous_status_id: int | None = None) -> int | None:

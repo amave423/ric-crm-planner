@@ -53,6 +53,10 @@ export const CONDITION_FIELD_OPTIONS = [
   { value: "assignee", label: "Исполнитель" },
   { value: "deadline", label: "Дедлайн" },
   { value: "in_sprint", label: "В спринте" },
+  { value: "active_task_count", label: "Активных задач" },
+  { value: "inactive_days", label: "Дней без движения" },
+  { value: "member_id", label: "Участник" },
+  { value: "deadline_changed", label: "Дедлайн изменен" },
 ];
 
 export const CONDITION_OPERATOR_OPTIONS: Array<{ value: AutomationConditionOperator; label: string }> = [

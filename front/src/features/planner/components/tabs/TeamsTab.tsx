@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import type { SyntheticEvent } from "react";
 import { InfoCircleOutlined } from "@ant-design/icons";
 import type { PlannerState, PlannerTeam } from "../../../../types/planner";
@@ -24,7 +24,6 @@ type TeamsTabProps = {
   visibleTeams: PlannerTeam[];
   userNameById: Map<number, string>;
   onOpenConfirmCloseEnrollment: (eventId: number, eventTitle: string) => void;
-  onSendPlannerInvites: (eventId: number) => void;
   onToggleEventVisibility: (eventId: number, enabled: boolean) => void;
   onSyncParticipants: () => void;
   onToggleApplicantForGroup: (groupKey: string, ownerId: number) => void;
@@ -79,7 +78,6 @@ export default function TeamsTab({
   visibleTeams,
   userNameById,
   onOpenConfirmCloseEnrollment,
-  onSendPlannerInvites,
   onToggleEventVisibility,
   onSyncParticipants,
   onToggleApplicantForGroup,
@@ -497,36 +495,23 @@ export default function TeamsTab({
                       </div>
 
                       <div className="planner-source-summary-actions">
-                        {eventNode.eventClosed ? (
+                        {eventNode.eventClosed && <span className="planner-source-meta planner-source-meta--closed">Набор завершён</span>}
+
+                        {isOrganizer && eventId && (
                           <>
-                            <span className="planner-source-meta planner-source-meta--closed">Набор завершён</span>
-                            {isOrganizer && eventId && (
+                            {!eventNode.eventClosed && (
                               <AppButton
                                 type="button"
                                 className="planner-source-close-btn"
                                 onClick={(event) => {
                                   stopSummaryToggle(event);
-                                  onSendPlannerInvites(eventId);
+                                  onOpenConfirmCloseEnrollment(eventId, eventNode.title);
                                 }}
                               >
-                                Отправить VK-приглашения
+                                Завершить набор
                               </AppButton>
                             )}
                           </>
-                        ) : (
-                          isOrganizer &&
-                          eventId && (
-                            <AppButton
-                              type="button"
-                              className="planner-source-close-btn"
-                              onClick={(event) => {
-                                stopSummaryToggle(event);
-                                onOpenConfirmCloseEnrollment(eventId, eventNode.title);
-                              }}
-                            >
-                              Завершить набор
-                            </AppButton>
-                          )
                         )}
 
                         {switchControl}
@@ -572,3 +557,4 @@ export default function TeamsTab({
     </div>
   );
 }
+

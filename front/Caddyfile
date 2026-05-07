@@ -1,0 +1,30 @@
+{$APP_DOMAIN} {
+    encode gzip zstd
+
+    handle_path /static/* {
+        root * /srv/django-static
+        file_server
+    }
+
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    handle /admin* {
+        reverse_proxy backend:8000
+    }
+
+    handle /swagger* {
+        reverse_proxy backend:8000
+    }
+
+    handle /redoc* {
+        reverse_proxy backend:8000
+    }
+
+    handle {
+        root * /srv/front
+        try_files {path} /index.html
+        file_server
+    }
+}

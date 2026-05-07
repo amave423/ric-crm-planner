@@ -1,5 +1,6 @@
 from copy import deepcopy
 
+from django.db.models import Q
 from django.db import transaction
 from django.utils.decorators import method_decorator
 from drf_yasg.utils import swagger_auto_schema
@@ -19,9 +20,8 @@ from planner.serializers import (
     PlannerWorkspaceStateSerializer,
     TeamPlannerDeskSerializer,
 )
-from users.models import Application
-from users.models import CRMRole, ROLE_ADMIN, ROLE_CURATOR, ROLE_PROJECTANT
-from users.permissions import CuratorOrAdminPermission
+from users.models import Application, Event
+from users.permissions import CuratorOrAdminPermission, has_curator_or_admin_role
 
 TAG_PLANNER = "Planner"
 
@@ -69,6 +69,44 @@ def _team_ids_for_user(teams, user_id):
     } - {None}
 
 
+def _team_event_id(team):
+    if not isinstance(team, dict):
+        return None
+    return _to_int(team.get("eventId", team.get("event_id")))
+
+
+def _team_created_by(team):
+    if not isinstance(team, dict):
+        return None
+    return _to_int(team.get("createdBy", team.get("created_by")))
+
+
+def _assigned_event_ids_for_user(user):
+    if not user or not user.is_authenticated:
+        return set()
+    return set(
+        Event.objects.filter(Q(leader=user) | Q(organizers=user)).values_list("id", flat=True)
+    )
+
+
+def _team_ids_created_by_event_organizer(teams, user_id, event_ids):
+    if not isinstance(teams, list) or not event_ids:
+        return set()
+    return {
+        _to_int(team.get("id"))
+        for team in teams
+        if isinstance(team, dict)
+        and _team_event_id(team) in event_ids
+        and _team_created_by(team) == user_id
+    } - {None}
+
+
+def _visible_team_ids_for_restricted_user(teams, user):
+    user_id = _to_int(user.id)
+    assigned_event_ids = _assigned_event_ids_for_user(user)
+    return _team_ids_for_user(teams, user_id) | _team_ids_created_by_event_organizer(teams, user_id, assigned_event_ids)
+
+
 def _assignee_id_from_item(item):
     if not isinstance(item, dict):
         return None
@@ -79,15 +117,6 @@ def _has_assignee_field(item):
     return isinstance(item, dict) and (
         "assigneeId" in item or "assignee_id" in item
     )
-
-
-def _is_projectant_user(user):
-    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
-        return False
-    roles = set(CRMRole.objects.filter(user=user).values_list("role_type", flat=True))
-    if ROLE_ADMIN in roles or ROLE_CURATOR in roles:
-        return False
-    return ROLE_PROJECTANT in roles
 
 
 def _filter_items_by_team(items, team_ids):
@@ -225,9 +254,8 @@ class PlannerStateCompatView(RetrieveUpdateAPIView):
         workspace = self.get_object()
         data = self.get_serializer(workspace).data
         data["teams"] = _enrich_team_member_roles(data.get("teams", []))
-        if _is_projectant_user(request.user):
-            user_id = _to_int(request.user.id)
-            team_ids = _team_ids_for_user(data.get("teams", []), user_id)
+        if not has_curator_or_admin_role(request.user):
+            team_ids = _visible_team_ids_for_restricted_user(data.get("teams", []), request.user)
             data["teams"] = [
                 team for team in data.get("teams", []) if _to_int(team.get("id")) in team_ids
             ]
@@ -259,11 +287,25 @@ class PlannerStateCompatView(RetrieveUpdateAPIView):
         }
         workspace = serializer.save()
 
-        if _is_projectant_user(self.request.user):
+        if not has_curator_or_admin_role(self.request.user):
             user_id = _to_int(self.request.user.id)
-            allowed_team_ids = _team_ids_for_user(previous_teams, user_id)
+            assigned_event_ids = _assigned_event_ids_for_user(self.request.user)
+            incoming_teams = workspace.teams if isinstance(workspace.teams, list) else []
+            member_team_ids = _team_ids_for_user(previous_teams, user_id)
+            organizer_team_ids = _team_ids_created_by_event_organizer(previous_teams + incoming_teams, user_id, assigned_event_ids)
+            allowed_team_ids = member_team_ids | organizer_team_ids
             incoming_parent_tasks = workspace.parent_tasks if isinstance(workspace.parent_tasks, list) else []
             incoming_subtasks = workspace.subtasks if isinstance(workspace.subtasks, list) else []
+            editable_teams = [
+                team
+                for team in incoming_teams
+                if _to_int(team.get("id")) in organizer_team_ids
+                and _team_event_id(team) in assigned_event_ids
+                and _team_created_by(team) == user_id
+            ]
+            foreign_teams = [
+                team for team in previous_teams if _to_int(team.get("id")) not in organizer_team_ids
+            ]
 
             editable_parent_tasks = _filter_items_by_team(incoming_parent_tasks, allowed_team_ids)
             foreign_parent_tasks = [
@@ -274,7 +316,7 @@ class PlannerStateCompatView(RetrieveUpdateAPIView):
                 item for item in previous_subtasks if _team_id_from_item(item) not in allowed_team_ids
             ]
 
-            workspace.teams = previous_teams
+            workspace.teams = foreign_teams + editable_teams
             workspace.parent_tasks = foreign_parent_tasks + editable_parent_tasks
             workspace.subtasks = foreign_subtasks + editable_subtasks
             workspace.save(update_fields=["teams", "parent_tasks", "subtasks", "updated_at"])

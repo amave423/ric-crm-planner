@@ -30,6 +30,8 @@ from users.permissions import (
     PublicReadCuratorAdminWritePermission,
     ProjectantOnlyPermission,
     TestingServicePermission,
+    has_curator_or_admin_role,
+    is_event_organizer,
 )
 from users.serializers import (
     ApplicationCreateSerializer,
@@ -895,8 +897,11 @@ class ApplicationListView(ListCreateAPIView):
             "user", "direction", "event", "project", "specialization", "status"
         ).filter(Q(event__is_archived=False) | Q(event__isnull=True)).order_by("-date_sub")
         
-        if not CuratorOrAdminPermission().has_permission(self.request, self):
-            queryset = queryset.filter(user=self.request.user)
+        if not has_curator_or_admin_role(self.request.user):
+            assigned_event_ids = Event.objects.filter(
+                Q(leader=self.request.user) | Q(organizers=self.request.user)
+            ).values_list("id", flat=True)
+            queryset = queryset.filter(Q(user=self.request.user) | Q(event_id__in=assigned_event_ids))
 
         filters = {
             "event": "event_id",
@@ -941,6 +946,20 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
 
     serializer_class = ApplicationSerializer
     lookup_url_kwarg = "application_id"
+
+    def get_queryset(self):
+        queryset = Application.objects.select_related(
+            "user", "direction", "event", "project", "specialization", "status"
+        ).filter(Q(event__is_archived=False) | Q(event__isnull=True))
+
+        if not has_curator_or_admin_role(self.request.user):
+            assigned_event_ids = Event.objects.filter(
+                Q(leader=self.request.user) | Q(organizers=self.request.user)
+            ).values_list("id", flat=True)
+            queryset = queryset.filter(Q(user=self.request.user) | Q(event_id__in=assigned_event_ids))
+
+        return queryset
+
     def get_permissions(self):
         if self.request.method.lower() == "get":
             permissions = (IsAuthenticated,)
@@ -978,9 +997,10 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
     def delete(self, request, *args, **kwargs):
         application = self.get_object()
         is_curator_or_admin = CuratorOrAdminPermission().has_permission(request, self)
+        is_assigned_event_organizer = is_event_organizer(request.user, application.event_id)
         is_owner = application.user_id == request.user.id
 
-        if not (is_curator_or_admin or is_owner):
+        if not (is_curator_or_admin or is_assigned_event_organizer or is_owner):
             return Response(status=status.HTTP_403_FORBIDDEN)
 
         self.perform_destroy(application)
@@ -1019,10 +1039,13 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
             "user", "direction", "event", "project", "specialization", "status"
         )
 
-        if CuratorOrAdminPermission().has_permission(self.request, self):
+        if has_curator_or_admin_role(self.request.user):
             return queryset
 
-        return queryset.filter(user=self.request.user)
+        assigned_event_ids = Event.objects.filter(
+            Q(leader=self.request.user) | Q(organizers=self.request.user)
+        ).values_list("id", flat=True)
+        return queryset.filter(Q(user=self.request.user) | Q(event_id__in=assigned_event_ids))
 
 
 class CRMAutomationConfigView(RetrieveUpdateAPIView):

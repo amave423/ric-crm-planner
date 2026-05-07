@@ -112,12 +112,14 @@ function normalizeRobot(robot: AutomationRobot, fallbackStageId: string): Automa
       ? "application-chat-link-sent"
       : String(robot.stageId || fallbackStageId);
 
+  const action = String(robot.action || "notification.organizer");
+
   return {
     id,
     stageId,
     title: String(robot.title || "Робот"),
     description: String(robot.description || ""),
-    action: String(robot.action || "notification.organizer"),
+    action: action === "message.vk_interactive" ? "message.vk" : action,
     enabled: Boolean(robot.enabled),
     deleted: Boolean(robot.deleted),
     settings: normalizeSettings(robot.settings),

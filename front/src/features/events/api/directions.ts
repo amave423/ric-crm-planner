@@ -190,6 +190,19 @@ export async function saveDirectionsForEvent(eventId: number, dirs: Direction[])
     return mapToUiDirections(Array.isArray(saved) ? saved : []);
   }
 
+  const existing = await getDirectionsByEvent(eventId).catch(() => []);
+  const keepIds = new Set(
+    dirs
+      .map((direction) => direction.id)
+      .filter((id): id is number => typeof id === "number" && !isTempId(id))
+      .map((id) => Number(id))
+  );
+  await Promise.all(
+    existing
+      .filter((direction) => direction.id && !keepIds.has(Number(direction.id)))
+      .map((direction) => client.del(`/api/users/events/${eventId}/directions/${direction.id}/`).catch(() => null))
+  );
+
   const created: unknown[] = [];
   for (const d of dirs) {
     const payload = mapToBackendPayload(d);

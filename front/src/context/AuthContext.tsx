@@ -9,6 +9,11 @@ interface User {
   name: string;
   surname: string;
   role: string;
+  vk?: string;
+  vkConfirmed?: boolean;
+  vkBotUrl?: string;
+  isSuperuser?: boolean;
+  isStaff?: boolean;
   password?: string;
 }
 
@@ -37,6 +42,7 @@ interface AuthContextType {
   register: (u: Omit<User, "id"> & { confirm?: string }) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
   updateProfile: (u: ProfileUpdate) => Promise<void>;
+  refreshUser: () => Promise<User | null>;
 }
 
 export const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -60,6 +66,11 @@ function mapBackendUser(data: unknown): User | null {
   const email = String(obj.email ?? profile.email ?? "");
   const name = String(obj.firstName ?? obj.first_name ?? obj.name ?? profile.name ?? "");
   const surname = String(obj.lastName ?? obj.last_name ?? obj.surname ?? profile.surname ?? "");
+  const vk = String(obj.vk ?? profile.vk ?? "");
+  const vkConfirmed = Boolean(obj.vkConfirmed ?? obj.vk_confirmed ?? profile.vkConfirmed ?? profile.vk_confirmed);
+  const vkBotUrl = String(obj.vkBotUrl ?? obj.vk_bot_url ?? profile.vkBotUrl ?? profile.vk_bot_url ?? "");
+  const isSuperuser = Boolean(obj.isSuperuser ?? obj.is_superuser);
+  const isStaff = Boolean(obj.isStaff ?? obj.is_staff);
   let role = "guest";
   if (typeof obj.role === "string") {
     role = obj.role;
@@ -83,6 +94,11 @@ function mapBackendUser(data: unknown): User | null {
     name,
     surname,
     role,
+    vk,
+    vkConfirmed,
+    vkBotUrl,
+    isSuperuser,
+    isStaff,
   };
 }
 
@@ -187,7 +203,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const parsed = JSON.parse(saved) as MockUser;
         const allUsers = [...(baseUsers as MockUser[]), ...readStoredMockUsers()];
-        return allUsers.find((item) => Number(item.id) === Number(parsed.id) && item.email === parsed.email) || null;
+        return (
+          allUsers.find(
+            (item) =>
+              Number(item.id) === Number(parsed.id) &&
+              String(item.email).trim().toLowerCase() === String(parsed.email).trim().toLowerCase()
+          ) || null
+        );
       } catch {
         localStorage.removeItem(LS_CURRENT_USER);
         return null;
@@ -242,7 +264,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMock = async (email: string, password: string) => {
     const users = getAllUsersMock();
-    const found = users.find((u) => u.email === email && u.password === password);
+    const normalizedEmail = email.trim().toLowerCase();
+    const found = users.find((u) => String(u.email).trim().toLowerCase() === normalizedEmail && u.password === password);
     if (!found) return false;
     setUser(found);
     localStorage.setItem(LS_CURRENT_USER, JSON.stringify(found));
@@ -251,7 +274,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMock = async (u: Omit<User, "id"> & { confirm?: string }): Promise<AuthActionResult> => {
     ensureMockAuthSeeded();
-    const newUser: MockUser = { ...u, id: Date.now() };
+    const normalizedEmail = u.email.trim().toLowerCase();
+    const newUser: MockUser = { ...u, email: normalizedEmail, id: Date.now() };
     const stored = readStoredMockUsers();
     stored.push(newUser);
     localStorage.setItem(LS_USERS, JSON.stringify(stored));
@@ -278,9 +302,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(LS_CURRENT_USER);
   };
 
+  const refreshUserMock = async () => user;
+
   const loginBackend = async (email: string, password: string) => {
     try {
-      const info = await client.login(email, password);
+      const info = await client.login(email.trim().toLowerCase(), password);
       const mapped = mapBackendUser(info);
       setUser(mapped);
       if (mapped) localStorage.setItem(LS_CURRENT_USER, JSON.stringify(mapped));
@@ -291,10 +317,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshUserBackend = async () => {
+    try {
+      const info = await client.get("/api/users/user-info/");
+      const mapped = mapBackendUser(info);
+      setUser(mapped);
+      if (mapped) localStorage.setItem(LS_CURRENT_USER, JSON.stringify(mapped));
+      else localStorage.removeItem(LS_CURRENT_USER);
+      return mapped;
+    } catch {
+      return user;
+    }
+  };
+
   const registerBackend = async (u: Omit<User, "id"> & { confirm?: string }): Promise<AuthActionResult> => {
     try {
       const payload = {
-        email: u.email,
+        email: u.email.trim().toLowerCase(),
+        vk: String(u.vk || ""),
         first_name: u.name || "",
         last_name: u.surname || "",
         password: u.password || "",
@@ -369,6 +409,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register: registerMock,
         logout: logoutMock,
         updateProfile: updateProfileMock,
+        refreshUser: refreshUserMock,
       }
     : {
         user,
@@ -376,6 +417,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register: registerBackend,
         logout: logoutBackend,
         updateProfile: updateProfileBackend,
+        refreshUser: refreshUserBackend,
       };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

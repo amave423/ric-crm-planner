@@ -189,7 +189,7 @@ class CRMContractTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         notification = Notification.objects.get(user=self.curator)
-        self.assertEqual(notification.title, "Новая заявка")
+        self.assertEqual(notification.title, "Новая заявка: Student Project")
         self.assertIn("Student Project", notification.message)
         self.assertIn("Contract Event", notification.message)
         self.assertEqual(notification.link, "/requests")
