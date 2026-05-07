@@ -941,6 +941,17 @@ class ApplicationDetailView(RetrieveUpdateDestroyAPIView):
 
     serializer_class = ApplicationSerializer
     lookup_url_kwarg = "application_id"
+
+    def get_queryset(self):
+        queryset = Application.objects.select_related(
+            "user", "direction", "event", "project", "specialization", "status"
+        ).filter(Q(event__is_archived=False) | Q(event__isnull=True))
+
+        if not CuratorOrAdminPermission().has_permission(self.request, self):
+            queryset = queryset.filter(user=self.request.user)
+
+        return queryset
+
     def get_permissions(self):
         if self.request.method.lower() == "get":
             permissions = (IsAuthenticated,)

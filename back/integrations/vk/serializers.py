@@ -38,4 +38,3 @@ class VKPlannerInviteSerializer(serializers.Serializer):
 
     recipient_mode = serializers.ChoiceField(choices=RECIPIENT_CHOICES, required=False, default="joined")
     message = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
-    buttons = serializers.ListField(child=serializers.DictField(), required=False)

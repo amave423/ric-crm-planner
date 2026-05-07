@@ -112,26 +112,19 @@ function normalizeRobot(robot: AutomationRobot, fallbackStageId: string): Automa
       ? "application-chat-link-sent"
       : String(robot.stageId || fallbackStageId);
 
+  const action = String(robot.action || "notification.organizer");
+
   return {
     id,
     stageId,
     title: String(robot.title || "Робот"),
     description: String(robot.description || ""),
-    action: String(robot.action || "notification.organizer"),
+    action: action === "message.vk_interactive" ? "message.vk" : action,
     enabled: Boolean(robot.enabled),
     deleted: Boolean(robot.deleted),
     settings: normalizeSettings(robot.settings),
     subject: String(robot.subject || robot.title || "Уведомление"),
     message: String(robot.message || robot.description || ""),
-    buttons: Array.isArray(robot.buttons)
-      ? robot.buttons.map((button) => ({
-          id: String(button.id || `button-${Date.now()}`),
-          label: String(button.label || "Кнопка"),
-          color: button.color || "primary",
-          targetStageId: String(button.targetStageId || stageId),
-          responseMessage: String(button.responseMessage || "Статус заявки обновлен."),
-        }))
-      : [],
   };
 }
 

@@ -50,7 +50,6 @@ export function makeRobot(stageId: string, item: CatalogItem): AutomationRobot {
     settings: cloneDefaultSettings(),
     subject: item.subject || item.title,
     message: item.message || item.description,
-    buttons: item.buttons || [],
   };
 }
 

@@ -54,15 +54,6 @@ export interface AutomationRobot {
   settings: AutomationCommonSettings;
   subject: string;
   message: string;
-  buttons?: AutomationRobotButton[];
-}
-
-export interface AutomationRobotButton {
-  id: string;
-  label: string;
-  color: "primary" | "secondary" | "positive" | "negative";
-  targetStageId: string;
-  responseMessage: string;
 }
 
 export interface AutomationTrigger {

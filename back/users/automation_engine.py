@@ -13,7 +13,6 @@ from integrations.vk.crm_notifications import (
     notify_organizers_about_vk_error,
     send_application_vk_message,
 )
-from integrations.vk.planner_invites import build_custom_vk_keyboard
 from integrations.vk.services import VKAPIError, VKConfigurationError
 from users.automation_defaults import create_default_crm_automation_config
 from users.models import Application, CRMAutomationConfig, CRMAutomationExecutionLog, Event, Notification, Status
@@ -314,28 +313,6 @@ def create_organizer_notifications(application: Application, title: str, message
     return created
 
 
-def build_robot_vk_buttons(robot: dict[str, Any], config: dict[str, Any], application: Application) -> dict[str, Any] | None:
-    buttons = []
-    for raw_button in robot.get("buttons") or []:
-        if not isinstance(raw_button, dict):
-            continue
-        target_stage_id = str(raw_button.get("targetStageId") or "").strip()
-        status_name = str(raw_button.get("status") or "").strip() or target_status_for_stage(config, target_stage_id)
-        if not status_name:
-            continue
-        buttons.append(
-            {
-                "id": raw_button.get("id"),
-                "label": raw_button.get("label"),
-                "color": raw_button.get("color") or "primary",
-                "status": status_name,
-                "responseMessage": raw_button.get("responseMessage") or "Статус заявки обновлен.",
-            }
-        )
-
-    return build_custom_vk_keyboard(buttons, application.id) if buttons else None
-
-
 def update_application_status(application: Application, status_name: str) -> bool:
     if not status_name or application_status(application) == status_name:
         return False
@@ -370,6 +347,8 @@ def run_robot_action(
             return False
 
     action = normalized_text(robot.get("action"))
+    if action == "message.vk_interactive":
+        action = "message.vk"
     title = render_template(robot.get("subject") or robot.get("title", ""), event) or "Уведомление"
     message = render_template(robot.get("message") or robot.get("description", ""), event)
     success = False
@@ -389,12 +368,12 @@ def run_robot_action(
     elif action in {"notification.user", "notification.assignee", "testing.link"}:
         success = create_notification(event.application.user_id, title, message)
         log_message = "Уведомление отправлено проектанту." if success else "Проектант не найден."
-    elif action in {"message.vk", "chat.link.vk", "message.vk_or_notification", "message.vk_interactive"}:
+    elif action in {"message.vk", "chat.link.vk", "message.vk_or_notification"}:
         try:
             vk_message = message
             if action in {"chat.link.vk", "message.vk_or_notification"} or CHAT_LINK_PLACEHOLDER in vk_message:
                 vk_message = inject_application_chat_link(vk_message, event.application, event.request)
-            send_application_vk_message(event.application, vk_message, keyboard=build_robot_vk_buttons(robot, config, event.application))
+            send_application_vk_message(event.application, vk_message)
             success = True
             log_message = "VK-сообщение отправлено проектанту."
         except (VKConfigurationError, VKAPIError, ValueError) as exc:

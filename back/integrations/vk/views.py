@@ -166,7 +166,6 @@ class VKPlannerInviteView(APIView):
                 event_id,
                 recipient_mode=serializer.validated_data["recipient_mode"],
                 message=serializer.validated_data.get("message", ""),
-                buttons=serializer.validated_data.get("buttons", []),
             )
         except VKConfigurationError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
