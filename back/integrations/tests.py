@@ -109,6 +109,8 @@ class VKCRMNotificationTests(TestCase):
                 "email": "student@example.com",
                 "course": 1,
                 "vk": "https://vk.com/id123456",
+                "vk_user_id": 123456,
+                "vk_confirmed_at": timezone.now(),
             },
         )
         self.event = Event.objects.create(

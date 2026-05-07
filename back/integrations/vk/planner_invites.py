@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import transaction
 
 from users.models import Application, Profile, Status
+from users.vk_profiles import confirm_profile_by_vk_user_id, get_vk_bot_url, refresh_profile_vk_user_id
 
 from .crm_notifications import notify_organizers_about_vk_error
 from .services import (
@@ -19,6 +20,7 @@ from .services import (
 
 
 PLANNER_INVITE_PAYLOAD_TYPE = "planner_invite"
+AUTOMATION_ACTION_PAYLOAD_TYPE = "automation_action"
 JOINED_CHAT_STATUS_NAME = "Добавился в орг. чат"
 STARTED_PSH_STATUS_NAME = "Приступил к ПШ"
 REMOVED_FROM_PSH_STATUS_NAME = "Удален с ПШ"
@@ -37,10 +39,13 @@ def resolve_application_status(name: str, *, description: str = "", is_positive:
     )
 
 
-def resolve_vk_application_user_id(application: Application) -> int | None:
-    profile = Profile.objects.filter(user=application.user).only("vk").first()
-    vk_value = profile.vk if profile else ""
-    return resolve_vk_user_id(vk_value)
+def resolve_vk_application_user_id(application: Application, *, require_confirmed: bool = True) -> int | None:
+    profile = Profile.objects.filter(user=application.user).only("vk", "vk_user_id", "vk_confirmed_at").first()
+    if not profile:
+        return None
+    if require_confirmed and not profile.vk_confirmed_at:
+        return None
+    return refresh_profile_vk_user_id(profile)
 
 
 def vk_button(label: str, color: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -101,6 +106,33 @@ def build_planner_invite_keyboard(application_id: int) -> dict[str, Any]:
     )
 
 
+def build_custom_vk_keyboard(buttons: list[dict[str, Any]], application_id: int) -> dict[str, Any] | None:
+    normalized_buttons: list[dict[str, Any]] = []
+    for index, button in enumerate(buttons[:5]):
+        label = str(button.get("label") or "").strip()
+        status_name = str(button.get("status") or "").strip()
+        if not label or not status_name:
+            continue
+        normalized_buttons.append(
+            vk_button(
+                label[:40],
+                str(button.get("color") or "primary"),
+                {
+                    "type": AUTOMATION_ACTION_PAYLOAD_TYPE,
+                    "application_id": application_id,
+                    "button_id": str(button.get("id") or index),
+                    "status": status_name,
+                    "response_message": str(button.get("responseMessage") or "Статус заявки обновлен."),
+                },
+            )
+        )
+
+    if not normalized_buttons:
+        return None
+
+    return build_inline_keyboard([normalized_buttons])
+
+
 def build_decline_confirmation_keyboard(application_id: int) -> dict[str, Any]:
     return build_inline_keyboard(
         [
@@ -120,32 +152,46 @@ def build_planner_invite_message(application: Application) -> str:
     )
 
 
-def send_planner_invite(application: Application) -> int:
+def send_planner_invite(application: Application, *, message: str = "", keyboard: dict[str, Any] | None = None) -> int:
     vk_user_id = resolve_vk_application_user_id(application)
     if not vk_user_id:
-        raise ValueError("у проектанта не указан корректный VK")
+        raise ValueError("проектант не подтвердил VK-бота или указал некорректный VK")
 
     return send_vk_message(
         user_id=vk_user_id,
-        message=build_planner_invite_message(application),
-        keyboard=build_planner_invite_keyboard(application.id),
+        message=message or build_planner_invite_message(application),
+        keyboard=keyboard or build_planner_invite_keyboard(application.id),
     )
 
 
-def send_planner_invites_for_event(event_id: int) -> dict[str, int]:
+def send_planner_invites_for_event(
+    event_id: int,
+    *,
+    recipient_mode: str = "joined",
+    message: str = "",
+    buttons: list[dict[str, Any]] | None = None,
+) -> dict[str, int]:
     if not settings.VK_ENABLED:
         return {"sent": 0, "failed": 0, "skipped": 0}
 
     applications = (
         Application.objects.select_related("user", "event", "event__leader", "status")
         .prefetch_related("event__organizers")
-        .filter(event_id=event_id, status__name=JOINED_CHAT_STATUS_NAME)
+        .filter(event_id=event_id)
     )
+    if recipient_mode == "declined":
+        applications = applications.filter(status__name=REMOVED_FROM_PSH_STATUS_NAME)
+    elif recipient_mode == "joined":
+        applications = applications.filter(status__name=JOINED_CHAT_STATUS_NAME)
 
     result = {"sent": 0, "failed": 0, "skipped": 0}
     for application in applications:
         try:
-            send_planner_invite(application)
+            send_planner_invite(
+                application,
+                message=message,
+                keyboard=build_custom_vk_keyboard(buttons or [], application.id) if buttons else None,
+            )
             result["sent"] += 1
         except (VKConfigurationError, VKAPIError, ValueError) as exc:
             result["failed"] += 1
@@ -195,7 +241,7 @@ def handle_vk_message_new_event(callback_payload: dict[str, Any]) -> bool:
         return False
 
     button_payload = parse_vk_button_payload(message.get("payload"))
-    if not button_payload or button_payload.get("type") != PLANNER_INVITE_PAYLOAD_TYPE:
+    if not button_payload or button_payload.get("type") not in {PLANNER_INVITE_PAYLOAD_TYPE, AUTOMATION_ACTION_PAYLOAD_TYPE}:
         return handle_vk_start_message(message)
 
     try:
@@ -203,7 +249,10 @@ def handle_vk_message_new_event(callback_payload: dict[str, Any]) -> bool:
     except (TypeError, ValueError):
         return True
 
-    handle_planner_invite_payload(from_id=from_id, payload=button_payload)
+    if button_payload.get("type") == AUTOMATION_ACTION_PAYLOAD_TYPE:
+        handle_automation_action_payload(from_id=from_id, payload=button_payload)
+    else:
+        handle_planner_invite_payload(from_id=from_id, payload=button_payload)
     return True
 
 
@@ -216,15 +265,20 @@ def handle_vk_start_message(message: dict[str, Any]) -> bool:
     except (TypeError, ValueError):
         return True
 
-    send_vk_message(
-        user_id=from_id,
-        message=(
+    profile = confirm_profile_by_vk_user_id(from_id)
+    if profile:
+        message = (
+            "VK подтвержден. Теперь бот сможет отправлять вам сообщения по заявкам, "
+            "организационному чату и планировщику."
+        )
+    else:
+        message = (
             "Привет! Это бот CRM проектной школы.\n\n"
-            "Здесь будут приходить уведомления по заявкам, организационному чату и переходу к работе в планировщике. "
-            "Чтобы бот связал сообщения с вашей заявкой, укажите ссылку на VK в профиле CRM."
-        ),
-        keyboard=build_welcome_keyboard(),
-    )
+            "Не удалось связать ваш VK с профилем CRM. Проверьте, что в профиле указан именно этот аккаунт VK, "
+            "затем нажмите «Начать» еще раз."
+        )
+
+    send_vk_message(user_id=from_id, message=message, keyboard=build_welcome_keyboard())
     return True
 
 
@@ -234,7 +288,7 @@ def handle_vk_message_event(callback_payload: dict[str, Any]) -> bool:
         return False
 
     button_payload = parse_vk_button_payload(vk_object.get("payload"))
-    if not button_payload or button_payload.get("type") != PLANNER_INVITE_PAYLOAD_TYPE:
+    if not button_payload or button_payload.get("type") not in {PLANNER_INVITE_PAYLOAD_TYPE, AUTOMATION_ACTION_PAYLOAD_TYPE}:
         return False
 
     try:
@@ -277,8 +331,40 @@ def handle_vk_message_event(callback_payload: dict[str, Any]) -> bool:
     except (VKConfigurationError, VKAPIError):
         pass
 
-    handle_planner_invite_payload(from_id=from_id, payload=button_payload)
+    if button_payload.get("type") == AUTOMATION_ACTION_PAYLOAD_TYPE:
+        handle_automation_action_payload(from_id=from_id, payload=button_payload)
+    else:
+        handle_planner_invite_payload(from_id=from_id, payload=button_payload)
     return True
+
+
+def handle_automation_action_payload(*, from_id: int, payload: dict[str, Any]) -> str:
+    try:
+        application_id = int(payload.get("application_id"))
+    except (TypeError, ValueError):
+        send_vk_message(user_id=from_id, message="Не удалось определить заявку для этого действия.")
+        return "Заявка не определена"
+
+    application = Application.objects.select_related("user", "event", "event__leader", "status").filter(pk=application_id).first()
+    if not application:
+        send_vk_message(user_id=from_id, message="Заявка для этого действия не найдена.")
+        return "Заявка не найдена"
+
+    expected_user_id = resolve_vk_application_user_id(application)
+    if expected_user_id != from_id:
+        send_vk_message(user_id=from_id, message="Эта кнопка относится к другой заявке.")
+        return "Кнопка относится к другой заявке"
+
+    status_name = str(payload.get("status") or "").strip()
+    if not status_name:
+        send_vk_message(user_id=from_id, message="Для этой кнопки не настроено действие.")
+        return "Действие не настроено"
+
+    status_obj = resolve_application_status(status_name)
+    application.status = status_obj
+    application.save(update_fields=["status"])
+    send_vk_message(user_id=from_id, message=str(payload.get("response_message") or "Статус заявки обновлен."))
+    return "Статус заявки обновлен"
 
 
 def handle_planner_invite_payload(*, from_id: int, payload: dict[str, Any]) -> str:

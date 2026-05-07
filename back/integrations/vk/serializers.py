@@ -27,3 +27,15 @@ class VKApplicationMessageSerializer(serializers.Serializer):
 
         attrs["text"] = f"{subject}\n\n{message}"
         return attrs
+
+
+class VKPlannerInviteSerializer(serializers.Serializer):
+    RECIPIENT_CHOICES = (
+        ("joined", "joined"),
+        ("all", "all"),
+        ("declined", "declined"),
+    )
+
+    recipient_mode = serializers.ChoiceField(choices=RECIPIENT_CHOICES, required=False, default="joined")
+    message = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+    buttons = serializers.ListField(child=serializers.DictField(), required=False)
