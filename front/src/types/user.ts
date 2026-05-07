@@ -7,5 +7,7 @@ export interface User {
   vk?: string;
   vkConfirmed?: boolean;
   vkBotUrl?: string;
+  isSuperuser?: boolean;
+  isStaff?: boolean;
   password?: string;
 }

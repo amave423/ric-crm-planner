@@ -16,7 +16,7 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const ok = await login(email.trim(), password);
+    const ok = await login(email.trim().toLowerCase(), password);
     if (!ok) {
       showToast("error", "Неверный email или пароль");
       return;

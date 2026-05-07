@@ -61,6 +61,8 @@ function mapUserRecord(raw: unknown): User | null {
   const name = String(record.name ?? record.firstName ?? record.first_name ?? profile.name ?? "");
   const surname = String(record.surname ?? record.lastName ?? record.last_name ?? profile.surname ?? "");
   const role = String(record.role ?? profile.role ?? "");
+  const isSuperuser = Boolean(record.isSuperuser ?? record.is_superuser);
+  const isStaff = Boolean(record.isStaff ?? record.is_staff);
 
   return {
     id,
@@ -68,6 +70,8 @@ function mapUserRecord(raw: unknown): User | null {
     name,
     surname,
     role: role || "student",
+    isSuperuser,
+    isStaff,
   };
 }
 

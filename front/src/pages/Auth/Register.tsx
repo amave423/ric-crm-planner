@@ -31,7 +31,7 @@ export default function Register() {
     }
 
     const result = await register({
-      email: form.email.trim(),
+      email: form.email.trim().toLowerCase(),
       vk: form.vk.trim(),
       name: form.name.trim(),
       surname: form.surname.trim(),
