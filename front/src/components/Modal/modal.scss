@@ -43,6 +43,22 @@
   margin-bottom: 18px;
 }
 
+.vk-bot-confirmation {
+  display: grid;
+  gap: 16px;
+}
+
+.vk-bot-confirmation p {
+  margin: 0;
+}
+
+.vk-bot-confirmation__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .modal-actions {
   display:flex;
   justify-content: flex-end;

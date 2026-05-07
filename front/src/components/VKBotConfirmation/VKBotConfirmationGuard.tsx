@@ -1,8 +1,9 @@
-import { useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { getVKBotStatus, type VKBotStatus } from "../../api/vk";
 import Modal from "../Modal/Modal";
 import AppButton from "../UI/Button";
+import { useToast } from "../Toast/ToastProvider";
 
 export const VK_BOT_CONFIRMATION_REQUIRED_KEY = "vk_bot_confirmation_required_v1";
 
@@ -11,27 +12,40 @@ export function requireVKBotConfirmation() {
 }
 
 export default function VKBotConfirmationGuard() {
-  const { user } = useContext(AuthContext);
+  const { user, refreshUser } = useContext(AuthContext);
+  const { showToast } = useToast();
   const [status, setStatus] = useState<VKBotStatus | null>(null);
   const [open, setOpen] = useState(false);
+  const [checking, setChecking] = useState(false);
 
   const shouldCheck = Boolean(user && user.role === "student" && !user.vkConfirmed && localStorage.getItem(VK_BOT_CONFIRMATION_REQUIRED_KEY) === "1");
 
-  const refresh = async () => {
-    if (!shouldCheck) return;
+  const refresh = useCallback(async (manual = false) => {
+    if (!user || user.role !== "student") return;
+    if (manual) setChecking(true);
+
     try {
       const nextStatus = await getVKBotStatus();
       setStatus(nextStatus);
       if (nextStatus.confirmed) {
         localStorage.removeItem(VK_BOT_CONFIRMATION_REQUIRED_KEY);
+        await refreshUser();
         setOpen(false);
+        if (manual) showToast("success", "VK-бот подтвержден.");
         return;
       }
+
       setOpen(true);
+      if (manual) {
+        showToast("info", "Подтверждение пока не найдено. Откройте VK-бота и нажмите «Начать».");
+      }
     } catch {
       setOpen(true);
+      if (manual) showToast("error", "Не удалось проверить подтверждение VK-бота.");
+    } finally {
+      if (manual) setChecking(false);
     }
-  };
+  }, [refreshUser, showToast, user]);
 
   useEffect(() => {
     if (!shouldCheck) {
@@ -45,7 +59,7 @@ export default function VKBotConfirmationGuard() {
     }, 60_000);
 
     return () => window.clearInterval(timer);
-  }, [shouldCheck]);
+  }, [refresh, shouldCheck]);
 
   if (!shouldCheck) return null;
 
@@ -60,9 +74,13 @@ export default function VKBotConfirmationGuard() {
         </p>
         <div className="vk-bot-confirmation__actions">
           {botUrl && (
-            <AppButton onClick={() => window.open(botUrl, "_blank", "noopener,noreferrer")}>Открыть VK-бота</AppButton>
+            <AppButton className="close-btn" onClick={() => window.open(botUrl, "_blank", "noopener,noreferrer")}>
+              Открыть VK-бота
+            </AppButton>
           )}
-          <AppButton onClick={refresh}>Проверить подтверждение</AppButton>
+          <AppButton className="btn-send" loading={checking} onClick={() => void refresh(true)}>
+            Проверить подтверждение
+          </AppButton>
         </div>
       </div>
     </Modal>

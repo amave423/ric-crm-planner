@@ -15,6 +15,7 @@ import AppSelect from "../../../components/UI/Select";
 import { requireVKBotConfirmation } from "../../../components/VKBotConfirmation/VKBotConfirmationGuard";
 
 type ProfileResponse = {
+  vk?: string;
   telegram?: string;
   university?: string;
   course?: string | number;
@@ -79,7 +80,7 @@ export default function ApplyModal({
         if (!mounted) return;
 
         setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");
-        setTelegram(String(profile?.telegram ?? userRecord.telegram ?? ""));
+        setTelegram(String(profile?.vk ?? userRecord.vk ?? profile?.telegram ?? userRecord.telegram ?? ""));
         setUniversity(String(profile?.university ?? userRecord.university ?? ""));
         setCourse(String(profile?.course ?? userRecord.course ?? ""));
         setSpecialization(String(profile?.specialty ?? userRecord.specialty ?? specializations[0]?.title ?? ""));
@@ -93,7 +94,8 @@ export default function ApplyModal({
       } catch {
         if (!mounted) return;
         setStudentName(user ? `${user.name || ""} ${user.surname || ""}`.trim() : "");
-        setTelegram("");
+        const userRecord = (user ?? {}) as Record<string, unknown>;
+        setTelegram(String(userRecord.vk ?? userRecord.telegram ?? ""));
         setUniversity("");
         setCourse("");
         setSpecialization(specializations[0]?.title || "");

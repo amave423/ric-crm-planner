@@ -40,6 +40,7 @@ interface AuthContextType {
   register: (u: Omit<User, "id"> & { confirm?: string }) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
   updateProfile: (u: ProfileUpdate) => Promise<void>;
+  refreshUser: () => Promise<User | null>;
 }
 
 export const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -287,6 +288,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(LS_CURRENT_USER);
   };
 
+  const refreshUserMock = async () => user;
+
   const loginBackend = async (email: string, password: string) => {
     try {
       const info = await client.login(email, password);
@@ -297,6 +300,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return true;
     } catch {
       return false;
+    }
+  };
+
+  const refreshUserBackend = async () => {
+    try {
+      const info = await client.get("/api/users/user-info/");
+      const mapped = mapBackendUser(info);
+      setUser(mapped);
+      if (mapped) localStorage.setItem(LS_CURRENT_USER, JSON.stringify(mapped));
+      else localStorage.removeItem(LS_CURRENT_USER);
+      return mapped;
+    } catch {
+      return user;
     }
   };
 
@@ -379,6 +395,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register: registerMock,
         logout: logoutMock,
         updateProfile: updateProfileMock,
+        refreshUser: refreshUserMock,
       }
     : {
         user,
@@ -386,6 +403,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register: registerBackend,
         logout: logoutBackend,
         updateProfile: updateProfileBackend,
+        refreshUser: refreshUserBackend,
       };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
