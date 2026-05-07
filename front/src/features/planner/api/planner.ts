@@ -33,11 +33,15 @@ type BackendPlannerTeam = Partial<PlannerState["teams"][number]> & {
   direction_id?: number | string;
   project_id?: number | string;
   source_request_ids?: Array<number | string>;
+  created_by?: number | string;
+  updated_at?: string;
 };
 
 type BackendPlannerParentTask = Partial<PlannerState["parentTasks"][number]> & {
   assigneeId?: number | string;
   assignee_id?: number | string;
+  created_by?: number | string;
+  updated_at?: string;
 };
 
 type BackendPlannerSubtask = Partial<PlannerState["subtasks"][number]> & {
@@ -45,6 +49,8 @@ type BackendPlannerSubtask = Partial<PlannerState["subtasks"][number]> & {
   assignee_id?: number | string;
   inSprint?: boolean;
   in_sprint?: boolean | number | string;
+  created_by?: number | string;
+  updated_at?: string;
 };
 
 function toNumber(value: unknown): number | undefined {
@@ -94,6 +100,8 @@ function mapBackendTeams(teams: unknown, fallback: PlannerState): PlannerState["
       sourceRequestIds: Array.isArray(team.sourceRequestIds ?? team.source_request_ids)
         ? (team.sourceRequestIds ?? team.source_request_ids ?? []).map((id) => Number(id)).filter((id) => Number.isFinite(id))
         : [],
+      createdBy: toNumber(team.createdBy ?? team.created_by),
+      updatedAt: String(team.updatedAt ?? team.updated_at ?? ""),
     };
   });
 }
@@ -111,6 +119,8 @@ function mapBackendParentTasks(parentTasks: unknown, fallback: PlannerState): Pl
       assigneeId: toNumber(task.assigneeId ?? task.assignee_id),
       startDate: String(task.startDate ?? ""),
       endDate: String(task.endDate ?? ""),
+      createdBy: toNumber(task.createdBy ?? task.created_by),
+      updatedAt: String(task.updatedAt ?? task.updated_at ?? ""),
     };
   });
 }
@@ -148,6 +158,8 @@ function mapBackendPlanner(raw: unknown): PlannerState {
           endDate: String(subtask.endDate ?? fallbackSubtask?.endDate ?? ""),
           inSprint,
           status: String(subtask.status ?? fallbackSubtask?.status ?? ""),
+          createdBy: toNumber(subtask.createdBy ?? subtask.created_by) ?? fallbackSubtask?.createdBy,
+          updatedAt: String(subtask.updatedAt ?? subtask.updated_at ?? fallbackSubtask?.updatedAt ?? ""),
         };
       })
     : fallback.subtasks;

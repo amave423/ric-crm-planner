@@ -1,13 +1,11 @@
 ﻿import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Modal as AntModal, Select } from "antd";
+import { Modal as AntModal } from "antd";
 import {
   buildParticipantsFromRequests,
   getPlannerState,
   hasPlannerAccessStatus,
   savePlannerState,
-  sendPlannerInviteMessages,
   syncParticipants,
-  type PlannerInviteRecipientMode,
 } from "../api/planner";
 import { getRequests } from "../../requests/api/requests";
 import { useToast } from "../../../components/Toast/ToastProvider";
@@ -92,8 +90,6 @@ export default function PlannerPage() {
   const [subInSprint, setSubInSprint] = useState(false);
   const [newColumn, setNewColumn] = useState("");
   const [closeEnrollmentTarget, setCloseEnrollmentTarget] = useState<{ eventId: number; eventTitle: string } | null>(null);
-  const [plannerInviteTarget, setPlannerInviteTarget] = useState<{ eventId: number; eventTitle: string } | null>(null);
-  const [plannerInviteRecipientMode, setPlannerInviteRecipientMode] = useState<PlannerInviteRecipientMode>("joined");
   const [deleteTeamTargetId, setDeleteTeamTargetId] = useState<number | null>(null);
   const [teamInfoOpen, setTeamInfoOpen] = useState(false);
   const [teamInfoId, setTeamInfoId] = useState<number | null>(null);
@@ -117,9 +113,7 @@ export default function PlannerPage() {
     showToast("success", message);
   };
 
-  const notifyInfo = (message: string) => {
-    showToast("info", message);
-  };
+  const currentTimestamp = () => new Date().toISOString();
 
   useEffect(() => {
     if (!isPlannerLoaded) return;
@@ -475,18 +469,20 @@ export default function PlannerPage() {
         acc[String(applicant.ownerId)] = String(applicant.specialization);
         return acc;
       }, {});
-    const created: PlannerTeam = {
-      id: nextPlannerId(state.teams),
-      name: teamName,
-      curatorId,
-      memberIds,
+	    const created: PlannerTeam = {
+	      id: nextPlannerId(state.teams),
+	      name: teamName,
+	      curatorId,
+	      memberIds,
       memberRoles,
       confirmed: false,
       eventId: group.eventId,
-      directionId,
-      projectId,
-      sourceRequestIds: requestIds,
-    };
+	      directionId,
+	      projectId,
+	      sourceRequestIds: requestIds,
+	      createdBy: userId || undefined,
+	      updatedAt: currentTimestamp(),
+	    };
 
     setState((prev) => {
       const participantsById = new Map(prev.participants.map((p) => [Number(p.id), p]));
@@ -527,14 +523,16 @@ export default function PlannerPage() {
       ...prev,
       parentTasks: [
         ...prev.parentTasks,
-        {
-          id: nextPlannerId(prev.parentTasks),
-          teamId,
-          title: parentTitle.trim(),
-          assigneeId: parentAssigneeId ? Number(parentAssigneeId) : undefined,
-          startDate: parentStart,
-          endDate: parentEnd,
-        },
+	        {
+	          id: nextPlannerId(prev.parentTasks),
+	          teamId,
+	          title: parentTitle.trim(),
+	          assigneeId: parentAssigneeId ? Number(parentAssigneeId) : undefined,
+	          startDate: parentStart,
+	          endDate: parentEnd,
+	          createdBy: userId || undefined,
+	          updatedAt: currentTimestamp(),
+	        },
       ],
     }));
     setParentTitle("");
@@ -568,11 +566,13 @@ export default function PlannerPage() {
       title: subTitle.trim(),
       role: "",
       assigneeId: Number(subAssigneeId),
-      startDate: subStart,
-      endDate: subEnd,
-      status: plannedColumn,
-      inSprint: subInSprint,
-    };
+	      startDate: subStart,
+	      endDate: subEnd,
+	      status: plannedColumn,
+	      inSprint: subInSprint,
+	      createdBy: userId || undefined,
+	      updatedAt: currentTimestamp(),
+	    };
     setState((prev) => ({ ...prev, subtasks: [...prev.subtasks, created] }));
     setSubTitle("");
     setSubAssigneeId("");
@@ -622,10 +622,11 @@ export default function PlannerPage() {
           ? {
               ...p,
               title: nextTitle,
-              assigneeId: editingParentDraft.assigneeId,
-              startDate: editingParentDraft.startDate,
-              endDate: editingParentDraft.endDate,
-            }
+	              assigneeId: editingParentDraft.assigneeId,
+	              startDate: editingParentDraft.startDate,
+	              endDate: editingParentDraft.endDate,
+	              updatedAt: currentTimestamp(),
+	            }
           : p
       ),
     }));
@@ -684,9 +685,10 @@ export default function PlannerPage() {
               assigneeId: editingSubtaskDraft.assigneeId,
               startDate: editingSubtaskDraft.startDate,
               endDate: editingSubtaskDraft.endDate,
-              status: safeStatus,
-              inSprint: Boolean(editingSubtaskDraft.inSprint),
-            }
+	              status: safeStatus,
+	              inSprint: Boolean(editingSubtaskDraft.inSprint),
+	              updatedAt: currentTimestamp(),
+	            }
           : s
       ),
     }));
@@ -728,33 +730,6 @@ export default function PlannerPage() {
     }));
     setCloseEnrollmentTarget(null);
     notifySuccess(`Набор по мероприятию «${eventTitle}» завершён`);
-    openPlannerInviteModal(eventId, eventTitle);
-  };
-
-  const openPlannerInviteModal = (eventId: number, eventTitle: string) => {
-    setPlannerInviteTarget({ eventId, eventTitle });
-    setPlannerInviteRecipientMode("joined");
-  };
-
-  const sendPlannerInvites = async () => {
-    if (!plannerInviteTarget) return;
-    try {
-      const result = await sendPlannerInviteMessages(plannerInviteTarget.eventId, plannerInviteRecipientMode);
-      if (!result) return;
-      if (result.sent > 0 && result.failed > 0) {
-        notifyInfo(`VK-приглашения отправлены: ${result.sent}, ошибок: ${result.failed}`);
-      } else if (result.sent > 0) {
-        notifySuccess(`VK-приглашения отправлены: ${result.sent}`);
-      } else if (result.failed > 0) {
-        notifyError(`Не удалось отправить VK-приглашения: ${result.failed}`);
-      }
-      if (result.sent === 0 && result.failed === 0) {
-        notifyInfo("Нет подходящих заявок для VK-приглашений");
-      }
-      setPlannerInviteTarget(null);
-    } catch {
-      notifyError("Не удалось отправить VK-приглашения");
-    }
   };
 
   const toggleEventVisibility = (eventId: number, enabled: boolean) => {
@@ -775,7 +750,7 @@ export default function PlannerPage() {
       const moved = prev.subtasks.find((subtask) => Number(subtask.id) === Number(subtaskId));
       if (!moved || !canEditTeam(moved.teamId)) return prev;
 
-      const movedNext: PlannerSubtask = { ...moved, status: column, inSprint: true };
+	      const movedNext: PlannerSubtask = { ...moved, status: column, inSprint: true, updatedAt: currentTimestamp() };
       const targetSubtasks = prev.subtasks.filter(
         (subtask) =>
           Number(subtask.id) !== Number(subtaskId) &&
@@ -912,7 +887,6 @@ export default function PlannerPage() {
           visibleTeams={visibleTeams}
           userNameById={userNameById}
           onOpenConfirmCloseEnrollment={openCloseEnrollment}
-          onSendPlannerInvites={openPlannerInviteModal}
           onToggleEventVisibility={toggleEventVisibility}
           onSyncParticipants={() => setState((prev) => ({ ...prev, participants: snapshotParticipants(prev.closedEventIds) }))}
           onToggleApplicantForGroup={toggleApplicantForGroup}
@@ -1084,29 +1058,6 @@ export default function PlannerPage() {
         onClose={closeTaskCard}
       />
       <AntModal
-        open={Boolean(plannerInviteTarget)}
-        title="Отправить VK-приглашения"
-        okText="Отправить"
-        cancelText="Отмена"
-        onCancel={() => setPlannerInviteTarget(null)}
-        onOk={sendPlannerInvites}
-        centered
-      >
-        <p>
-          Выберите, кому бот отправит приглашение по мероприятию «{plannerInviteTarget?.eventTitle || ""}».
-        </p>
-        <Select
-          style={{ width: "100%" }}
-          value={plannerInviteRecipientMode}
-          onChange={(value) => setPlannerInviteRecipientMode(value as PlannerInviteRecipientMode)}
-          options={[
-            { value: "joined", label: "Участникам, добавившимся в орг. чат" },
-            { value: "all", label: "Всем участникам мероприятия" },
-            { value: "declined", label: "Всем отклонившим участникам мероприятия" },
-          ]}
-        />
-      </AntModal>
-      <AntModal
         open={automationOpen}
         onCancel={() => setAutomationOpen(false)}
         footer={null}
@@ -1123,13 +1074,6 @@ export default function PlannerPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
 
 
 

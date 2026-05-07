@@ -24,7 +24,6 @@ type TeamsTabProps = {
   visibleTeams: PlannerTeam[];
   userNameById: Map<number, string>;
   onOpenConfirmCloseEnrollment: (eventId: number, eventTitle: string) => void;
-  onSendPlannerInvites: (eventId: number, eventTitle: string) => void;
   onToggleEventVisibility: (eventId: number, enabled: boolean) => void;
   onSyncParticipants: () => void;
   onToggleApplicantForGroup: (groupKey: string, ownerId: number) => void;
@@ -79,7 +78,6 @@ export default function TeamsTab({
   visibleTeams,
   userNameById,
   onOpenConfirmCloseEnrollment,
-  onSendPlannerInvites,
   onToggleEventVisibility,
   onSyncParticipants,
   onToggleApplicantForGroup,
@@ -513,16 +511,6 @@ export default function TeamsTab({
                                 Завершить набор
                               </AppButton>
                             )}
-                            <AppButton
-                              type="button"
-                              className="planner-source-close-btn"
-                              onClick={(event) => {
-                                stopSummaryToggle(event);
-                                onSendPlannerInvites(eventId, eventNode.title);
-                              }}
-                            >
-                              Отправить VK-приглашения
-                            </AppButton>
                           </>
                         )}
 
