@@ -567,6 +567,21 @@
   gap: 7px;
 }
 
+.automation-form__vk-button {
+  display: grid;
+  grid-template-columns: 1fr 120px 1fr;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #d8e4f5;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.automation-form__vk-button .app-input:last-of-type,
+.automation-form__vk-button .ant-btn {
+  grid-column: 1 / -1;
+}
+
 .automation-form label > span,
 .automation-form__code > span {
   color: #5e6f86;

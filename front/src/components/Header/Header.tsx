@@ -18,6 +18,7 @@ import { useNotifications } from "../../context/NotificationsContext";
 import { useToast } from "../Toast/ToastProvider";
 import Modal from "../Modal/Modal";
 import AppButton from "../UI/Button";
+import logoIcon from "../../assets/LogoIcon.png";
 
 const HEADER_TEXT = {
   automation: "Архив мероприятий",
@@ -237,7 +238,7 @@ export default function Header() {
 
       <div className="header-center">
         <AppButton className="header-logo" onClick={() => goTo("/")}>
-          <img src="/src/assets/LogoIcon.png" alt="logo" className="header-logo-img" />
+          <img src={logoIcon} alt="logo" className="header-logo-img" />
         </AppButton>
       </div>
 

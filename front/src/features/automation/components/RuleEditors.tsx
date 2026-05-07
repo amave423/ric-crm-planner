@@ -72,6 +72,14 @@ export function RobotEditor({ robot, stageOptions, onChange, onDelete }: RobotEd
           />
         </label>
 
+        {robot.action.includes("vk") && (
+          <VKButtonsEditor
+            robot={robot}
+            stageOptions={stageOptions}
+            onChange={(buttons) => onChange((item) => ({ ...item, buttons }))}
+          />
+        )}
+
         <ReadOnlyCode label={TEXT.actionCode} value={robot.action} />
 
         <AppButton className="automation-form__delete" onClick={onDelete}>
@@ -80,6 +88,70 @@ export function RobotEditor({ robot, stageOptions, onChange, onDelete }: RobotEd
         </AppButton>
       </div>
     </div>
+  );
+}
+
+function VKButtonsEditor({
+  robot,
+  stageOptions,
+  onChange,
+}: {
+  robot: AutomationRobot;
+  stageOptions: StageOption[];
+  onChange: (buttons: NonNullable<AutomationRobot["buttons"]>) => void;
+}) {
+  const buttons = robot.buttons || [];
+
+  const updateButton = (buttonId: string, patch: Partial<NonNullable<AutomationRobot["buttons"]>[number]>) => {
+    onChange(buttons.map((button) => (button.id === buttonId ? { ...button, ...patch } : button)));
+  };
+
+  return (
+    <fieldset className="automation-form__fieldset">
+      <legend>Кнопки VK</legend>
+      {buttons.map((button) => (
+        <div className="automation-form__vk-button" key={button.id}>
+          <AppInput value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} />
+          <AppSelect
+            value={button.color}
+            onChange={(value) => updateButton(button.id, { color: value as NonNullable<AutomationRobot["buttons"]>[number]["color"] })}
+            options={[
+              { value: "primary", label: "Синяя" },
+              { value: "positive", label: "Зеленая" },
+              { value: "negative", label: "Красная" },
+              { value: "secondary", label: "Серая" },
+            ]}
+          />
+          <AppSelect
+            value={button.targetStageId}
+            onChange={(value) => updateButton(button.id, { targetStageId: String(value) })}
+            options={stageOptions}
+          />
+          <AppInput
+            value={button.responseMessage}
+            onChange={(event) => updateButton(button.id, { responseMessage: event.target.value })}
+            placeholder="Ответ после нажатия"
+          />
+          <AppButton onClick={() => onChange(buttons.filter((item) => item.id !== button.id))}>Удалить</AppButton>
+        </div>
+      ))}
+      <AppButton
+        onClick={() =>
+          onChange([
+            ...buttons,
+            {
+              id: `vk-button-${Date.now()}`,
+              label: "Кнопка",
+              color: "primary",
+              targetStageId: stageOptions[0]?.value || robot.stageId,
+              responseMessage: "Статус заявки обновлен.",
+            },
+          ])
+        }
+      >
+        Добавить кнопку
+      </AppButton>
+    </fieldset>
   );
 }
 

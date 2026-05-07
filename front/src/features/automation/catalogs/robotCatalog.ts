@@ -13,6 +13,29 @@ export const ROBOT_CATALOG: Record<AutomationScope, CatalogGroup[]> = {
           message: "Здравствуйте! Отправляем информацию по следующему шагу.",
         },
         {
+          code: "message.vk_interactive",
+          title: "Отправить VK с кнопками",
+          description: "Отправляет проектанту VK-сообщение с настраиваемыми кнопками и сменой статуса.",
+          subject: "Подтвердите действие",
+          message: "Выберите один из вариантов ниже.",
+          buttons: [
+            {
+              id: "accept",
+              label: "Принять",
+              color: "positive",
+              targetStageId: "application-started",
+              responseMessage: "Решение принято, статус заявки обновлен.",
+            },
+            {
+              id: "decline",
+              label: "Отказаться",
+              color: "negative",
+              targetStageId: "application-submitted",
+              responseMessage: "Ответ зафиксирован.",
+            },
+          ],
+        },
+        {
           code: "chat.link.vk",
           title: "Отправить ссылку на орг.чат",
           description: "Отправляет проектанту VK-сообщение с индивидуальной ссылкой на организационный чат.",

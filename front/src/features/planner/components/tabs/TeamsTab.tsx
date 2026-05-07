@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import type { SyntheticEvent } from "react";
 import { InfoCircleOutlined } from "@ant-design/icons";
 import type { PlannerState, PlannerTeam } from "../../../../types/planner";
@@ -24,7 +24,7 @@ type TeamsTabProps = {
   visibleTeams: PlannerTeam[];
   userNameById: Map<number, string>;
   onOpenConfirmCloseEnrollment: (eventId: number, eventTitle: string) => void;
-  onSendPlannerInvites: (eventId: number) => void;
+  onSendPlannerInvites: (eventId: number, eventTitle: string) => void;
   onToggleEventVisibility: (eventId: number, enabled: boolean) => void;
   onSyncParticipants: () => void;
   onToggleApplicantForGroup: (groupKey: string, ownerId: number) => void;
@@ -135,7 +135,7 @@ export default function TeamsTab({
       return fullName(currentUser) || currentUser.email || `ID ${currentUser.id}`;
     }
 
-    return userNameById.get(Number(id)) || `Участник #${id}`;
+    return userNameById.get(Number(id)) || `РЈС‡Р°СЃС‚РЅРёРє #${id}`;
   };
 
   const getCuratorOptions = (team: PlannerTeam) => {
@@ -144,10 +144,10 @@ export default function TeamsTab({
     team.memberIds.forEach((memberId) => optionIds.add(Number(memberId)));
 
     return [
-      { value: "", label: "Выберите куратора", disabled: true },
+      { value: "", label: "Р’С‹Р±РµСЂРёС‚Рµ РєСѓСЂР°С‚РѕСЂР°", disabled: true },
       ...Array.from(optionIds).map((id) => ({
         value: String(id),
-        label: Number(id) === Number(currentUser.id) ? `Организатор: ${getCuratorName(id)}` : getCuratorName(id),
+        label: Number(id) === Number(currentUser.id) ? `РћСЂРіР°РЅРёР·Р°С‚РѕСЂ: ${getCuratorName(id)}` : getCuratorName(id),
       })),
     ];
   };
@@ -168,7 +168,7 @@ export default function TeamsTab({
   const renderApplicantInfo = (applicant: ProjectApplicantsGroup["applicants"][number]) => (
     <div className={`planner-applicant-columns ${applicant.desiredDirections.length === 0 ? "planner-applicant-columns--compact" : ""}`}>
       <span className="planner-applicant-name">{applicant.name}</span>
-      <span className="planner-applicant-specialization">{applicant.specialization || "Без специализации"}</span>
+      <span className="planner-applicant-specialization">{applicant.specialization || "Р‘РµР· СЃРїРµС†РёР°Р»РёР·Р°С†РёРё"}</span>
       {applicant.desiredDirections.length > 0 && (
         <span className="planner-applicant-directions">
           {applicant.desiredDirections.map((direction) => (
@@ -182,9 +182,9 @@ export default function TeamsTab({
   const renderApplicantHeader = (compact = false) => (
     <div className="planner-applicant-row planner-applicant-row--header" aria-hidden="true">
       <div className={`planner-applicant-columns planner-applicant-columns--header ${compact ? "planner-applicant-columns--compact" : ""}`}>
-        <span>ФИ</span>
-        <span>Специализация</span>
-        {!compact && <span>Желаемое направление</span>}
+        <span>Р¤Р</span>
+        <span>РЎРїРµС†РёР°Р»РёР·Р°С†РёСЏ</span>
+        {!compact && <span>Р–РµР»Р°РµРјРѕРµ РЅР°РїСЂР°РІР»РµРЅРёРµ</span>}
       </div>
       <span className="planner-applicant-switch-placeholder" />
     </div>
@@ -194,14 +194,14 @@ export default function TeamsTab({
     <section className="teams-created-block">
       <div className="teams-panel-head teams-panel-head--compact">
         <div>
-          <div className="teams-eyebrow">Готовый список</div>
-          <h3 className="h3">Сформированные команды</h3>
-          <p>{visibleTeams.length ? `${visibleTeams.length} команд` : "Пока нет созданных команд"}</p>
+          <div className="teams-eyebrow">Р“РѕС‚РѕРІС‹Р№ СЃРїРёСЃРѕРє</div>
+          <h3 className="h3">РЎС„РѕСЂРјРёСЂРѕРІР°РЅРЅС‹Рµ РєРѕРјР°РЅРґС‹</h3>
+          <p>{visibleTeams.length ? `${visibleTeams.length} РєРѕРјР°РЅРґ` : "РџРѕРєР° РЅРµС‚ СЃРѕР·РґР°РЅРЅС‹С… РєРѕРјР°РЅРґ"}</p>
         </div>
       </div>
 
       <div className="teams-list">
-        {visibleTeams.length === 0 && <div className="planner-empty-inline">Команды появятся здесь после формирования.</div>}
+        {visibleTeams.length === 0 && <div className="planner-empty-inline">РљРѕРјР°РЅРґС‹ РїРѕСЏРІСЏС‚СЃСЏ Р·РґРµСЃСЊ РїРѕСЃР»Рµ С„РѕСЂРјРёСЂРѕРІР°РЅРёСЏ.</div>}
 
         {visibleTeams.map((team) => (
           <div key={team.id} className="team-item">
@@ -210,7 +210,7 @@ export default function TeamsTab({
                 <AppInput
                   value={team.name}
                   disabled={team.confirmed}
-                  title={team.confirmed ? "Чтобы изменить название, сначала сними подтверждение команды" : undefined}
+                  title={team.confirmed ? "Р§С‚РѕР±С‹ РёР·РјРµРЅРёС‚СЊ РЅР°Р·РІР°РЅРёРµ, СЃРЅР°С‡Р°Р»Р° СЃРЅРёРјРё РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ РєРѕРјР°РЅРґС‹" : undefined}
                   onChange={(event) => onRenameTeam(team.id, event.target.value)}
                 />
               ) : (
@@ -219,14 +219,14 @@ export default function TeamsTab({
 
               {isOrganizer ? (
                 <div className={`team-badge ${team.confirmed ? "ok" : "draft"}`}>
-                  {team.confirmed ? "Подтверждена" : "Черновик"}
+                  {team.confirmed ? "РџРѕРґС‚РІРµСЂР¶РґРµРЅР°" : "Р§РµСЂРЅРѕРІРёРє"}
                 </div>
               ) : (
                 <div className="team-badge-stack">
                   <div className={`team-badge ${team.confirmed ? "ok" : "draft"}`}>
-                    {team.confirmed ? "Подтверждена" : "Черновик"}
+                    {team.confirmed ? "РџРѕРґС‚РІРµСЂР¶РґРµРЅР°" : "Р§РµСЂРЅРѕРІРёРє"}
                   </div>
-                  <AppButton className="info-icon-btn" type="button" onClick={() => onOpenTeamInfo(team.id)} aria-label="Информация о команде">
+                  <AppButton className="info-icon-btn" type="button" onClick={() => onOpenTeamInfo(team.id)} aria-label="РРЅС„РѕСЂРјР°С†РёСЏ Рѕ РєРѕРјР°РЅРґРµ">
                     <InfoCircleOutlined />
                   </AppButton>
                 </div>
@@ -235,18 +235,18 @@ export default function TeamsTab({
 
             <div className="team-meta-grid">
               <div className="team-value">
-                <span>Куратор</span>
+                <span>РљСѓСЂР°С‚РѕСЂ</span>
                 {team.curatorId ? userNameById.get(team.curatorId) || `ID ${team.curatorId}` : "-"}
               </div>
               <div className="team-value">
-                <span>Участники</span>
+                <span>РЈС‡Р°СЃС‚РЅРёРєРё</span>
                 {team.memberIds.length}
               </div>
             </div>
 
             {sourceLabelForTeam(team) && (
               <div className="team-value team-value--source">
-                <span>Источник</span>
+                <span>РСЃС‚РѕС‡РЅРёРє</span>
                 {sourceLabelForTeam(team)}
               </div>
             )}
@@ -264,10 +264,10 @@ export default function TeamsTab({
                   disabled={!curatorDraftByTeam[team.id]}
                   onClick={() => submitTeamCurator(team.id)}
                 >
-                  Назначить
+                  РќР°Р·РЅР°С‡РёС‚СЊ
                 </AppButton>
                 <AppButton className="link-btn" type="button" onClick={() => setCuratorEditTeamId(null)}>
-                  Отмена
+                  РћС‚РјРµРЅР°
                 </AppButton>
               </div>
             )}
@@ -275,10 +275,10 @@ export default function TeamsTab({
             {isOrganizer && (
               <div className="team-actions">
                 <AppButton className="primary" type="button" onClick={() => onToggleTeamConfirmed(team.id)}>
-                  {team.confirmed ? "Расформировать" : "Подтвердить"}
+                  {team.confirmed ? "Р Р°СЃС„РѕСЂРјРёСЂРѕРІР°С‚СЊ" : "РџРѕРґС‚РІРµСЂРґРёС‚СЊ"}
                 </AppButton>
                 <AppButton className="link-btn" type="button" onClick={() => onOpenTeamEdit(team.id)}>
-                  Состав
+                  РЎРѕСЃС‚Р°РІ
                 </AppButton>
                 {!team.curatorId && curatorEditTeamId !== team.id && (
                   <AppButton
@@ -289,17 +289,17 @@ export default function TeamsTab({
                       setCuratorEditTeamId(team.id);
                     }}
                   >
-                    Назначить куратора
+                    РќР°Р·РЅР°С‡РёС‚СЊ РєСѓСЂР°С‚РѕСЂР°
                   </AppButton>
                 )}
                 <AppButton
                   className="danger-outline"
                   type="button"
                   disabled={team.confirmed}
-                  title={team.confirmed ? "Сначала расформируйте команду" : undefined}
+                  title={team.confirmed ? "РЎРЅР°С‡Р°Р»Р° СЂР°СЃС„РѕСЂРјРёСЂСѓР№С‚Рµ РєРѕРјР°РЅРґСѓ" : undefined}
                   onClick={() => onDeleteTeam(team.id)}
                 >
-                  Удалить
+                  РЈРґР°Р»РёС‚СЊ
                 </AppButton>
               </div>
             )}
@@ -315,23 +315,23 @@ export default function TeamsTab({
         <section className="planner-card teams-panel teams-panel--selection">
           <div className="teams-panel-head teams-panel-head--compact">
             <div>
-              <div className="teams-eyebrow">Сбор команды</div>
-              <h3 className="h3">Выбранные участники</h3>
-              <p>Выберите проектантов в мероприятии слева.</p>
+              <div className="teams-eyebrow">РЎР±РѕСЂ РєРѕРјР°РЅРґС‹</div>
+              <h3 className="h3">Р’С‹Р±СЂР°РЅРЅС‹Рµ СѓС‡Р°СЃС‚РЅРёРєРё</h3>
+              <p>Р’С‹Р±РµСЂРёС‚Рµ РїСЂРѕРµРєС‚Р°РЅС‚РѕРІ РІ РјРµСЂРѕРїСЂРёСЏС‚РёРё СЃР»РµРІР°.</p>
             </div>
           </div>
-          <div className="planner-empty-inline">Нет доступных мероприятий.</div>
+          <div className="planner-empty-inline">РќРµС‚ РґРѕСЃС‚СѓРїРЅС‹С… РјРµСЂРѕРїСЂРёСЏС‚РёР№.</div>
         </section>
       );
     }
 
     const curatorOptions = [
-      { value: "", label: "Куратор команды", disabled: true },
+      { value: "", label: "РљСѓСЂР°С‚РѕСЂ РєРѕРјР°РЅРґС‹", disabled: true },
       ...(!activeSelectedApplicants.some((applicant) => Number(applicant.ownerId) === Number(currentUser.id))
         ? [
             {
               value: String(currentUser.id),
-              label: `Организатор: ${fullName(currentUser) || currentUser.email || `ID ${currentUser.id}`}`,
+              label: `РћСЂРіР°РЅРёР·Р°С‚РѕСЂ: ${fullName(currentUser) || currentUser.email || `ID ${currentUser.id}`}`,
             },
           ]
         : []),
@@ -345,8 +345,8 @@ export default function TeamsTab({
       <section className="planner-card teams-panel teams-panel--selection">
         <div className="teams-panel-head teams-panel-head--compact">
           <div>
-            <div className="teams-eyebrow">Сбор команды</div>
-            <h3 className="h3">Выбранные участники</h3>
+            <div className="teams-eyebrow">РЎР±РѕСЂ РєРѕРјР°РЅРґС‹</div>
+            <h3 className="h3">Р’С‹Р±СЂР°РЅРЅС‹Рµ СѓС‡Р°СЃС‚РЅРёРєРё</h3>
             <p>{activeGroup.eventTitle}</p>
           </div>
           <div className="team-badge draft">{activeSelectedApplicants.length}</div>
@@ -354,7 +354,7 @@ export default function TeamsTab({
 
         <div className="planner-selected-list">
           {activeSelectedApplicants.length === 0 ? (
-            <div className="planner-empty-inline">Выберите участников в мероприятии слева.</div>
+            <div className="planner-empty-inline">Р’С‹Р±РµСЂРёС‚Рµ СѓС‡Р°СЃС‚РЅРёРєРѕРІ РІ РјРµСЂРѕРїСЂРёСЏС‚РёРё СЃР»РµРІР°.</div>
           ) : (
             <>
               {renderApplicantHeader(true)}
@@ -362,7 +362,7 @@ export default function TeamsTab({
                 <label key={`${activeGroup.key}:selected:${applicant.ownerId}`} className="planner-check planner-applicant-row planner-applicant-row--selected">
                   <div className="planner-applicant-columns planner-applicant-columns--compact">
                     <span className="planner-applicant-name">{applicant.name}</span>
-                    <span className="planner-applicant-specialization">{applicant.specialization || "Без специализации"}</span>
+                    <span className="planner-applicant-specialization">{applicant.specialization || "Р‘РµР· СЃРїРµС†РёР°Р»РёР·Р°С†РёРё"}</span>
                   </div>
                   <AppSwitch checked onChange={() => onToggleApplicantForGroup(activeGroup.key, applicant.ownerId)} compact />
                 </label>
@@ -375,7 +375,7 @@ export default function TeamsTab({
           <AppInput
             value={teamNameByGroup[activeGroup.key] || ""}
             onChange={(event) => onTeamNameChange(activeGroup.key, event.target.value)}
-            placeholder="Название команды"
+            placeholder="РќР°Р·РІР°РЅРёРµ РєРѕРјР°РЅРґС‹"
           />
 
           <AppSelect
@@ -383,7 +383,7 @@ export default function TeamsTab({
             onChange={(value) => onTeamDirectionChange(activeGroup.key, String(value))}
             disabled={activeGroup.directionOptions.length === 0}
             options={[
-              { value: "", label: activeGroup.directionOptions.length ? "Выберите направление" : "У мероприятия нет направлений", disabled: true },
+              { value: "", label: activeGroup.directionOptions.length ? "Р’С‹Р±РµСЂРёС‚Рµ РЅР°РїСЂР°РІР»РµРЅРёРµ" : "РЈ РјРµСЂРѕРїСЂРёСЏС‚РёСЏ РЅРµС‚ РЅР°РїСЂР°РІР»РµРЅРёР№", disabled: true },
               ...activeGroup.directionOptions.map((direction) => ({ value: String(direction.id), label: direction.title })),
             ]}
           />
@@ -393,7 +393,7 @@ export default function TeamsTab({
             onChange={(value) => onTeamProjectChange(activeGroup.key, String(value))}
             disabled={!selectedDirectionId || availableProjects.length === 0}
             options={[
-              { value: "", label: availableProjects.length ? "Выберите проект" : "У направления нет проектов", disabled: true },
+              { value: "", label: availableProjects.length ? "Р’С‹Р±РµСЂРёС‚Рµ РїСЂРѕРµРєС‚" : "РЈ РЅР°РїСЂР°РІР»РµРЅРёСЏ РЅРµС‚ РїСЂРѕРµРєС‚РѕРІ", disabled: true },
               ...availableProjects.map((project) => ({ value: String(project.id), label: project.title })),
             ]}
           />
@@ -405,7 +405,7 @@ export default function TeamsTab({
           />
 
           <AppButton className="primary" type="button" onClick={() => onCreateTeamFromGroup(activeGroup, teamNameByGroup[activeGroup.key] || "")}>
-            Сформировать команду
+            РЎС„РѕСЂРјРёСЂРѕРІР°С‚СЊ РєРѕРјР°РЅРґСѓ
           </AppButton>
         </div>
       </section>
@@ -418,27 +418,27 @@ export default function TeamsTab({
         <section className="planner-card teams-panel teams-panel--builder">
           <div className="teams-panel-head">
             <div>
-              <div className="teams-eyebrow">Работа с заявками</div>
-              <h3 className="h3">Формирование команд</h3>
-              <p>Выбери проектантов внутри мероприятия, затем справа задай параметры команды.</p>
+              <div className="teams-eyebrow">Р Р°Р±РѕС‚Р° СЃ Р·Р°СЏРІРєР°РјРё</div>
+              <h3 className="h3">Р¤РѕСЂРјРёСЂРѕРІР°РЅРёРµ РєРѕРјР°РЅРґ</h3>
+              <p>Р’С‹Р±РµСЂРё РїСЂРѕРµРєС‚Р°РЅС‚РѕРІ РІРЅСѓС‚СЂРё РјРµСЂРѕРїСЂРёСЏС‚РёСЏ, Р·Р°С‚РµРј СЃРїСЂР°РІР° Р·Р°РґР°Р№ РїР°СЂР°РјРµС‚СЂС‹ РєРѕРјР°РЅРґС‹.</p>
             </div>
 
             {hasClosedEvents && (
               <AppButton className="primary" type="button" onClick={onSyncParticipants}>
-                Синхронизировать участников
+                РЎРёРЅС…СЂРѕРЅРёР·РёСЂРѕРІР°С‚СЊ СѓС‡Р°СЃС‚РЅРёРєРѕРІ
               </AppButton>
             )}
           </div>
 
           {hasClosedEvents && (
             <div className="planner-note teams-note">
-              Для мероприятий с завершённым набором в планировщике остаются только участники со статусом «Приступил к ПШ».
+              Р”Р»СЏ РјРµСЂРѕРїСЂРёСЏС‚РёР№ СЃ Р·Р°РІРµСЂС€С‘РЅРЅС‹Рј РЅР°Р±РѕСЂРѕРј РІ РїР»Р°РЅРёСЂРѕРІС‰РёРєРµ РѕСЃС‚Р°СЋС‚СЃСЏ С‚РѕР»СЊРєРѕ СѓС‡Р°СЃС‚РЅРёРєРё СЃРѕ СЃС‚Р°С‚СѓСЃРѕРј В«РџСЂРёСЃС‚СѓРїРёР» Рє РџРЁВ».
             </div>
           )}
 
           <div className="planner-source-tree">
             {applicantsTree.length === 0 ? (
-              <div className="planner-empty-inline">Нет заявок для формирования команд.</div>
+              <div className="planner-empty-inline">РќРµС‚ Р·Р°СЏРІРѕРє РґР»СЏ С„РѕСЂРјРёСЂРѕРІР°РЅРёСЏ РєРѕРјР°РЅРґ.</div>
             ) : (
               applicantsTree.map((eventNode) => {
                 const group = eventNode.group;
@@ -453,7 +453,7 @@ export default function TeamsTab({
                   group.applicants.length > 0 && group.applicants.every((applicant) => assignedIds.has(Number(applicant.ownerId)));
                 const switchControl = (
                   <div className="planner-source-switch" onClick={stopSummaryToggle}>
-                    <span>В списке команд</span>
+                    <span>Р’ СЃРїРёСЃРєРµ РєРѕРјР°РЅРґ</span>
                     <AppSwitch
                       checked={isVisibleInTeams}
                       disabled={!eventId}
@@ -471,11 +471,11 @@ export default function TeamsTab({
                     <div key={eventNode.key} className="planner-source-node planner-source-node--event planner-source-node--disabled">
                       <div className="planner-source-summary planner-source-summary--static">
                         <div className="planner-source-summary-main">
-                          <span>Мероприятие: {eventNode.title}</span>
+                          <span>РњРµСЂРѕРїСЂРёСЏС‚РёРµ: {eventNode.title}</span>
                         </div>
 
                         <div className="planner-source-summary-actions">
-                          <span className="planner-source-meta planner-source-meta--muted">Скрыто из списка команд</span>
+                          <span className="planner-source-meta planner-source-meta--muted">РЎРєСЂС‹С‚Рѕ РёР· СЃРїРёСЃРєР° РєРѕРјР°РЅРґ</span>
                           {switchControl}
                         </div>
                       </div>
@@ -492,41 +492,38 @@ export default function TeamsTab({
                   >
                     <summary className="planner-source-summary" onClick={() => onSelectBuilderGroup(group.key)}>
                       <div className="planner-source-summary-main">
-                        <span>Мероприятие: {eventNode.title}</span>
-                        <span className="planner-source-meta">{group.applicants.length} участников</span>
+                        <span>РњРµСЂРѕРїСЂРёСЏС‚РёРµ: {eventNode.title}</span>
+                        <span className="planner-source-meta">{group.applicants.length} СѓС‡Р°СЃС‚РЅРёРєРѕРІ</span>
                       </div>
 
                       <div className="planner-source-summary-actions">
-                        {eventNode.eventClosed ? (
+                        {eventNode.eventClosed && <span className="planner-source-meta planner-source-meta--closed">Набор завершён</span>}
+
+                        {isOrganizer && eventId && (
                           <>
-                            <span className="planner-source-meta planner-source-meta--closed">Набор завершён</span>
-                            {isOrganizer && eventId && (
+                            {!eventNode.eventClosed && (
                               <AppButton
                                 type="button"
                                 className="planner-source-close-btn"
                                 onClick={(event) => {
                                   stopSummaryToggle(event);
-                                  onSendPlannerInvites(eventId);
+                                  onOpenConfirmCloseEnrollment(eventId, eventNode.title);
                                 }}
                               >
-                                Отправить VK-приглашения
+                                Завершить набор
                               </AppButton>
                             )}
-                          </>
-                        ) : (
-                          isOrganizer &&
-                          eventId && (
                             <AppButton
                               type="button"
                               className="planner-source-close-btn"
                               onClick={(event) => {
                                 stopSummaryToggle(event);
-                                onOpenConfirmCloseEnrollment(eventId, eventNode.title);
+                                onSendPlannerInvites(eventId, eventNode.title);
                               }}
                             >
-                              Завершить набор
+                              Отправить VK-приглашения
                             </AppButton>
-                          )
+                          </>
                         )}
 
                         {switchControl}
@@ -537,10 +534,10 @@ export default function TeamsTab({
                       {availableApplicants.length === 0 ? (
                         <div className="planner-empty-inline">
                           {group.applicants.length === 0
-                            ? "По этому мероприятию пока нет доступных участников."
+                            ? "РџРѕ СЌС‚РѕРјСѓ РјРµСЂРѕРїСЂРёСЏС‚РёСЋ РїРѕРєР° РЅРµС‚ РґРѕСЃС‚СѓРїРЅС‹С… СѓС‡Р°СЃС‚РЅРёРєРѕРІ."
                             : allApplicantsAssigned
-                              ? "Все доступные участники уже распределены по командам."
-                              : "Все доступные участники выбраны."}
+                              ? "Р’СЃРµ РґРѕСЃС‚СѓРїРЅС‹Рµ СѓС‡Р°СЃС‚РЅРёРєРё СѓР¶Рµ СЂР°СЃРїСЂРµРґРµР»РµРЅС‹ РїРѕ РєРѕРјР°РЅРґР°Рј."
+                              : "Р’СЃРµ РґРѕСЃС‚СѓРїРЅС‹Рµ СѓС‡Р°СЃС‚РЅРёРєРё РІС‹Р±СЂР°РЅС‹."}
                         </div>
                       ) : (
                         <div className="planner-members-list">
@@ -572,3 +569,4 @@ export default function TeamsTab({
     </div>
   );
 }
+

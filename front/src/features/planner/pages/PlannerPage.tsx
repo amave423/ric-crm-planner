@@ -1,5 +1,5 @@
 ﻿import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Modal as AntModal } from "antd";
+import { Modal as AntModal, Select } from "antd";
 import {
   buildParticipantsFromRequests,
   getPlannerState,
@@ -7,6 +7,7 @@ import {
   savePlannerState,
   sendPlannerInviteMessages,
   syncParticipants,
+  type PlannerInviteRecipientMode,
 } from "../api/planner";
 import { getRequests } from "../../requests/api/requests";
 import { useToast } from "../../../components/Toast/ToastProvider";
@@ -91,6 +92,8 @@ export default function PlannerPage() {
   const [subInSprint, setSubInSprint] = useState(false);
   const [newColumn, setNewColumn] = useState("");
   const [closeEnrollmentTarget, setCloseEnrollmentTarget] = useState<{ eventId: number; eventTitle: string } | null>(null);
+  const [plannerInviteTarget, setPlannerInviteTarget] = useState<{ eventId: number; eventTitle: string } | null>(null);
+  const [plannerInviteRecipientMode, setPlannerInviteRecipientMode] = useState<PlannerInviteRecipientMode>("joined");
   const [deleteTeamTargetId, setDeleteTeamTargetId] = useState<number | null>(null);
   const [teamInfoOpen, setTeamInfoOpen] = useState(false);
   const [teamInfoId, setTeamInfoId] = useState<number | null>(null);
@@ -725,12 +728,18 @@ export default function PlannerPage() {
     }));
     setCloseEnrollmentTarget(null);
     notifySuccess(`Набор по мероприятию «${eventTitle}» завершён`);
-    await sendPlannerInvites(eventId);
+    openPlannerInviteModal(eventId, eventTitle);
   };
 
-  const sendPlannerInvites = async (eventId: number) => {
+  const openPlannerInviteModal = (eventId: number, eventTitle: string) => {
+    setPlannerInviteTarget({ eventId, eventTitle });
+    setPlannerInviteRecipientMode("joined");
+  };
+
+  const sendPlannerInvites = async () => {
+    if (!plannerInviteTarget) return;
     try {
-      const result = await sendPlannerInviteMessages(eventId);
+      const result = await sendPlannerInviteMessages(plannerInviteTarget.eventId, plannerInviteRecipientMode);
       if (!result) return;
       if (result.sent > 0 && result.failed > 0) {
         notifyInfo(`VK-приглашения отправлены: ${result.sent}, ошибок: ${result.failed}`);
@@ -740,8 +749,9 @@ export default function PlannerPage() {
         notifyError(`Не удалось отправить VK-приглашения: ${result.failed}`);
       }
       if (result.sent === 0 && result.failed === 0) {
-        notifyInfo("Нет заявок в статусе «Добавился в орг. чат» для VK-приглашений");
+        notifyInfo("Нет подходящих заявок для VK-приглашений");
       }
+      setPlannerInviteTarget(null);
     } catch {
       notifyError("Не удалось отправить VK-приглашения");
     }
@@ -902,7 +912,7 @@ export default function PlannerPage() {
           visibleTeams={visibleTeams}
           userNameById={userNameById}
           onOpenConfirmCloseEnrollment={openCloseEnrollment}
-          onSendPlannerInvites={sendPlannerInvites}
+          onSendPlannerInvites={openPlannerInviteModal}
           onToggleEventVisibility={toggleEventVisibility}
           onSyncParticipants={() => setState((prev) => ({ ...prev, participants: snapshotParticipants(prev.closedEventIds) }))}
           onToggleApplicantForGroup={toggleApplicantForGroup}
@@ -1074,6 +1084,29 @@ export default function PlannerPage() {
         onClose={closeTaskCard}
       />
       <AntModal
+        open={Boolean(plannerInviteTarget)}
+        title="Отправить VK-приглашения"
+        okText="Отправить"
+        cancelText="Отмена"
+        onCancel={() => setPlannerInviteTarget(null)}
+        onOk={sendPlannerInvites}
+        centered
+      >
+        <p>
+          Выберите, кому бот отправит приглашение по мероприятию «{plannerInviteTarget?.eventTitle || ""}».
+        </p>
+        <Select
+          style={{ width: "100%" }}
+          value={plannerInviteRecipientMode}
+          onChange={(value) => setPlannerInviteRecipientMode(value as PlannerInviteRecipientMode)}
+          options={[
+            { value: "joined", label: "Участникам, добавившимся в орг. чат" },
+            { value: "all", label: "Всем участникам мероприятия" },
+            { value: "declined", label: "Всем отклонившим участникам мероприятия" },
+          ]}
+        />
+      </AntModal>
+      <AntModal
         open={automationOpen}
         onCancel={() => setAutomationOpen(false)}
         footer={null}
@@ -1090,11 +1123,6 @@ export default function PlannerPage() {
     </div>
   );
 }
-
-
-
-
-
 
 
 

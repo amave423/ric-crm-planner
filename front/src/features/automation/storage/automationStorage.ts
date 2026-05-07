@@ -123,6 +123,15 @@ function normalizeRobot(robot: AutomationRobot, fallbackStageId: string): Automa
     settings: normalizeSettings(robot.settings),
     subject: String(robot.subject || robot.title || "Уведомление"),
     message: String(robot.message || robot.description || ""),
+    buttons: Array.isArray(robot.buttons)
+      ? robot.buttons.map((button) => ({
+          id: String(button.id || `button-${Date.now()}`),
+          label: String(button.label || "Кнопка"),
+          color: button.color || "primary",
+          targetStageId: String(button.targetStageId || stageId),
+          responseMessage: String(button.responseMessage || "Статус заявки обновлен."),
+        }))
+      : [],
   };
 }
 

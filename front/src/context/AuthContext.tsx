@@ -9,6 +9,9 @@ interface User {
   name: string;
   surname: string;
   role: string;
+  vk?: string;
+  vkConfirmed?: boolean;
+  vkBotUrl?: string;
   password?: string;
 }
 
@@ -60,6 +63,9 @@ function mapBackendUser(data: unknown): User | null {
   const email = String(obj.email ?? profile.email ?? "");
   const name = String(obj.firstName ?? obj.first_name ?? obj.name ?? profile.name ?? "");
   const surname = String(obj.lastName ?? obj.last_name ?? obj.surname ?? profile.surname ?? "");
+  const vk = String(obj.vk ?? profile.vk ?? "");
+  const vkConfirmed = Boolean(obj.vkConfirmed ?? obj.vk_confirmed ?? profile.vkConfirmed ?? profile.vk_confirmed);
+  const vkBotUrl = String(obj.vkBotUrl ?? obj.vk_bot_url ?? profile.vkBotUrl ?? profile.vk_bot_url ?? "");
   let role = "guest";
   if (typeof obj.role === "string") {
     role = obj.role;
@@ -83,6 +89,9 @@ function mapBackendUser(data: unknown): User | null {
     name,
     surname,
     role,
+    vk,
+    vkConfirmed,
+    vkBotUrl,
   };
 }
 
@@ -295,6 +304,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const payload = {
         email: u.email,
+        vk: String(u.vk || ""),
         first_name: u.name || "",
         last_name: u.surname || "",
         password: u.password || "",

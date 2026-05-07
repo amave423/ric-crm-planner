@@ -226,9 +226,16 @@ export type PlannerInviteResult = {
   skipped: number;
 };
 
-export async function sendPlannerInviteMessages(eventId: number): Promise<PlannerInviteResult | null> {
+export type PlannerInviteRecipientMode = "all" | "joined" | "declined";
+
+export async function sendPlannerInviteMessages(
+  eventId: number,
+  recipientMode: PlannerInviteRecipientMode = "joined"
+): Promise<PlannerInviteResult | null> {
   if (USE_MOCK) return null;
-  return client.post<PlannerInviteResult>(`/api/integrations/vk/events/${eventId}/planner-invite/`, {});
+  return client.post<PlannerInviteResult>(`/api/integrations/vk/events/${eventId}/planner-invite/`, {
+    recipient_mode: recipientMode,
+  });
 }
 
 function isStudent(user: User) {

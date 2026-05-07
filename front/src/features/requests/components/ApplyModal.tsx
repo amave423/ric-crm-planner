@@ -12,6 +12,7 @@ import { useToast } from "../../../components/Toast/ToastProvider";
 import AppButton from "../../../components/UI/Button";
 import AppInput, { AppTextArea } from "../../../components/UI/Input";
 import AppSelect from "../../../components/UI/Select";
+import { requireVKBotConfirmation } from "../../../components/VKBotConfirmation/VKBotConfirmationGuard";
 
 type ProfileResponse = {
   telegram?: string;
@@ -185,7 +186,10 @@ export default function ApplyModal({
 
     const result = onSubmit(request);
     Promise.resolve(result).then((ok) => {
-      if (ok) onClose();
+      if (ok) {
+        requireVKBotConfirmation();
+        onClose();
+      }
     });
   };
 

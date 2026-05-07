@@ -33,6 +33,7 @@ export type CatalogItem = {
   description: string;
   subject?: string;
   message?: string;
+  buttons?: AutomationRobot["buttons"];
 };
 
 export type CatalogGroup = {

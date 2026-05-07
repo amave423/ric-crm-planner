@@ -4,5 +4,8 @@ export interface User {
   name: string;
   surname: string;
   role: "student" | "organizer" | string;
+  vk?: string;
+  vkConfirmed?: boolean;
+  vkBotUrl?: string;
   password?: string;
 }
