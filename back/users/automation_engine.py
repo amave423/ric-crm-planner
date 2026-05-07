@@ -13,6 +13,7 @@ from integrations.vk.crm_notifications import (
     notify_organizers_about_vk_error,
     send_application_vk_message,
 )
+from integrations.vk.planner_invites import send_planner_invite
 from integrations.vk.services import VKAPIError, VKConfigurationError
 from users.automation_defaults import create_default_crm_automation_config
 from users.models import Application, CRMAutomationConfig, CRMAutomationExecutionLog, Event, Notification, Status
@@ -112,8 +113,8 @@ def application_status(application: Application) -> str:
 
 
 def application_display_name(application: Application) -> str:
-    full_name = application.user.get_full_name()
-    return full_name or application.user.email or str(application.user)
+    display_name = f"{application.user.last_name or ''} {application.user.first_name or ''}".strip()
+    return display_name or application.user.get_full_name() or application.user.email or str(application.user)
 
 
 def event_context(event: CRMAutomationEvent) -> dict[str, Any]:
@@ -354,20 +355,20 @@ def run_robot_action(
     success = False
     log_message = ""
 
-    if (
-        event.code == "application.created"
-        and action == "notification.organizer"
-        and normalized_text(robot.get("id")) == "crm-notify-organizer"
-        and not force_immediate
-    ):
-        success = True
-        log_message = "Уведомление о новой заявке создано штатной логикой CRM."
-    elif action in {"notification.organizer", "notification.curator"}:
+    if action in {"notification.organizer", "notification.curator"}:
         success = create_organizer_notifications(event.application, title, message) > 0
         log_message = "Уведомления отправлены организаторам." if success else "Организаторы не найдены."
     elif action in {"notification.user", "notification.assignee", "testing.link"}:
         success = create_notification(event.application.user_id, title, message)
         log_message = "Уведомление отправлено проектанту." if success else "Проектант не найден."
+    elif action == "planner.invite.vk":
+        try:
+            send_planner_invite(event.application, message=message)
+            success = True
+            log_message = "VK-приглашение в планировщик отправлено проектанту."
+        except (VKConfigurationError, VKAPIError, ValueError) as exc:
+            notify_organizers_about_vk_error(event.application, str(exc))
+            log_message = str(exc)
     elif action in {"message.vk", "chat.link.vk", "message.vk_or_notification"}:
         try:
             vk_message = message
