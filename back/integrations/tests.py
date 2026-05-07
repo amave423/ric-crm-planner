@@ -294,6 +294,29 @@ class VKCRMNotificationTests(TestCase):
         self.assertTrue(handled)
         send_vk_message_mock.assert_called_once()
 
+    @override_settings(VK_ENABLED=True)
+    def test_vk_bot_status_confirms_current_duplicate_vk_profile(self):
+        duplicate_user = get_user_model().objects.create_user(
+            username="duplicate@example.com",
+            email="duplicate@example.com",
+            password="password",
+            is_active=True,
+        )
+        duplicate_profile = duplicate_user.crm_profile
+        duplicate_profile.vk = "https://vk.com/id123456"
+        duplicate_profile.vk_user_id = 123456
+        duplicate_profile.vk_confirmed_at = None
+        duplicate_profile.save(update_fields=["vk", "vk_user_id", "vk_confirmed_at"])
+
+        api_client = APIClient()
+        api_client.force_authenticate(user=duplicate_user)
+        response = api_client.get("/api/integrations/vk/bot-status/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["confirmed"])
+        duplicate_profile.refresh_from_db()
+        self.assertIsNotNone(duplicate_profile.vk_confirmed_at)
+
     @override_settings(VK_BOT_FRONTEND_URL="http://localhost:5173")
     def test_vk_welcome_keyboard_skips_invalid_public_link(self):
         self.assertIsNone(build_welcome_keyboard())

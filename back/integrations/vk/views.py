@@ -5,6 +5,7 @@ from django.conf import settings
 from django.core import signing
 from django.shortcuts import get_object_or_404, redirect
 from django.http import HttpResponse
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from drf_yasg import openapi
@@ -178,6 +179,13 @@ class VKBotStatusView(APIView):
         profile = Profile.objects.filter(user=request.user).first()
         if profile:
             refresh_profile_vk_user_id(profile)
+            if (
+                profile.vk_user_id
+                and not profile.vk_confirmed_at
+                and Profile.objects.filter(vk_user_id=profile.vk_user_id, vk_confirmed_at__isnull=False).exists()
+            ):
+                profile.vk_confirmed_at = timezone.now()
+                profile.save(update_fields=["vk_confirmed_at"])
 
         return Response(
             {

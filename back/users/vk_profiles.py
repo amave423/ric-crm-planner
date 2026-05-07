@@ -56,19 +56,21 @@ def reset_profile_vk_confirmation_if_changed(profile: Profile, old_vk: str) -> N
 
 
 def confirm_profile_by_vk_user_id(vk_user_id: int) -> Profile | None:
-    profile = Profile.objects.filter(vk_user_id=vk_user_id).select_related("user").first()
-    if profile:
+    confirmed_at = timezone.now()
+    matched_profiles = list(Profile.objects.filter(vk_user_id=vk_user_id).select_related("user"))
+    for profile in matched_profiles:
         if not profile.vk_confirmed_at:
-            profile.vk_confirmed_at = timezone.now()
+            profile.vk_confirmed_at = confirmed_at
             profile.save(update_fields=["vk_confirmed_at"])
-        return profile
 
     candidates = Profile.objects.exclude(vk="").select_related("user")
     for candidate in candidates:
+        if any(profile.pk == candidate.pk for profile in matched_profiles):
+            continue
         resolved_user_id = refresh_profile_vk_user_id(candidate, force=True)
         if resolved_user_id == vk_user_id:
-            candidate.vk_confirmed_at = timezone.now()
+            candidate.vk_confirmed_at = confirmed_at
             candidate.save(update_fields=["vk_user_id", "vk_confirmed_at"])
-            return candidate
+            matched_profiles.append(candidate)
 
-    return None
+    return matched_profiles[0] if matched_profiles else None
