@@ -15,6 +15,7 @@ from rest_framework.serializers import ModelSerializer, Serializer
 from integrations.vk.crm_notifications import notify_application_testing_started
 
 from users.automation_defaults import create_default_crm_automation_config
+from users.vk_profiles import get_vk_bot_url, refresh_profile_vk_user_id, reset_profile_vk_confirmation_if_changed
 
 from .models import CRMRole, ROLE_PROJECTANT, ROLE_CURATOR, ROLE_ADMIN
 from .models import (
@@ -140,10 +141,13 @@ class UserSerializer(ModelSerializer):
     role = serializers.SerializerMethodField()
     first_name = serializers.SerializerMethodField()
     last_name = serializers.SerializerMethodField()
+    vk = serializers.SerializerMethodField()
+    vkConfirmed = serializers.SerializerMethodField()
+    vkBotUrl = serializers.SerializerMethodField()
 
     class Meta:
         model = get_user_model()
-        fields = ("id", "email", "username", "first_name", "last_name", "role")
+        fields = ("id", "email", "username", "first_name", "last_name", "role", "vk", "vkConfirmed", "vkBotUrl")
 
     def get_first_name(self, obj):
         profile = getattr(obj, "crm_profile", None)
@@ -164,9 +168,21 @@ class UserSerializer(ModelSerializer):
             return "student"
         return "student"
 
+    def get_vk(self, obj):
+        profile = getattr(obj, "crm_profile", None)
+        return getattr(profile, "vk", "")
+
+    def get_vkConfirmed(self, obj):
+        profile = getattr(obj, "crm_profile", None)
+        return bool(getattr(profile, "vk_confirmed_at", None))
+
+    def get_vkBotUrl(self, obj):
+        return get_vk_bot_url()
+
 
 class RegisterUserSerializer(ModelSerializer):
     email = serializers.EmailField(required=True)
+    vk = serializers.CharField(required=True, allow_blank=False, write_only=True)
     password = serializers.CharField(write_only=True)
     password_confirmation = serializers.CharField(write_only=True)
     first_name = serializers.CharField(required=True)
@@ -176,6 +192,7 @@ class RegisterUserSerializer(ModelSerializer):
         model = get_user_model()
         fields = (
             "email",
+            "vk",
             "first_name",
             "last_name",
             "password",
@@ -198,6 +215,12 @@ class RegisterUserSerializer(ModelSerializer):
 
         return normalized_email
 
+    def validate_vk(self, value):
+        normalized_vk = value.strip()
+        if not normalized_vk:
+            raise serializers.ValidationError("Укажите аккаунт VK.")
+        return normalized_vk
+
     def validate(self, attrs):
         if attrs.get("password") != attrs.get("password_confirmation"):
             raise serializers.ValidationError({"password_confirmation": "Passwords do not match."})
@@ -215,9 +238,14 @@ class RegisterUserSerializer(ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop("password_confirmation", None)
+        vk_value = validated_data.pop("vk", "")
         try:
             with transaction.atomic():
                 user = get_user_model().objects.create_user(**validated_data, is_active=True)
+                profile = user.crm_profile
+                profile.vk = vk_value
+                profile.vk_user_id = refresh_profile_vk_user_id(profile, force=True)
+                profile.save(update_fields=["vk", "vk_user_id"])
         except IntegrityError as exc:
             raise serializers.ValidationError(
                 {"email": "Пользователь с таким email уже существует."}
@@ -332,6 +360,9 @@ class EmailConfirmationSerializer(Serializer):
 
 
 class ProfileSerializer(ModelSerializer):
+    vkConfirmed = serializers.SerializerMethodField()
+    vkBotUrl = serializers.SerializerMethodField()
+
     class Meta:
         model = Profile
         fields = (
@@ -343,11 +374,26 @@ class ProfileSerializer(ModelSerializer):
             "course",
             "university",
             "vk",
+            "vkConfirmed",
+            "vkBotUrl",
             "job",
             "workplace",
             "specialty",
             "about",
         )
+        read_only_fields = ("vkConfirmed", "vkBotUrl")
+
+    def get_vkConfirmed(self, obj):
+        return bool(obj.vk_confirmed_at)
+
+    def get_vkBotUrl(self, obj):
+        return get_vk_bot_url()
+
+    def update(self, instance, validated_data):
+        old_vk = instance.vk
+        profile = super().update(instance, validated_data)
+        reset_profile_vk_confirmation_if_changed(profile, old_vk)
+        return profile
 
 
 class EventSerializer(ModelSerializer):
@@ -655,7 +701,7 @@ class ApplicationCreateSerializer(ModelSerializer):
                     continue
                 Notification.objects.create(
                     user=recipient,
-                    title="Новая заявка",
+                    title=f"Новая заявка: {student_name}"[:255],
                     message=f"{student_name} подал(а) заявку на мероприятие \"{event.name}\".",
                     link="/requests",
                 )

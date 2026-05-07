@@ -51,6 +51,8 @@ class Profile(models.Model):
     course = models.PositiveIntegerField(blank=True)
     university = models.CharField(max_length=255, blank=True)
     vk = models.CharField(max_length=255, blank=True)
+    vk_user_id = models.BigIntegerField(blank=True, null=True, db_index=True)
+    vk_confirmed_at = models.DateTimeField(blank=True, null=True)
     job = models.CharField(max_length=255, blank=True)
     workplace = models.CharField(max_length=255, blank=True)
     specialty = models.CharField(max_length=255, blank=True)

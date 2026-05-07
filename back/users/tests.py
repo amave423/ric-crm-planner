@@ -62,6 +62,7 @@ class SerializerTests(TestCase):
             "email": "new@example.com",
             "first_name": "New",
             "last_name": "User",
+            "vk": "https://vk.com/id1001",
             "password": self.password,
             "password_confirmation": self.password,
         }
@@ -79,6 +80,7 @@ class SerializerTests(TestCase):
                 "email": "mismatch@example.com",
                 "first_name": "Test",
                 "last_name": "Mismatch",
+                "vk": "https://vk.com/id1002",
                 "password": "Password1",
                 "password_confirmation": "Password2",
             }
@@ -93,6 +95,7 @@ class SerializerTests(TestCase):
                 "email": self.user.email,
                 "first_name": "Dup",
                 "last_name": "User",
+                "vk": "https://vk.com/id1003",
                 "password": self.password,
                 "password_confirmation": self.password,
             }

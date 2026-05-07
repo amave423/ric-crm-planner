@@ -20,6 +20,8 @@ def create_user_profile(sender, instance, created, **kwargs):
                 "course": 0,
                 "university": "",
                 "vk": "",
+                "vk_user_id": None,
+                "vk_confirmed_at": None,
                 "job": "",
                 "workplace": "",
                 "specialty": "",
