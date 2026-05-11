@@ -23,6 +23,20 @@ type ProfileResponse = {
   about?: string;
 };
 
+function resolveProfileSpecialization(profileSpecialty: unknown, fallbackSpecialty: unknown, availableSpecializations: { title: string }[]) {
+  const raw = String(profileSpecialty ?? fallbackSpecialty ?? "");
+  const candidates = raw
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const matched = candidates.find((candidate) =>
+    availableSpecializations.some((specialization) => specialization.title === candidate)
+  );
+
+  return matched ?? availableSpecializations[0]?.title ?? candidates[0] ?? "";
+}
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -83,7 +97,7 @@ export default function ApplyModal({
         setTelegram(String(profile?.vk ?? userRecord.vk ?? profile?.telegram ?? userRecord.telegram ?? ""));
         setUniversity(String(profile?.university ?? userRecord.university ?? ""));
         setCourse(String(profile?.course ?? userRecord.course ?? ""));
-        setSpecialization(String(profile?.specialty ?? userRecord.specialty ?? specializations[0]?.title ?? ""));
+        setSpecialization(resolveProfileSpecialization(profile?.specialty, userRecord.specialty, specializations));
         setSelectedDirectionId("");
         setCustomFields(
           customApplicationFields.some((field) => field.id === "about")
@@ -98,7 +112,7 @@ export default function ApplyModal({
         setTelegram(String(userRecord.vk ?? userRecord.telegram ?? ""));
         setUniversity("");
         setCourse("");
-        setSpecialization(specializations[0]?.title || "");
+        setSpecialization(resolveProfileSpecialization(undefined, userRecord.specialty, specializations));
         setSelectedDirectionId("");
         setCustomFields({});
         setErrors({});

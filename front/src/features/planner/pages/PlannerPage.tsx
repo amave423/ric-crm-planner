@@ -9,6 +9,7 @@ import {
 } from "../api/planner";
 import { getRequests } from "../../requests/api/requests";
 import { useToast } from "../../../components/Toast/ToastProvider";
+import PageLoader from "../../../components/Loading/PageLoader";
 import { AuthContext } from "../../../context/AuthContext";
 import AutomationPanel from "../../automation/components/AutomationPanel";
 import { DEFAULT_KANBAN_COLUMNS, nextPlannerId, removeTeamCascade } from "../storage/planner";
@@ -848,7 +849,7 @@ export default function PlannerPage() {
   })();
 
   if (!user) return <div className="page planner-page"><div className="planner-empty">Войдите для доступа к планировщику.</div></div>;
-  if (loading) return <div className="page planner-page"><div className="planner-empty">Загрузка...</div></div>;
+  if (loading) return <div className="page planner-page"><PageLoader /></div>;
   if (!studentHasPlannerAccess) {
     return (
       <div className="page planner-page">
@@ -1074,7 +1075,6 @@ export default function PlannerPage() {
     </div>
   );
 }
-
 
 
 

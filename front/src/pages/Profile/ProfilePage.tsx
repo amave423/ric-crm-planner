@@ -5,6 +5,12 @@ import { AuthContext } from "../../context/AuthContext";
 import "../../styles/profile.scss";
 import AppButton from "../../components/UI/Button";
 import AppInput, { AppTextArea } from "../../components/UI/Input";
+import AppSelect from "../../components/UI/Select";
+import { SPECIALIZATION_OPTIONS } from "../../constants/specializations";
+
+const DEFAULT_NAME = "Имя";
+const DEFAULT_SURNAME = "Фамилия";
+const SPECIALIZATION_SEPARATOR = ", ";
 
 type ProfileResponse = {
   name?: string;
@@ -43,78 +49,80 @@ const AVATAR_COLORS = [
   "#607d8b",
 ];
 
+function splitSpecialties(value?: string) {
+  return String(value || "")
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeCourse(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+
+  const number = Math.min(6, Math.max(1, Number(digits)));
+  return String(number);
+}
+
 export default function ProfilePage() {
   const { user, updateProfile } = useContext(AuthContext);
   const [editing, setEditing] = useState(false);
   const { showToast } = useToast();
 
   const [profile, setProfile] = useState({
-    name: "Имя",
-    surname: "Фамилия",
+    name: DEFAULT_NAME,
+    surname: DEFAULT_SURNAME,
     university: "",
     course: "",
-    specialty: "",
+    specialties: [] as string[],
     workplace: "",
     about: "",
     telegram: "",
     vk: "",
     email: "example@mail.ru",
   });
+  const [selectedSpecializationId, setSelectedSpecializationId] = useState("");
 
   useEffect(() => {
     let mounted = true;
+
+    const fillFromProfile = (data: ProfileResponse, fallbackUser = user) => {
+      const userRecord = (fallbackUser ?? {}) as Record<string, unknown>;
+      const specialtyValue = String(data.specialty ?? userRecord.specialty ?? "");
+
+      setProfile({
+        name: data.name || fallbackUser?.name || DEFAULT_NAME,
+        surname: data.surname || fallbackUser?.surname || DEFAULT_SURNAME,
+        university: String(data.university ?? userRecord.university ?? ""),
+        course: data.course != null ? normalizeCourse(String(data.course)) : normalizeCourse(String(userRecord.course ?? "")),
+        specialties: splitSpecialties(specialtyValue),
+        workplace: String(data.workplace ?? data.job ?? userRecord.workplace ?? userRecord.job ?? ""),
+        about: String(data.about ?? userRecord.about ?? ""),
+        telegram: String(data.telegram ?? userRecord.telegram ?? ""),
+        vk: String(data.vk ?? userRecord.vk ?? ""),
+        email: data.email || fallbackUser?.email || "",
+      });
+      setSelectedSpecializationId("");
+    };
+
     (async () => {
       if (!user) {
-        setProfile((p) => ({ ...p, email: "example@mail.ru" }));
+        setProfile((prev) => ({ ...prev, email: "example@mail.ru" }));
         return;
       }
 
       if (client.USE_MOCK) {
-        const userRecord = user as unknown as Record<string, unknown>;
-        setProfile({
-          name: user.name || "Имя",
-          surname: user.surname || "Фамилия",
-          university: String(userRecord.university ?? ""),
-          course: String(userRecord.course ?? ""),
-          specialty: String(userRecord.specialty ?? ""),
-          workplace: String(userRecord.workplace ?? userRecord.job ?? ""),
-          about: String(userRecord.about ?? ""),
-          telegram: String(userRecord.telegram ?? ""),
-          vk: String(userRecord.vk ?? ""),
-          email: user.email || "",
-        });
+        fillFromProfile({}, user);
         return;
       }
 
       try {
         const data = await client.get<ProfileResponse>("/api/users/profile/");
         if (!mounted) return;
-        setProfile({
-          name: data?.name || user.name || "Имя",
-          surname: data?.surname || user.surname || "Фамилия",
-          university: data?.university || "",
-          course: data?.course != null ? String(data.course) : "",
-          specialty: data?.specialty || "",
-          workplace: data?.job || data?.workplace || "",
-          about: data?.about || "",
-          telegram: data?.telegram || "",
-          vk: data?.vk || "",
-          email: data?.email || user.email || "",
-        });
+        fillFromProfile(data, user);
       } catch {
         if (!mounted) return;
-        setProfile({
-          name: user.name || "Имя",
-          surname: user.surname || "Фамилия",
-          university: "",
-          course: "",
-          specialty: "",
-          workplace: "",
-          about: "",
-          telegram: "",
-          vk: "",
-          email: user.email || "",
-        });
+        fillFromProfile({}, user);
       }
     })();
 
@@ -123,10 +131,26 @@ export default function ProfilePage() {
     };
   }, [user]);
 
-  const update = (key: string, value: string) => setProfile({ ...profile, [key]: value });
+  const update = (key: keyof typeof profile, value: string | string[]) => setProfile((prev) => ({ ...prev, [key]: value }));
+
+  const addSpecialization = () => {
+    const selected = SPECIALIZATION_OPTIONS.find((item) => String(item.id) === String(selectedSpecializationId));
+    if (!selected) return;
+
+    setProfile((prev) => {
+      if (prev.specialties.some((item) => item === selected.title)) return prev;
+      return { ...prev, specialties: [...prev.specialties, selected.title] };
+    });
+    setSelectedSpecializationId("");
+  };
+
+  const removeSpecialization = (title: string) => {
+    setProfile((prev) => ({ ...prev, specialties: prev.specialties.filter((item) => item !== title) }));
+  };
 
   const onSave = async () => {
     if (!user) return;
+
     try {
       const payload: ProfileUpdatePayload = {
         name: profile.name,
@@ -136,15 +160,15 @@ export default function ProfilePage() {
         course: profile.course || undefined,
         university: profile.university || undefined,
         vk: profile.vk || undefined,
-        specialty: profile.specialty || undefined,
+        specialty: profile.specialties.join(SPECIALIZATION_SEPARATOR) || undefined,
         about: profile.about || undefined,
         workplace: profile.workplace || undefined,
         job: profile.workplace || undefined,
       };
 
-      Object.keys(payload).forEach((k) => {
-        const value = payload[k];
-        if (typeof value === "undefined" || value === "") delete payload[k];
+      Object.keys(payload).forEach((key) => {
+        const value = payload[key];
+        if (typeof value === "undefined" || value === "") delete payload[key];
       });
 
       await updateProfile(payload);
@@ -156,18 +180,16 @@ export default function ProfilePage() {
   };
 
   const initials = useMemo(() => {
-    const s = (profile.surname || "").trim();
-    const n = (profile.name || "").trim();
-    const a = (s[0] || "").toUpperCase();
-    const b = (n[0] || "").toUpperCase();
-    return (a + b) || "—";
+    const surname = profile.surname.trim();
+    const name = profile.name.trim();
+    return `${surname[0] || ""}${name[0] || ""}`.toUpperCase() || "-";
   }, [profile.name, profile.surname]);
 
   const avatarBg = useMemo(() => {
-    const s = String(user?.id ?? profile.email ?? profile.name ?? "default");
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+    const source = String(user?.id ?? profile.email ?? profile.name ?? "default");
+    let hash = 0;
+    for (let i = 0; i < source.length; i += 1) hash = (hash * 31 + source.charCodeAt(i)) | 0;
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
   }, [profile, user]);
 
   return (
@@ -185,24 +207,75 @@ export default function ProfilePage() {
           </div>
 
           <div className="inputs">
-            <AppInput className="text-regular" disabled={!editing} value={profile.name} onChange={(e) => update("name", e.target.value)} />
-            <AppInput className="text-regular" disabled={!editing} value={profile.surname} onChange={(e) => update("surname", e.target.value)} />
+            <AppInput className="text-regular" disabled={!editing} value={profile.name} onChange={(event) => update("name", event.target.value)} />
+            <AppInput className="text-regular" disabled={!editing} value={profile.surname} onChange={(event) => update("surname", event.target.value)} />
             <AppInput
               className="text-regular"
               disabled={!editing}
               value={profile.university}
-              onChange={(e) => update("university", e.target.value)}
+              onChange={(event) => update("university", event.target.value)}
               placeholder="Учебное заведение"
             />
-            <AppInput className="text-regular" disabled={!editing} value={profile.course} onChange={(e) => update("course", e.target.value)} placeholder="Курс" />
             <AppInput
               className="text-regular"
               disabled={!editing}
-              value={profile.specialty}
-              onChange={(e) => update("specialty", e.target.value)}
-              placeholder="Специальность"
+              type="number"
+              min={1}
+              max={6}
+              inputMode="numeric"
+              value={profile.course}
+              onChange={(event) => update("course", normalizeCourse(event.target.value))}
+              placeholder="Курс"
             />
-            <AppTextArea className="text-regular" disabled={!editing} value={profile.about} onChange={(e) => update("about", e.target.value)} placeholder="О себе" />
+
+            <div className="profile-specializations">
+              <div className="profile-specializations__add-row">
+                <AppSelect
+                  value={selectedSpecializationId}
+                  disabled={!editing}
+                  placeholder="Выберите специализацию"
+                  onChange={(value) => setSelectedSpecializationId(String(value))}
+                  options={[
+                    { value: "", label: "Выберите специализацию" },
+                    ...SPECIALIZATION_OPTIONS.map((specialization) => ({
+                      value: String(specialization.id),
+                      label: specialization.title,
+                    })),
+                  ]}
+                />
+                <AppButton
+                  className="primary profile-specializations__add-button"
+                  type="button"
+                  onClick={addSpecialization}
+                  disabled={!editing || !selectedSpecializationId}
+                >
+                  Добавить
+                </AppButton>
+              </div>
+              <div className="profile-specializations__selected">
+                {profile.specialties.length === 0 ? (
+                  <span className="profile-specializations__empty">Специализации не выбраны</span>
+                ) : (
+                  profile.specialties.map((specialty) => (
+                    <div key={specialty} className="profile-specialization-tag">
+                      <span>{specialty}</span>
+                      {editing && (
+                        <AppButton
+                          className="profile-specialization-tag__remove"
+                          type="button"
+                          onClick={() => removeSpecialization(specialty)}
+                          aria-label="Удалить специализацию"
+                        >
+                          x
+                        </AppButton>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <AppTextArea className="text-regular" disabled={!editing} value={profile.about} onChange={(event) => update("about", event.target.value)} placeholder="О себе" />
           </div>
         </div>
 
@@ -210,8 +283,8 @@ export default function ProfilePage() {
           <h4 className="h4">Контакты</h4>
 
           <div className="inputs">
-            <AppInput className="text-regular" disabled={!editing} value={profile.telegram} onChange={(e) => update("telegram", e.target.value)} placeholder="Telegram" />
-            <AppInput className="text-regular" disabled={!editing} value={profile.vk} onChange={(e) => update("vk", e.target.value)} placeholder="ВКонтакте" />
+            <AppInput className="text-regular" disabled={!editing} value={profile.telegram} onChange={(event) => update("telegram", event.target.value)} placeholder="Telegram" />
+            <AppInput className="text-regular" disabled={!editing} value={profile.vk} onChange={(event) => update("vk", event.target.value)} placeholder="ВКонтакте" />
             <AppInput className="text-regular" disabled value={profile.email} />
           </div>
         </div>

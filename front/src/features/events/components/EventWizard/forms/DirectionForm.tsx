@@ -9,6 +9,7 @@ import type { Event } from "../../../../../types/event";
 import type { User } from "../../../../../types/user";
 import { getAllUsers } from "../../../../../storage/storage";
 import { useToast } from "../../../../../components/Toast/ToastProvider";
+import PageLoader from "../../../../../components/Loading/PageLoader";
 import AppButton from "../../../../../components/UI/Button";
 import AppInput, { AppTextArea } from "../../../../../components/UI/Input";
 import AppSelect from "../../../../../components/UI/Select";
@@ -364,7 +365,7 @@ export default function DirectionForm() {
 
       <div className="tags">
         {loading ? (
-          <div>Загрузка...</div>
+          <PageLoader className="page-loader--compact" />
         ) : (
           directions.map((direction) => (
             <div
