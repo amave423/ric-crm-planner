@@ -5,6 +5,8 @@ import type { MenuProps } from "antd";
 import {
   BarsOutlined,
   BellOutlined,
+  ContainerOutlined,
+  ExportOutlined,
   LoginOutlined,
   LogoutOutlined,
   MenuOutlined,
@@ -39,7 +41,15 @@ const HEADER_TEXT = {
   profile: "Профиль",
   projectant: "Проектант",
   requests: "Заявки",
+  testing: "Модуль тестирования",
 } as const;
+
+interface HeaderImportMetaEnv {
+  VITE_TESTING_URL?: string;
+}
+
+const TESTING_MODULE_URL =
+  ((import.meta as ImportMeta & { env?: HeaderImportMetaEnv }).env?.VITE_TESTING_URL || "").trim() || "https://example.com/testing";
 
 function isProjectantRole(role?: string) {
   const normalized = String(role || "").toLowerCase();
@@ -95,6 +105,12 @@ export default function Header() {
     navigate(path);
   };
 
+  const openTestingModule = () => {
+    if (!TESTING_MODULE_URL) return;
+    setMobileMenuOpen(false);
+    window.open(TESTING_MODULE_URL, "_blank", "noopener,noreferrer");
+  };
+
   const mobileMenuItems: MenuProps["items"] = user
     ? [
         {
@@ -134,6 +150,21 @@ export default function Header() {
             </span>
           ),
         },
+        ...(TESTING_MODULE_URL
+          ? [
+              {
+                key: "__testing",
+                label: (
+                  <span className="mobile-menu-entry">
+                    <span className="mobile-menu-entry__icon">
+                      <ContainerOutlined />
+                    </span>
+                    <span>{HEADER_TEXT.testing}</span>
+                  </span>
+                ),
+              },
+            ]
+          : []),
         {
           key: "/profile",
           label: (
@@ -149,6 +180,11 @@ export default function Header() {
     : [];
 
   const onMobileMenuClick: MenuProps["onClick"] = ({ key }) => {
+    if (key === "__testing") {
+      openTestingModule();
+      return;
+    }
+
     goTo(String(key));
   };
 
@@ -232,6 +268,14 @@ export default function Header() {
               <TeamOutlined />
               <span>{HEADER_TEXT.planner}</span>
             </AppButton>
+
+            {TESTING_MODULE_URL && (
+              <AppButton className="head-btn head-btn--testing" onClick={openTestingModule}>
+                <ContainerOutlined />
+                <span>{HEADER_TEXT.testing}</span>
+                <ExportOutlined className="head-btn__external-icon" />
+              </AppButton>
+            )}
           </>
         )}
       </div>

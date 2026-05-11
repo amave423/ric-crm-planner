@@ -248,6 +248,38 @@
   color: #fff;
 }
 
+.head-btn--testing {
+  position: relative;
+  border-color: #38bdf8 !important;
+  background: linear-gradient(180deg, #f7fcff 0%, #eef8ff 100%) !important;
+  color: #0369a1 !important;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.head-btn--testing .anticon {
+  color: #0369a1;
+}
+
+.head-btn--testing:hover,
+.head-btn--testing:focus-visible {
+  background: #0284c7 !important;
+  color: #fff !important;
+  border-color: #0284c7 !important;
+}
+
+.head-btn--testing:hover .anticon,
+.head-btn--testing:focus-visible .anticon {
+  color: #fff;
+}
+
+.head-btn__external-icon {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  font-size: 10px !important;
+  opacity: 0.86;
+}
+
 .head-btn--automation {
   border-color: #93c5fd !important;
   background: #f8fbff !important;
