@@ -141,6 +141,7 @@ export default function EventWizardModal({
         footer={null}
         width="min(1380px, calc(100vw - 32px))"
         centered
+        zIndex={1400}
         destroyOnHidden
         className="automation-settings-modal"
         title="Настройка роботов и триггеров CRM"

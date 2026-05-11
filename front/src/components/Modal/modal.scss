@@ -18,10 +18,13 @@
 
 .modal {
   position: relative;
+  display: flex;
+  flex-direction: column;
   background: #fff;
   border-radius: 12px;
   width: 560px;
   max-width: calc(100% - 32px);
+  max-height: calc(100dvh - 32px);
   padding: 22px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.18);
   transform-origin: center;
@@ -41,6 +44,8 @@
 
 .modal-content {
   margin-bottom: 18px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .vk-bot-confirmation {

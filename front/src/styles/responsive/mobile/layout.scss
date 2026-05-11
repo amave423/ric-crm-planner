@@ -33,8 +33,15 @@
   }
 }
 
+@media (max-width: 768px) {
+  body .page {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+}
+
 @media (max-width: 480px) {
   body .page {
     padding: 10px;
+    padding-bottom: calc(94px + env(safe-area-inset-bottom));
   }
 }
