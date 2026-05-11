@@ -28,10 +28,17 @@ type BackendStatus = {
 const LEGACY_STATUS_MAP: Record<string, string> = {
   "Прислал заявку": REQUEST_STATUS.SUBMITTED,
   "Прохождение тестирования": REQUEST_STATUS.TESTING,
+  "Не перешёл к тестированию": REQUEST_STATUS.TESTING_NOT_STARTED,
+  "Не перешел к тестированию": REQUEST_STATUS.TESTING_NOT_STARTED,
+  "Не прошел тестирование": REQUEST_STATUS.TESTING_FAILED,
+  "Не прошёл тестирование": REQUEST_STATUS.TESTING_FAILED,
   "Отправлена ссылка на орг. чат": REQUEST_STATUS.CHAT_LINK_SENT,
+  "Не добавился в орг чат": REQUEST_STATUS.CHAT_NOT_JOINED,
+  "Не добавился в орг. чат": REQUEST_STATUS.CHAT_NOT_JOINED,
   "Добавился в орг чат": REQUEST_STATUS.JOINED_CHAT,
   "Добавился в орг. чат": REQUEST_STATUS.JOINED_CHAT,
   "Присутствует на ПШ": REQUEST_STATUS.STARTED,
+  "Отказался от ПШ": REQUEST_STATUS.DECLINED_PSH,
   "Удален с ПШ": REQUEST_STATUS.REMOVED_FROM_PSH,
 };
 

@@ -1,5 +1,5 @@
 ﻿import client from "../../../api/client";
-import { REQUEST_STATUS } from "../../../constants/requestProgress";
+import { REQUEST_STATUS, isNegativeRequestStatus } from "../../../constants/requestProgress";
 import { readPlannerState, writePlannerState } from "../storage/planner";
 import type { PlannerParticipant, PlannerState } from "../../../types/planner";
 import type { Request } from "../../../types/request";
@@ -68,6 +68,7 @@ export function hasStartedWork(status?: string) {
 
 export function hasPlannerAccessStatus(status?: string) {
   const normalizedStatus = String(status || "").trim().toLowerCase();
+  if (isNegativeRequestStatus(status)) return false;
   return (
     normalizedStatus === REQUEST_STATUS.STARTED.toLowerCase() ||
     normalizedStatus === REQUEST_STATUS.JOINED_CHAT.toLowerCase()
@@ -274,6 +275,7 @@ export function buildParticipantsFromRequests(users: User[], requests: Request[]
 
   const ids = new Set<number>();
   requests.forEach((request) => {
+    if (isNegativeRequestStatus(request.status)) return;
     if (!hasPlannerAccessStatus(request.status)) return;
     const ownerId = toNumber(request.ownerId);
     const eventId = toNumber(request.eventId);

@@ -7,7 +7,12 @@ import { getEvents } from "../../events/api/events";
 import { getRequests, removeRequest, updateRequestStatus } from "../api/requests";
 import Modal from "../../../components/Modal/Modal";
 import Table from "../../../components/Table/Table";
-import { ORGANIZER_REQUEST_STATUSES, REQUEST_STATUS, getRequestTransitionCopy } from "../../../constants/requestProgress";
+import {
+  ORGANIZER_REQUEST_STATUSES,
+  REQUEST_STATUS,
+  canWithdrawRequestStatus,
+  getRequestTransitionCopy,
+} from "../../../constants/requestProgress";
 import { AuthContext } from "../../../context/AuthContext";
 import { useSearchSubmitFeedback } from "../../../hooks/useSearchSubmitFeedback";
 import type { Event as EventType } from "../../../types/event";
@@ -23,6 +28,7 @@ import {
   DISPLAYED_STATUSES_STORAGE_KEY,
   OTHER_STATUS_KEY,
   REQUESTS_VIEW_STORAGE_KEY,
+  REQUEST_STATUS_COLORS,
 } from "../config/requestsConfig";
 import { buildAnalyticsStatuses, RequestsAnalytics } from "../components/RequestsAnalytics";
 import { StatusSettingsModal } from "../components/StatusSettingsModal";
@@ -43,6 +49,29 @@ import {
   isRequestsView,
   readDisplayedStatuses,
 } from "../utils/requestsUtils";
+
+function renderStatusOption(status: string) {
+  const color = REQUEST_STATUS_COLORS[status] || "#94a3b8";
+
+  return (
+    <span className="request-status-option" style={{ ["--status-color" as string]: color }}>
+      <span>{status}</span>
+    </span>
+  );
+}
+
+function renderSelectedStatusLabel(status: string) {
+  return (
+    <span className="request-status-selected-label" style={{ color: "#fff" }}>
+      {status}
+    </span>
+  );
+}
+
+function getStatusSelectStyle(status?: string) {
+  const color = REQUEST_STATUS_COLORS[String(status || "")] || "#94a3b8";
+  return { ["--request-status-color" as string]: color };
+}
 
 export default function RequestsPage() {
   const { user } = useContext(AuthContext);
@@ -350,30 +379,35 @@ export default function RequestsPage() {
               return (
                 <AppSelect
                   className="status-select"
-                  value={row.status || ""}
+                  style={getStatusSelectStyle(row.status)}
+                  value={row.status || undefined}
+                  placeholder={TEXT.status}
                   onChange={(value) => handleStatusChange(row.id, String(value))}
                   options={[
-                    { value: "", label: "-" },
-                    ...ORGANIZER_REQUEST_STATUSES.map((status) => ({ value: status, label: status })),
+                    ...ORGANIZER_REQUEST_STATUSES.map((status) => ({
+                      value: status,
+                      label: renderSelectedStatusLabel(status),
+                    })),
                   ]}
+                  optionRender={(option) => renderStatusOption(String(option.value || ""))}
                 />
               );
             }
 
-		            if (isProjectant) {
-		              const canWithdraw = row.status !== REQUEST_STATUS.STARTED;
+            if (isProjectant) {
+              const canWithdraw = canWithdrawRequestStatus(row.status);
 
-	              return (
-	                <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
-	                  <div>{row.status || "-"}</div>
-	                  {canWithdraw && (
-	                    <AppButton className="danger-outline" onClick={() => handleWithdraw(row.id)}>
-	                      {TEXT.withdrawRequest}
-	                    </AppButton>
-	                  )}
-	                </div>
-	              );
-	            }
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+                  <div>{row.status || ""}</div>
+                  {canWithdraw && (
+                    <AppButton className="danger-outline" onClick={() => handleWithdraw(row.id)}>
+                      {TEXT.withdrawRequest}
+                    </AppButton>
+                  )}
+                </div>
+              );
+            }
 
             return <div>{row.status || "-"}</div>;
           }}

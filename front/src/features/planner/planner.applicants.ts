@@ -1,4 +1,4 @@
-import { REQUEST_STATUS } from "../../constants/requestProgress";
+import { REQUEST_STATUS, isNegativeRequestStatus } from "../../constants/requestProgress";
 import type { Request } from "../../types/request";
 import type { ApplicantsTreeNode, ProjectApplicantsGroup } from "./planner.types";
 import type { PlannerCatalogEvent } from "./planner.catalog";
@@ -95,6 +95,7 @@ function mapApplicants(applicantsByOwner: Map<number, ApplicantAccumulator>) {
 
 function hasPlannerAccessStatus(status?: string) {
   const normalizedStatus = String(status || "").trim().toLowerCase();
+  if (isNegativeRequestStatus(status)) return false;
   return (
     normalizedStatus === REQUEST_STATUS.STARTED.toLowerCase() ||
     normalizedStatus === REQUEST_STATUS.JOINED_CHAT.toLowerCase()
@@ -115,6 +116,7 @@ export function buildProjectApplicantGroups({
     const eventId = Number(request.eventId);
     const ownerId = Number(request.ownerId);
     if (!Number.isFinite(eventId) || !Number.isFinite(ownerId)) return;
+    if (isNegativeRequestStatus(request.status)) return;
     if (closedEventIds.includes(eventId) && !hasPlannerAccessStatus(request.status)) return;
 
     if (!applicantsByEvent.has(eventId)) applicantsByEvent.set(eventId, new Map());
