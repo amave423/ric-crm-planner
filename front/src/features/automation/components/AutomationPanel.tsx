@@ -305,6 +305,17 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
             </div>
           </div>
 
+          <label className="automation-stage-picker">
+            <span>Выберите статус</span>
+            <AppSelect
+              value={selectedStageId}
+              onChange={(value) => setSelectedStageId(String(value))}
+              options={config.stages.map((stage) => ({ value: stage.id, label: stage.title }))}
+              showSearch
+              optionFilterProp="label"
+            />
+          </label>
+
           <div className="automation-workspace">
             <AutomationBoard
               config={config}

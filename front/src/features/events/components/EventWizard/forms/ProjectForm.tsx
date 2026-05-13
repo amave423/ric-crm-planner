@@ -4,6 +4,7 @@ import { getDirectionsByEvent } from "../../../../../api/directions";
 import { getProjectsByDirection, saveProjectsForDirection } from "../../../../../api/projects";
 import type { Project } from "../../../../../types/project";
 import { useToast } from "../../../../../components/Toast/ToastProvider";
+import PageLoader from "../../../../../components/Loading/PageLoader";
 import { useWizard } from "../EventWizardModal";
 import type { DirectionModel, ProjectModel } from "../types";
 import AppButton from "../../../../../components/UI/Button";
@@ -332,7 +333,7 @@ export default function ProjectForm() {
 
       <div className="tags" style={{ marginTop: 12 }}>
         {loadingProjects ? (
-          <div>Загрузка...</div>
+          <PageLoader className="page-loader--compact" />
         ) : (
           projects.map((project) => (
             <div

@@ -9,6 +9,7 @@ import AppButton from "../../../../components/UI/Button";
 import AppInput from "../../../../components/UI/Input";
 import AppSelect from "../../../../components/UI/Select";
 import AppSwitch from "../../../../components/UI/Switch";
+import { TeamApplicantHeader, TeamApplicantInfo } from "../teams/TeamApplicantRow";
 
 type TeamsTabProps = {
   isOrganizer: boolean;
@@ -162,31 +163,6 @@ export default function TeamsTab({
       return next;
     });
   };
-
-  const renderApplicantInfo = (applicant: ProjectApplicantsGroup["applicants"][number]) => (
-    <div className={`planner-applicant-columns ${applicant.desiredDirections.length === 0 ? "planner-applicant-columns--compact" : ""}`}>
-      <span className="planner-applicant-name">{applicant.name}</span>
-      <span className="planner-applicant-specialization">{applicant.specialization || "Без специализации"}</span>
-      {applicant.desiredDirections.length > 0 && (
-        <span className="planner-applicant-directions">
-          {applicant.desiredDirections.map((direction) => (
-            <span key={`${applicant.ownerId}:${direction.id ?? direction.title}`}>{direction.title}</span>
-          ))}
-        </span>
-      )}
-    </div>
-  );
-
-  const renderApplicantHeader = (compact = false) => (
-    <div className="planner-applicant-row planner-applicant-row--header" aria-hidden="true">
-      <div className={`planner-applicant-columns planner-applicant-columns--header ${compact ? "planner-applicant-columns--compact" : ""}`}>
-        <span>ФИ</span>
-        <span>Специализация</span>
-        {!compact && <span>Желаемое направление</span>}
-      </div>
-      <span className="planner-applicant-switch-placeholder" />
-    </div>
-  );
 
   const renderCreatedTeams = () => (
     <section className="teams-created-block">
@@ -355,7 +331,7 @@ export default function TeamsTab({
             <div className="planner-empty-inline">Выберите участников в мероприятии слева.</div>
           ) : (
             <>
-              {renderApplicantHeader(true)}
+              <TeamApplicantHeader compact />
               {activeSelectedApplicants.map((applicant) => (
                 <label key={`${activeGroup.key}:selected:${applicant.ownerId}`} className="planner-check planner-applicant-row planner-applicant-row--selected">
                   <div className="planner-applicant-columns planner-applicant-columns--compact">
@@ -529,10 +505,10 @@ export default function TeamsTab({
                         </div>
                       ) : (
                         <div className="planner-members-list">
-                          {renderApplicantHeader()}
+                          <TeamApplicantHeader />
                           {availableApplicants.map((applicant) => (
                             <label key={`${group.key}:${applicant.ownerId}`} className="planner-check planner-applicant-row">
-                              {renderApplicantInfo(applicant)}
+                              <TeamApplicantInfo applicant={applicant} />
                               <AppSwitch
                                 checked={false}
                                 onChange={() => onToggleApplicantForGroup(group.key, applicant.ownerId)}

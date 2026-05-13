@@ -9,6 +9,7 @@ import TableHeader from "../../../components/Layout/TableHeader";
 import InfoModal from "../../../components/Modal/InfoModal";
 import Table from "../../../components/Table/Table";
 import { useToast } from "../../../components/Toast/ToastProvider";
+import PageLoader from "../../../components/Loading/PageLoader";
 import BackButton from "../../../components/UI/BackButton";
 import { useSearchSubmitFeedback } from "../../../hooks/useSearchSubmitFeedback";
 import { getAllUsers } from "../../../storage/storage";
@@ -164,7 +165,7 @@ export default function ProjectsPage() {
 
       <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} title={infoItem?.title} description={infoItem?.description} />
 
-      {loading && <div style={{ marginTop: 12 }}>Загрузка...</div>}
+      {loading && <PageLoader className="page-loader--compact" />}
     </div>
   );
 }
