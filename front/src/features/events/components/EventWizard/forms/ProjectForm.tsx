@@ -1,7 +1,7 @@
 ﻿import { CheckOutlined } from "@ant-design/icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getDirectionsByEvent } from "../../../../../api/directions";
-import { getProjectsByDirection, saveProjectsForDirection } from "../../../../../api/projects";
+import { getDirectionsByEvent } from "../../../api/directions";
+import { getProjectsByDirection, saveProjectsForDirection } from "../../../api/projects";
 import type { Project } from "../../../../../types/project";
 import { useToast } from "../../../../../components/Toast/ToastProvider";
 import PageLoader from "../../../../../components/Loading/PageLoader";

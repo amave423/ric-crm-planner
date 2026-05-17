@@ -2,8 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useWizard } from "../EventWizardModal";
 import type { DirectionModel } from "../types";
-import { getDirectionsByEvent, saveDirectionsForEvent as persistDirections } from "../../../../../api/directions";
-import { getEventById } from "../../../../../api/events";
+import { getDirectionsByEvent, saveDirectionsForEvent as persistDirections } from "../../../api/directions";
+import { getEventById } from "../../../api/events";
 import type { Direction } from "../../../../../types/direction";
 import type { Event } from "../../../../../types/event";
 import type { User } from "../../../../../types/user";

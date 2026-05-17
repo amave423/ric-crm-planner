@@ -5,7 +5,7 @@ import seedProfile from "../mock-data/profile.json";
 import seedProjects from "../mock-data/projects.json";
 import seedUsers from "../mock-data/users.json";
 import { CURRENT_MOCK_SEED_VERSION, LS_MOCK_SEED_VERSION } from "./mockSeed";
-import { readPlannerState, writePlannerState } from "./planner";
+import { readPlannerState, writePlannerState } from "../features/planner/storage/planner";
 import type { Direction } from "../types/direction";
 import type { Event } from "../types/event";
 import type { Project } from "../types/project";

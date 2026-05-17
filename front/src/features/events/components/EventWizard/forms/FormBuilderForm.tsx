@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { normalizeApplicationFormFields } from "../../../../../constants/applicationForm";
-import { getEventById, saveEvent as persistEvent } from "../../../../../api/events";
+import { getEventById, saveEvent as persistEvent } from "../../../api/events";
 import type { ApplicationFormField, Event } from "../../../../../types/event";
 import AppButton from "../../../../../components/UI/Button";
 import AppInput, { AppTextArea } from "../../../../../components/UI/Input";

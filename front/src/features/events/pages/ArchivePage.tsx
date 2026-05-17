@@ -1,16 +1,16 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Empty, Modal as AntModal } from "antd";
 import { RollbackOutlined } from "@ant-design/icons";
-import { getArchivedEvents, restoreEvent } from "../../api/events";
-import TableHeader from "../../components/Layout/TableHeader";
-import Table from "../../components/Table/Table";
-import AppButton from "../../components/UI/Button";
-import { useToast } from "../../components/Toast/ToastProvider";
-import { AuthContext } from "../../context/AuthContext";
-import { useSearchSubmitFeedback } from "../../hooks/useSearchSubmitFeedback";
-import type { Event } from "../../types/event";
-import "../../styles/page-colors.scss";
-import "./automation.scss";
+import { getArchivedEvents, restoreEvent } from "../api/events";
+import TableHeader from "../../../components/Layout/TableHeader";
+import Table from "../../../components/Table/Table";
+import AppButton from "../../../components/UI/Button";
+import { useToast } from "../../../components/Toast/ToastProvider";
+import { AuthContext } from "../../../context/AuthContext";
+import { useSearchSubmitFeedback } from "../../../hooks/useSearchSubmitFeedback";
+import type { Event } from "../../../types/event";
+import "../../../styles/page-colors.scss";
+import "./archive.scss";
 
 function isProjectantRole(role?: string) {
   const normalized = String(role || "").toLowerCase();
@@ -29,7 +29,7 @@ function filterEventsByQuery(items: Event[], query: string) {
   );
 }
 
-export default function AutomationPage() {
+export default function ArchivePage() {
   const { user } = useContext(AuthContext);
   const { showToast } = useToast();
   const [events, setEvents] = useState<Event[]>([]);
@@ -86,8 +86,8 @@ export default function AutomationPage() {
 
   if (!canManageArchive) {
     return (
-      <section className="automation-page">
-        <div className="automation-page__empty">
+      <section className="archive-page">
+        <div className="archive-page__empty">
           <Empty description="Архив мероприятий доступен организаторам.">
             <h1>Архив мероприятий</h1>
           </Empty>

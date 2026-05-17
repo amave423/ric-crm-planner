@@ -1,8 +1,8 @@
 ﻿import { CheckOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SPECIALIZATION_OPTIONS } from "../../../../../constants/specializations";
-import { getEventById, removeEvent as archiveEvent, saveEvent as persistEvent } from "../../../../../api/events";
-import { getRequests } from "../../../../../api/requests";
+import { getEventById, removeEvent as archiveEvent, saveEvent as persistEvent } from "../../../api/events";
+import { getRequests } from "../../../../requests/api/requests";
 import { getAllUsers } from "../../../../../storage/storage";
 import type { Event } from "../../../../../types/event";
 import type { User } from "../../../../../types/user";
