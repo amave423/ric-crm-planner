@@ -1,5 +1,5 @@
 ﻿import { readAutomationConfig } from "../storage/automationStorage";
-import { updateRequestStatus as updateStoredRequestStatus } from "../../../storage/requests";
+import { updateRequestStatus as updateStoredRequestStatus } from "../../requests/storage/requests";
 import { getEventById } from "../../../storage/storage";
 import type { Event } from "../../../types/event";
 import type { Request as ReqType } from "../../../types/request";

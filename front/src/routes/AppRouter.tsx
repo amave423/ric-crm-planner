@@ -5,17 +5,17 @@ import { AuthContext } from "../context/AuthContext";
 
 import Header from "../components/Header/Header";
 
-import EventsPage from "../pages/Events/EventsPage";
-import DirectionsPage from "../pages/Directions/DirectionsPage";
-import ProjectsPage from "../pages/Projects/ProjectsPage";
+import EventsPage from "../features/events/pages/EventsPage";
+import DirectionsPage from "../features/events/pages/DirectionsPage";
+import ProjectsPage from "../features/events/pages/ProjectsPage";
 
-import RequestsPage from "../pages/Requests/RequestsPage";
-import PlannerPage from "../pages/Planner/PlannerPage";
-import AutomationPage from "../pages/Automation/AutomationPage";
-import ProfilePage from "../pages/Profile/ProfilePage";
+import RequestsPage from "../features/requests/pages/RequestsPage";
+import PlannerPage from "../features/planner/pages/PlannerPage";
+import ArchivePage from "../features/events/pages/ArchivePage";
+import ProfilePage from "../features/profile/ProfilePage";
 
-import LoginPage from "../pages/Auth/Login";
-import RegisterPage from "../pages/Auth/Register";
+import LoginPage from "../features/auth/Login";
+import RegisterPage from "../features/auth/Register";
 
 export default function AppRouter() {
   const { user } = useContext(AuthContext);
@@ -49,7 +49,7 @@ export default function AppRouter() {
 
             {/* Только авторизованные */}
             <Route path="/planner" element={<PlannerPage />} />
-            <Route path="/automation" element={<AutomationPage />} />
+            <Route path="/automation" element={<ArchivePage />} />
             <Route path="/profile" element={<ProfilePage />} />
 
             <Route path="/requests" element={<RequestsPage />} />

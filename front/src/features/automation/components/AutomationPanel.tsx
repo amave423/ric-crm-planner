@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { CloseOutlined, RobotOutlined, SaveOutlined, SettingOutlined } from "@ant-design/icons";
 import { Empty, Spin, Tag } from "antd";
-import { getEvents } from "../../../api/events";
+import { getEvents } from "../../events/api/events";
 import { useToast } from "../../../components/Toast/ToastProvider";
 import AppButton from "../../../components/UI/Button";
 import AppSelect from "../../../components/UI/Select";
