@@ -141,6 +141,13 @@ DATABASES = {
     }
 }
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": os.getenv("DJANGO_CACHE_DIR", str(BASE_DIR / ".cache")),
+    }
+}
+
 # if os.getenv("USE_SQLITE_FOR_TESTS") == "1":
 #     DATABASES = {
 #         "default": {
@@ -220,6 +227,8 @@ SIMPLE_JWT = {
 }
 
 TESTING_SERVICE_TOKEN = os.getenv("TESTING_SERVICE_TOKEN", "")
+TESTING_SERVICE_URL = os.getenv("TESTING_SERVICE_URL", "")
+TESTING_SSO_TICKET_TTL_SECONDS = env_int("TESTING_SSO_TICKET_TTL_SECONDS", 300)
 
 VK_ENABLED = env_bool("VK_ENABLED", False)
 VK_GROUP_ID = os.getenv("VK_GROUP_ID", "")

@@ -1,6 +1,7 @@
 ﻿import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../../../api/client";
+import { createTestingSSOLink } from "../../../api/testing";
 import { getEvents } from "../api/events";
 import { getRequests as apiGetRequests, saveRequest, updateRequestStatus } from "../../requests/api/requests";
 import EventWizardModal, { type WizardLaunchContext } from "../components/EventWizard/EventWizardModal";
@@ -195,12 +196,12 @@ export default function EventsPage() {
   const startTestingScenario = async () => {
     if (!pendingRequest?.id) return;
 
-      try {
-        await updateRequestStatus(Number(pendingRequest.id), REQUEST_STATUS.TESTING);
+    try {
+      const link = client.USE_MOCK
+        ? buildMockRequestTransitionUrl(Number(pendingRequest.id), REQUEST_STATUS.CHAT_LINK_SENT, "testing")
+        : (await createTestingSSOLink(Number(pendingRequest.id))).url;
 
-        const link = client.USE_MOCK
-          ? buildMockRequestTransitionUrl(Number(pendingRequest.id), REQUEST_STATUS.CHAT_LINK_SENT, "testing")
-          : buildTestingUrl(pendingRequest);
+      await updateRequestStatus(Number(pendingRequest.id), REQUEST_STATUS.TESTING);
 
       addNotification({
         userId: user?.id,

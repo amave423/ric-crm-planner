@@ -17,6 +17,8 @@ import {
 import "../../styles/header.scss";
 import { AuthContext } from "../../context/AuthContext";
 import { useNotifications } from "../../context/NotificationsContext";
+import client from "../../api/client";
+import { createTestingSSOLink } from "../../api/testing";
 import { useToast } from "../Toast/ToastProvider";
 import Modal from "../Modal/Modal";
 import AppButton from "../UI/Button";
@@ -105,10 +107,21 @@ export default function Header() {
     navigate(path);
   };
 
-  const openTestingModule = () => {
+  const openTestingModule = async () => {
     if (!TESTING_MODULE_URL) return;
     setMobileMenuOpen(false);
-    window.open(TESTING_MODULE_URL, "_blank", "noopener,noreferrer");
+
+    if (client.USE_MOCK) {
+      window.open(TESTING_MODULE_URL, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    try {
+      const response = await createTestingSSOLink();
+      window.open(response.url, "_blank", "noopener,noreferrer");
+    } catch {
+      showToast("error", "Не удалось открыть модуль тестирования");
+    }
   };
 
   const mobileMenuItems: MenuProps["items"] = user
@@ -181,7 +194,7 @@ export default function Header() {
 
   const onMobileMenuClick: MenuProps["onClick"] = ({ key }) => {
     if (key === "__testing") {
-      openTestingModule();
+      void openTestingModule();
       return;
     }
 
@@ -260,7 +273,7 @@ export default function Header() {
                 label: HEADER_TEXT.testing,
                 icon: <ContainerOutlined />,
                 active: false,
-                onClick: openTestingModule,
+                onClick: () => void openTestingModule(),
               },
             ]
           : []),
@@ -321,7 +334,7 @@ export default function Header() {
               </AppButton>
 
               {TESTING_MODULE_URL && (
-                <AppButton className="head-btn head-btn--testing" onClick={openTestingModule}>
+                <AppButton className="head-btn head-btn--testing" onClick={() => void openTestingModule()}>
                   <ContainerOutlined />
                   <span>{HEADER_TEXT.testing}</span>
                   <ExportOutlined className="head-btn__external-icon" />

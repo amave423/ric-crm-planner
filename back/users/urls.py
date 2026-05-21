@@ -17,6 +17,8 @@ from .views import (
     IntegrationApplicationTestResultView,
     IntegrationApplicationTestSessionView,
     IntegrationTestExportView,
+    TestingSSOExchangeView,
+    TestingSSOLinkView,
     LoginView,
     LogoutView,
     NotificationClearView,
@@ -94,6 +96,16 @@ urlpatterns = [
         "integration/applications/<int:application_id>/testing-context/",
         IntegrationApplicationTestingContextView.as_view(),
         name="integration-application-testing-context",
+    ),
+    path(
+        "integration/testing/sso-link/",
+        TestingSSOLinkView.as_view(),
+        name="integration-testing-sso-link",
+    ),
+    path(
+        "integration/testing/sso-exchange/",
+        TestingSSOExchangeView.as_view(),
+        name="integration-testing-sso-exchange",
     ),
     path(
         "integration/applications/<int:application_id>/test-sessions/",

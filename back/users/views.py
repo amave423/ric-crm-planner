@@ -2,10 +2,13 @@ from django.conf import settings
 import secrets
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from urllib.parse import urlencode
 from rest_framework import status
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -123,6 +126,9 @@ INTEGRATION_TOKEN_PARAMETER = openapi.Parameter(
     required=True,
 )
 
+TESTING_SSO_SIGNER_SALT = "testing-service-sso"
+TESTING_SSO_CACHE_PREFIX = "testing_sso_ticket"
+
 
 def _get_available_tests_for_application(application: Application):
     queryset = Test.objects.filter(is_active=True)
@@ -164,6 +170,61 @@ def _get_application_latest_result(
         "-completed_at",
         "-id",
     ).first()
+
+
+def _get_testing_sso_signer():
+    return TimestampSigner(salt=TESTING_SSO_SIGNER_SALT)
+
+
+def _get_testing_sso_cache_key(nonce: str) -> str:
+    return f"{TESTING_SSO_CACHE_PREFIX}:{nonce}"
+
+
+def _build_testing_sso_user_payload(user):
+    profile = getattr(user, "crm_profile", None)
+    first_name = getattr(user, "first_name", "") or getattr(profile, "name", "")
+    last_name = getattr(user, "last_name", "") or getattr(profile, "surname", "")
+    display_name = " ".join(part for part in (last_name, first_name) if part).strip()
+    user_specializations = Specialization.objects.filter(
+        applications__user=user,
+    ).distinct().order_by("name")
+
+    return {
+        "id": user.id,
+        "email": user.email,
+        "first_name": first_name,
+        "last_name": last_name,
+        "display_name": display_name or user.email,
+        "role": UserSerializer().get_role(user),
+        "vk": getattr(profile, "vk", ""),
+        "vk_confirmed": bool(getattr(profile, "vk_confirmed_at", None)),
+        "course": getattr(profile, "course", None),
+        "specialty": getattr(profile, "specialty", ""),
+        "specializations": SpecializationSerializer(user_specializations, many=True).data,
+    }
+
+
+def _build_testing_application_context(application: Application, request):
+    available_tests = list(_get_available_tests_for_application(application))
+    current_session = _get_application_current_session(application)
+    latest_result = _get_application_latest_result(application, current_session)
+    return IntegrationApplicationTestingContextSerializer(
+        application,
+        context={
+            "request": request,
+            "available_tests": available_tests,
+            "current_session": current_session,
+            "latest_result": latest_result,
+        },
+    ).data
+
+
+def _user_can_access_application(user, application: Application) -> bool:
+    if application.user_id == user.id:
+        return True
+    if has_curator_or_admin_role(user):
+        return True
+    return is_event_organizer(user, application.event_id)
 
 
 @method_decorator(
@@ -1158,6 +1219,135 @@ class IntegrationApplicationTestingContextView(IntegrationApplicationMixin, APIV
             },
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class TestingSSOLinkView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    @swagger_auto_schema(
+        tags=[TAG_INTEGRATION],
+        operation_summary="Create testing service SSO link",
+        operation_description="Creates one-time SSO ticket and returns URL for opening the testing module.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "application_id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                "applicationId": openapi.Schema(type=openapi.TYPE_INTEGER),
+                "next": openapi.Schema(type=openapi.TYPE_STRING),
+            },
+        ),
+        responses={200: openapi.Schema(type=openapi.TYPE_OBJECT), 400: ERROR_RESPONSE_SCHEMA, 503: ERROR_RESPONSE_SCHEMA},
+    )
+    def post(self, request, *args, **kwargs):
+        testing_service_url = (getattr(settings, "TESTING_SERVICE_URL", "") or "").strip().rstrip("/")
+        if not testing_service_url:
+            return Response(
+                {"detail": "Testing service URL is not configured."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        application_id = request.data.get("application_id") or request.data.get("applicationId")
+        application = None
+        if application_id:
+            application = get_object_or_404(
+                Application.objects.select_related(
+                    "user",
+                    "event",
+                    "direction",
+                    "project",
+                    "specialization",
+                    "status",
+                ),
+                pk=application_id,
+            )
+            if not _user_can_access_application(request.user, application):
+                return Response(status=status.HTTP_403_FORBIDDEN)
+
+        nonce = secrets.token_urlsafe(32)
+        ttl = getattr(settings, "TESTING_SSO_TICKET_TTL_SECONDS", 300)
+        payload = {
+            "user_id": request.user.id,
+            "application_id": application.id if application else None,
+            "next": request.data.get("next") or "",
+        }
+        cache.set(_get_testing_sso_cache_key(nonce), payload, ttl)
+
+        ticket = _get_testing_sso_signer().sign(nonce)
+        query = {"ticket": ticket}
+        if payload["next"]:
+            query["next"] = payload["next"]
+
+        return Response(
+            {
+                "url": f"{testing_service_url}/sso?{urlencode(query)}",
+                "ticket": ticket,
+                "expiresIn": ttl,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class TestingSSOExchangeView(APIView):
+    authentication_classes = ()
+    permission_classes = (TestingServicePermission,)
+
+    @swagger_auto_schema(
+        tags=[TAG_INTEGRATION],
+        operation_summary="Exchange testing service SSO ticket",
+        operation_description="Exchanges one-time SSO ticket for CRM user and application context.",
+        manual_parameters=[INTEGRATION_TOKEN_PARAMETER],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["ticket"],
+            properties={"ticket": openapi.Schema(type=openapi.TYPE_STRING)},
+        ),
+        responses={200: openapi.Schema(type=openapi.TYPE_OBJECT), 400: ERROR_RESPONSE_SCHEMA, 403: ERROR_RESPONSE_SCHEMA},
+    )
+    def post(self, request, *args, **kwargs):
+        ticket = str(request.data.get("ticket") or "").strip()
+        if not ticket:
+            return Response({"detail": "Ticket is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            nonce = _get_testing_sso_signer().unsign(
+                ticket,
+                max_age=getattr(settings, "TESTING_SSO_TICKET_TTL_SECONDS", 300),
+            )
+        except SignatureExpired:
+            return Response({"detail": "SSO ticket expired."}, status=status.HTTP_400_BAD_REQUEST)
+        except BadSignature:
+            return Response({"detail": "Invalid SSO ticket."}, status=status.HTTP_400_BAD_REQUEST)
+
+        cache_key = _get_testing_sso_cache_key(nonce)
+        payload = cache.get(cache_key)
+        if not payload:
+            return Response({"detail": "SSO ticket expired or already used."}, status=status.HTTP_400_BAD_REQUEST)
+        cache.delete(cache_key)
+
+        user = get_object_or_404(get_user_model().objects.select_related("crm_profile"), pk=payload.get("user_id"))
+        application = None
+        application_id = payload.get("application_id")
+        if application_id:
+            application = get_object_or_404(
+                Application.objects.select_related(
+                    "user",
+                    "event",
+                    "direction",
+                    "project",
+                    "specialization",
+                    "status",
+                ),
+                pk=application_id,
+            )
+
+        return Response(
+            {
+                "user": _build_testing_sso_user_payload(user),
+                "application": _build_testing_application_context(application, request) if application else None,
+                "next": payload.get("next") or "",
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class IntegrationTestExportView(APIView):
