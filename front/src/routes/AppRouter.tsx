@@ -1,21 +1,19 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useContext } from "react";
-
-import { AuthContext } from "../context/AuthContext";
+import { lazy, Suspense, useContext } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import Header from "../components/Header/Header";
+import PageLoader from "../components/Loading/PageLoader";
+import { AuthContext } from "../context/AuthContext";
 
-import EventsPage from "../features/events/pages/EventsPage";
-import DirectionsPage from "../features/events/pages/DirectionsPage";
-import ProjectsPage from "../features/events/pages/ProjectsPage";
-
-import RequestsPage from "../features/requests/pages/RequestsPage";
-import PlannerPage from "../features/planner/pages/PlannerPage";
-import ArchivePage from "../features/events/pages/ArchivePage";
-import ProfilePage from "../features/profile/ProfilePage";
-
-import LoginPage from "../features/auth/Login";
-import RegisterPage from "../features/auth/Register";
+const EventsPage = lazy(() => import("../features/events/pages/EventsPage"));
+const DirectionsPage = lazy(() => import("../features/events/pages/DirectionsPage"));
+const ProjectsPage = lazy(() => import("../features/events/pages/ProjectsPage"));
+const RequestsPage = lazy(() => import("../features/requests/pages/RequestsPage"));
+const PlannerPage = lazy(() => import("../features/planner/pages/PlannerPage"));
+const ArchivePage = lazy(() => import("../features/events/pages/ArchivePage"));
+const ProfilePage = lazy(() => import("../features/profile/ProfilePage"));
+const LoginPage = lazy(() => import("../features/auth/Login"));
+const RegisterPage = lazy(() => import("../features/auth/Register"));
 
 export default function AppRouter() {
   const { user } = useContext(AuthContext);
@@ -24,42 +22,30 @@ export default function AppRouter() {
   return (
     <BrowserRouter>
       <Header />
-      <Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/events" replace />} />
 
-        {/* Главный маршрут */}
-        <Route path="/" element={<Navigate to="/events" replace />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
 
-        {/* Для всех */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+          <Route path="/events" element={<EventsPage />} />
+          <Route path="/events/:eventId/directions" element={<DirectionsPage />} />
+          <Route path="/events/:eventId/directions/:directionId/projects" element={<ProjectsPage />} />
 
-        {/* ГОСТЬ МОЖЕТ СМОТРЕТЬ МЕРОПРИЯТИЯ, НАПРАВЛЕНИЯ И ПРОЕКТЫ */}
-        <Route path="/events" element={<EventsPage />} />
-        <Route path="/events/:eventId/directions" element={<DirectionsPage />} />
-        <Route path="/events/:eventId/directions/:directionId/projects" element={<ProjectsPage />} />
-
-        {/* Если пользователь НЕ авторизован, ему запрещены остальные маршруты */}
-        {isGuest ? (
-          <>
+          {isGuest ? (
             <Route path="*" element={<Navigate to="/events" replace />} />
-          </>
-        ) : (
-          <>
-            {/* Направления и проекты доступны всем */}
-
-            {/* Только авторизованные */}
-            <Route path="/planner" element={<PlannerPage />} />
-            <Route path="/automation" element={<ArchivePage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-
-            <Route path="/requests" element={<RequestsPage />} />
-
-            {/* Остальное */}
-            <Route path="*" element={<Navigate to="/events" replace />} />
-          </>
-        )}
-
-      </Routes>
+          ) : (
+            <>
+              <Route path="/planner" element={<PlannerPage />} />
+              <Route path="/automation" element={<ArchivePage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/requests" element={<RequestsPage />} />
+              <Route path="*" element={<Navigate to="/events" replace />} />
+            </>
+          )}
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

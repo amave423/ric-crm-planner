@@ -41,5 +41,12 @@ export interface WizardContextState {
   savedEvent?: Event | null;
   isDirectionsSaved?: boolean;
   saveDirections?: (dirs: DirectionModel[]) => void;
+
+  hasUnsavedDirections?: boolean;
+  setHasUnsavedDirections?: (value: boolean) => void;
+  hasUnsavedProjects?: boolean;
+  setHasUnsavedProjects?: (value: boolean) => void;
+  hasUnsavedAutomation?: boolean;
+  setHasUnsavedAutomation?: (value: boolean) => void;
 }
 

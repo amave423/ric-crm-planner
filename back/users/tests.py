@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -489,9 +490,11 @@ class RoleDecoratorTests(TestCase):
 @override_settings(
     PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
     TESTING_SERVICE_TOKEN="integration-secret",
+    TESTING_SERVICE_URL="https://testing.example.test",
 )
 class IntegrationViewTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.client = APIClient()
         self.user_model = get_user_model()
         self.password = "StrongPass123"
@@ -645,6 +648,57 @@ class IntegrationViewTests(TestCase):
         self.assertEqual(len(export_response.data["questions"]), 1)
         self.assertEqual(len(export_response.data["questions"][0]["answers"]), 2)
         self.assertEqual(len(export_response.data["questions"][0]["true_answers"]), 1)
+
+    def test_user_can_create_testing_sso_link_and_service_exchanges_ticket_once(self):
+        self.client.force_authenticate(user=self.projectant)
+        link_response = self.client.post(
+            reverse("integration-testing-sso-link"),
+            {"application_id": self.application.id},
+            format="json",
+        )
+
+        self.assertEqual(link_response.status_code, status.HTTP_200_OK, link_response.data)
+        self.assertTrue(link_response.data["url"].startswith("https://testing.example.test/sso?"))
+        self.assertIn("ticket", link_response.data)
+
+        self.client.force_authenticate(user=None)
+        exchange_response = self.client.post(
+            reverse("integration-testing-sso-exchange"),
+            {"ticket": link_response.data["ticket"]},
+            format="json",
+            **self.integration_headers,
+        )
+        second_exchange_response = self.client.post(
+            reverse("integration-testing-sso-exchange"),
+            {"ticket": link_response.data["ticket"]},
+            format="json",
+            **self.integration_headers,
+        )
+
+        self.assertEqual(exchange_response.status_code, status.HTTP_200_OK, exchange_response.data)
+        self.assertEqual(exchange_response.data["user"]["email"], self.projectant.email)
+        self.assertEqual(
+            exchange_response.data["application"]["application"]["id"],
+            self.application.id,
+        )
+        self.assertEqual(second_exchange_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_testing_sso_exchange_requires_service_token(self):
+        self.client.force_authenticate(user=self.projectant)
+        link_response = self.client.post(
+            reverse("integration-testing-sso-link"),
+            {"application_id": self.application.id},
+            format="json",
+        )
+        self.client.force_authenticate(user=None)
+
+        response = self.client.post(
+            reverse("integration-testing-sso-exchange"),
+            {"ticket": link_response.data["ticket"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_service_can_assign_test_session(self):
         expires_at = timezone.now() + timedelta(hours=2)

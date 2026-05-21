@@ -46,4 +46,12 @@ export type AutomationPanelProps = {
   scope: AutomationScope;
   lockedEventId?: number;
   className?: string;
+  hideLocalSave?: boolean;
+  hideEventSelector?: boolean;
+  onDirtyChange?: (isDirty: boolean) => void;
+};
+
+export type AutomationPanelHandle = {
+  save: () => Promise<boolean>;
+  hasUnsavedChanges: () => boolean;
 };

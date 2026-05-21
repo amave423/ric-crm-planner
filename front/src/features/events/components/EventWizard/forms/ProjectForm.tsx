@@ -34,7 +34,7 @@ function buildProjectSnapshot(
 }
 
 export default function ProjectForm() {
-  const { mode, eventId, savedDirections, directionId: ctxDirectionId, projectId: ctxProjectId } = useWizard();
+  const { mode, eventId, savedDirections, directionId: ctxDirectionId, projectId: ctxProjectId, setHasUnsavedProjects } = useWizard();
   const { showToast } = useToast();
 
   const [directions, setDirections] = useState<DirectionModel[]>([]);
@@ -48,6 +48,11 @@ export default function ProjectForm() {
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "synced">("idle");
   const [savedSnapshot, setSavedSnapshot] = useState("");
+
+  const markUnsaved = () => {
+    setSaveState("idle");
+    setHasUnsavedProjects?.(true);
+  };
 
   const formSnapshot = useMemo(
     () => buildProjectSnapshot(projects, directionId, title, description, editingProjectId),
@@ -185,18 +190,21 @@ export default function ProjectForm() {
 
     if (editingProjectId != null) {
       setProjects((prev) => prev.map((project) => (Number(project.id) === Number(editingProjectId) ? { ...project, ...nextProject } : project)));
+      markUnsaved();
       showToast("success", "Изменения проекта добавлены в черновик");
       return true;
     }
 
     setProjects((prev) => [...prev, nextProject]);
     resetDraft();
+    markUnsaved();
     return true;
   };
 
   const removeProject = (id: number) => {
     setProjects((prev) => prev.filter((project) => Number(project.id) !== Number(id)));
     if (Number(editingProjectId) === Number(id)) resetDraft();
+    markUnsaved();
   };
 
   const handleSave = async () => {
@@ -257,6 +265,7 @@ export default function ProjectForm() {
         )
       );
       setSaveState("synced");
+      setHasUnsavedProjects?.(false);
       showToast("success", "Проекты сохранены");
     } catch {
       showToast("error", "Ошибка при сохранении проектов");
@@ -276,6 +285,7 @@ export default function ProjectForm() {
             disabled={mode === "edit" && Boolean(ctxDirectionId)}
             onChange={(value) => {
               setDirectionId(String(value));
+              markUnsaved();
               setErrors((prev) => {
                 const next = { ...prev };
                 delete next.directionId;
@@ -305,6 +315,7 @@ export default function ProjectForm() {
               value={title}
               onChange={(event) => {
                 setTitle(event.target.value);
+                markUnsaved();
                 setErrors((prev) => {
                   const next = { ...prev };
                   delete next.title;
@@ -328,7 +339,14 @@ export default function ProjectForm() {
 
       <label className="text-small">
         <span className="wizard-field-label">Описание</span>
-        <AppTextArea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Краткое описание проекта" />
+        <AppTextArea
+          value={description}
+          onChange={(event) => {
+            setDescription(event.target.value);
+            markUnsaved();
+          }}
+          placeholder="Краткое описание проекта"
+        />
       </label>
 
       <div className="tags" style={{ marginTop: 12 }}>
@@ -344,11 +362,10 @@ export default function ProjectForm() {
               <AppButton
                 className="tag-edit"
                 type="button"
-                style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", display: "flex", flexDirection: "column", gap: 2 }}
                 onClick={() => fillForm(project)}
               >
-                <strong style={{ lineHeight: 1 }}>{project.title}</strong>
-                {project.description && <span className="text-small" style={{ opacity: 0.8 }}>{project.description}</span>}
+                <strong className="tag-title">{project.title}</strong>
+                {project.description && <span className="tag-description">{project.description}</span>}
               </AppButton>
               <AppButton className="tag-remove" type="button" onClick={() => removeProject(Number(project.id))} aria-label="Удалить проект">
                 x

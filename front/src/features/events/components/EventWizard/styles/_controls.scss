@@ -131,12 +131,14 @@ select:focus {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  max-width: 100%;
   text-align: left;
   line-height: 1.2;
 }
 
 .tag .tag-edit.app-button.ant-btn {
   width: auto;
+  flex: 1 1 auto;
   min-width: 0;
   height: auto;
   padding: 0 !important;
@@ -144,10 +146,33 @@ select:focus {
   background: transparent !important;
   color: inherit !important;
   display: flex;
+  flex-direction: column;
+  gap: 2px;
   align-items: flex-start;
   justify-content: flex-start;
   text-align: left;
+  overflow: hidden;
   box-shadow: none !important;
+}
+
+.tag-title,
+.tag-description,
+.tag-meta {
+  display: block;
+  max-width: min(100%, 1080px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-title {
+  line-height: 1.12;
+}
+
+.tag-description,
+.tag-meta {
+  opacity: 0.8;
+  font-size: 13px;
 }
 
 .tag .tag-edit.app-button.ant-btn:hover,
