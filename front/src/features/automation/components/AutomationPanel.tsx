@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { CloseOutlined, RobotOutlined, SaveOutlined, SettingOutlined } from "@ant-design/icons";
 import { Empty, Spin, Tag } from "antd";
 import { getEvents } from "../../events/api/events";
@@ -13,6 +13,7 @@ import {
 import { SCOPE_TEXT, TEXT } from "../config/text";
 import type {
   AutomationConfig,
+  AutomationPanelHandle,
   AutomationPanelProps,
   AutomationRobot,
   AutomationTrigger,
@@ -29,7 +30,10 @@ import { CatalogPanel } from "./CatalogPanel";
 import { RobotEditor, TriggerEditor } from "./RuleEditors";
 import "../styles/automation-panel.scss";
 
-export default function AutomationPanel({ scope, lockedEventId, className = "" }: AutomationPanelProps) {
+const AutomationPanel = forwardRef<AutomationPanelHandle, AutomationPanelProps>(function AutomationPanel(
+  { scope, lockedEventId, className = "", hideLocalSave = false, hideEventSelector = false, onDirtyChange },
+  ref
+) {
   const { showToast } = useToast();
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(lockedEventId ?? null);
@@ -38,6 +42,14 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
   const [selectedRule, setSelectedRule] = useState<SelectedRule | null>(null);
   const [catalogState, setCatalogState] = useState<CatalogState | null>(null);
   const [loading, setLoading] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState("");
+
+  const configSnapshot = useMemo(() => (config ? JSON.stringify(config) : ""), [config]);
+  const hasUnsavedChanges = Boolean(config && savedSnapshot && configSnapshot !== savedSnapshot);
+
+  useEffect(() => {
+    onDirtyChange?.(hasUnsavedChanges);
+  }, [hasUnsavedChanges, onDirtyChange]);
 
   useEffect(() => {
     let mounted = true;
@@ -95,6 +107,7 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
       .then((nextConfig) => {
         if (!mounted) return;
         setConfig(nextConfig);
+        setSavedSnapshot(JSON.stringify(nextConfig));
         setSelectedStageId(readStoredStageId(scope, selectedEventId, nextConfig) || nextConfig.stages[0]?.id || "");
         setSelectedRule(null);
         setCatalogState(null);
@@ -199,8 +212,8 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
     setCatalogState(null);
   };
 
-  const handleSave = async () => {
-    if (!config || !selectedEventId) return;
+  const handleSave = useCallback(async () => {
+    if (!config || !selectedEventId) return false;
     const nextConfig = {
       ...config,
       scope,
@@ -211,13 +224,26 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
     try {
       const normalized = await writeAutomationConfigAsync(nextConfig);
       setConfig(normalized);
+      setSavedSnapshot(JSON.stringify(normalized));
+      onDirtyChange?.(false);
       showToast("success", TEXT.saved);
+      return true;
     } catch {
       showToast("error", TEXT.saveError);
+      return false;
     } finally {
       setLoading(false);
     }
-  };
+  }, [config, onDirtyChange, scope, selectedEventId, showToast]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      save: handleSave,
+      hasUnsavedChanges: () => hasUnsavedChanges,
+    }),
+    [handleSave, hasUnsavedChanges]
+  );
 
   const openCatalog = (kind: RuleKind, stageId: string) => {
     setSelectedStageId(stageId);
@@ -255,29 +281,35 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
           </div>
         </div>
 
-        <div className="automation-panel__actions">
-          <label className="automation-panel__event">
-            <span>{TEXT.event}</span>
-            {lockedEventId ? (
-              <strong>{getEventTitle(selectedEvent)}</strong>
-            ) : (
-              <AppSelect
-                value={selectedEventId ?? undefined}
-                placeholder={TEXT.event}
-                disabled={loading || events.length === 0}
-                onChange={(value) => setSelectedEventId(Number(value))}
-                options={events.map((event) => ({ value: Number(event.id), label: getEventTitle(event) }))}
-                showSearch
-                optionFilterProp="label"
-              />
+        {(!hideEventSelector || !hideLocalSave) && (
+          <div className="automation-panel__actions">
+            {!hideEventSelector && (
+              <label className="automation-panel__event">
+                <span>{TEXT.event}</span>
+                {lockedEventId ? (
+                  <strong>{getEventTitle(selectedEvent)}</strong>
+                ) : (
+                  <AppSelect
+                    value={selectedEventId ?? undefined}
+                    placeholder={TEXT.event}
+                    disabled={loading || events.length === 0}
+                    onChange={(value) => setSelectedEventId(Number(value))}
+                    options={events.map((event) => ({ value: Number(event.id), label: getEventTitle(event) }))}
+                    showSearch
+                    optionFilterProp="label"
+                  />
+                )}
+              </label>
             )}
-          </label>
 
-          <AppButton className="automation-panel__save" onClick={handleSave} disabled={!config || loading}>
-            <SaveOutlined />
-            <span>{TEXT.save}</span>
-          </AppButton>
-        </div>
+            {!hideLocalSave && (
+              <AppButton className="automation-panel__save" onClick={handleSave} disabled={!config || loading}>
+                <SaveOutlined />
+                <span>{TEXT.save}</span>
+              </AppButton>
+            )}
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -363,4 +395,7 @@ export default function AutomationPanel({ scope, lockedEventId, className = "" }
       )}
     </section>
   );
-}
+});
+
+export default AutomationPanel;
+

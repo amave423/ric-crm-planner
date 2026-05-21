@@ -10,8 +10,25 @@
   background: #f5f8fc;
 }
 
+.automation-settings-modal .ant-modal-footer {
+  margin-top: 0;
+  padding: 12px 18px 16px;
+  border-top: 1px solid rgba(137, 166, 222, 0.24);
+  background: #fff;
+}
+
+.automation-settings-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .automation-settings-modal .automation-panel {
   box-shadow: none;
+}
+
+.automation-settings-modal .automation-panel--modal .automation-panel__head {
+  padding-right: 48px;
 }
 
 @media (max-width: 768px) {
@@ -70,6 +87,38 @@
     padding: 12px;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .automation-settings-modal .ant-modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .automation-settings-modal__footer {
+    flex-direction: column-reverse;
+  }
+
+  .automation-settings-modal__footer .app-button {
+    width: 100%;
+  }
+
+  .automation-settings-modal .automation-side__close {
+    width: auto;
+    min-width: 94px;
+    padding: 0 10px !important;
+    font-size: 0;
+  }
+
+  .automation-settings-modal .automation-side__close .anticon {
+    display: none;
+  }
+
+  .automation-settings-modal .automation-side__close::after {
+    content: "К списку";
+    font-size: 13px;
+    font-weight: 800;
   }
 }
 

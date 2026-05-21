@@ -57,7 +57,7 @@ function buildDirectionSnapshot(
 }
 
 export default function DirectionForm() {
-  const { mode, saveDirections, eventId, savedDirections, directionId: ctxDirectionId } = useWizard();
+  const { mode, saveDirections, eventId, savedDirections, directionId: ctxDirectionId, setHasUnsavedDirections } = useWizard();
   const { showToast } = useToast();
 
   const [description, setDescription] = useState("");
@@ -72,6 +72,10 @@ export default function DirectionForm() {
   const [savedSnapshot, setSavedSnapshot] = useState("");
 
   const organizers = usersList.filter((user) => user.role === "organizer");
+  const markUnsaved = () => {
+    setSaveState("idle");
+    setHasUnsavedDirections?.(true);
+  };
   const formSnapshot = useMemo(
     () => buildDirectionSnapshot(directions, input, description, selectedOrganizer, editingDirectionId),
     [description, directions, editingDirectionId, input, selectedOrganizer]
@@ -183,6 +187,7 @@ export default function DirectionForm() {
             : direction
         )
       );
+      markUnsaved();
       showToast("success", "Изменения направления добавлены в черновик");
       return;
     }
@@ -201,6 +206,7 @@ export default function DirectionForm() {
     setDescription("");
     setSelectedOrganizer("");
     setErrors({});
+    markUnsaved();
   };
 
   const removeDirection = (id: number) => {
@@ -211,6 +217,7 @@ export default function DirectionForm() {
       setDescription("");
       setSelectedOrganizer("");
     }
+    markUnsaved();
   };
 
   const handleSave = async () => {
@@ -292,6 +299,7 @@ export default function DirectionForm() {
         )
       );
       setSaveState("synced");
+      setHasUnsavedDirections?.(false);
       showToast("success", "Направления сохранены");
     } catch {
       showToast("error", "Ошибка при сохранении направлений");
@@ -311,6 +319,7 @@ export default function DirectionForm() {
               value={input}
               onChange={(event) => {
                 setInput(event.target.value);
+                markUnsaved();
                 setErrors((prev) => {
                   const next = { ...prev };
                   delete next.input;
@@ -334,7 +343,13 @@ export default function DirectionForm() {
 
       <label className="text-small">
         <span className="wizard-field-label">Описание</span>
-        <AppTextArea value={description} onChange={(event) => setDescription(event.target.value)} />
+        <AppTextArea
+          value={description}
+          onChange={(event) => {
+            setDescription(event.target.value);
+            markUnsaved();
+          }}
+        />
       </label>
 
       <div className={`field-wrap ${errors.selectedOrganizer ? "error" : ""}`}>
@@ -345,6 +360,7 @@ export default function DirectionForm() {
             value={selectedOrganizer}
             onChange={(value) => {
               setSelectedOrganizer(String(value));
+              markUnsaved();
               setErrors((prev) => {
                 const next = { ...prev };
                 delete next.selectedOrganizer;
@@ -376,12 +392,11 @@ export default function DirectionForm() {
               <AppButton
                 className="tag-edit"
                 type="button"
-                style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", display: "flex", flexDirection: "column", gap: 2 }}
                 onClick={() => fillForm(direction)}
               >
-                <strong style={{ lineHeight: 1 }}>{direction.title}</strong>
-                {direction.description && <span className="text-small" style={{ opacity: 0.8 }}>{direction.description}</span>}
-                {direction.organizer && <span className="text-small" style={{ opacity: 0.8 }}>Организатор: {direction.organizer}</span>}
+                <strong className="tag-title">{direction.title}</strong>
+                {direction.description && <span className="tag-description">{direction.description}</span>}
+                {direction.organizer && <span className="tag-meta">Организатор: {direction.organizer}</span>}
               </AppButton>
               <AppButton className="tag-remove" type="button" onClick={() => removeDirection(Number(direction.id))} aria-label="Удалить направление">
                 x
