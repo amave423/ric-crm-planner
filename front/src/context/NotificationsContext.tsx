@@ -92,7 +92,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             setItems((prev) => [created, ...prev.filter((item) => item.id !== created.id)]);
           })
           .catch(() => {
-            // Keep the UI stable if the backend is temporarily unavailable.
           });
         return;
       }
@@ -115,7 +114,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     if (shouldUseBackendNotifications(Boolean(user))) {
       void markAllBackendNotificationsAsRead().catch(() => {
-        // No-op, optimistic UI already updated.
       });
     }
   }, [user]);
@@ -133,7 +131,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
       if (shouldUseBackendNotifications(Boolean(user)) && /^\d+$/.test(id)) {
         void markBackendNotificationAsRead(id).catch(() => {
-          // No-op, optimistic UI already updated.
         });
       }
     },
@@ -148,7 +145,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
       if (shouldUseBackendNotifications(Boolean(user)) && /^\d+$/.test(id)) {
         void deleteBackendNotification(id).catch(() => {
-          // No-op, optimistic UI already updated.
         });
       }
     },
@@ -164,7 +160,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     if (shouldUseBackendNotifications(Boolean(user))) {
       void clearBackendNotifications().catch(() => {
-        // No-op, optimistic UI already updated.
       });
     }
   }, [user]);

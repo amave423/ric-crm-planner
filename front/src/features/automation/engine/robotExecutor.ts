@@ -179,7 +179,6 @@ export async function executeRobot(
       try {
         await sendBackendApplicationVkMessage(robot, eventItem.request, event);
       } catch {
-        // Backend creates organizer notifications for VK delivery problems.
       }
       return;
     }

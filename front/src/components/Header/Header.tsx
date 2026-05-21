@@ -220,7 +220,6 @@ export default function Header() {
         return;
       }
     } catch {
-      // Fallback to opening the original link below.
     }
     window.open(link, "_blank", "noopener,noreferrer");
   };

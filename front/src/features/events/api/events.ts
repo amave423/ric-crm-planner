@@ -278,7 +278,6 @@ async function resolveOrganizer(event: BackendEvent): Promise<string | undefined
       const dirs = await getStoredDirectionsByEvent(Number(event.id));
       if (Array.isArray(dirs) && dirs.length > 0) id = dirs[0].leader ?? dirs[0].organizer;
     } catch {
-      // fallback to unknown organizer
     }
   }
 
