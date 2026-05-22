@@ -338,6 +338,51 @@ class CRMContractTests(TestCase):
         application.refresh_from_db()
         self.assertEqual(application.status.name, failed_status.name)
 
+    def test_crm_chat_link_opened_trigger_does_not_revert_joined_status_from_legacy_config(self):
+        sent_status = Status.objects.get_or_create(name="Отправлена ссылка на орг. чат")[0]
+        joined_status = Status.objects.get_or_create(name="Добавился в орг. чат")[0]
+        application = Application.objects.create(
+            user=self.projectant,
+            event=self.event,
+            direction=self.direction,
+            message="Ready",
+            date_sub=timezone.now(),
+            date_end=self.event.end_app_date,
+            status=joined_status,
+        )
+        CRMAutomationConfig.objects.create(
+            scope="crm",
+            event=self.event,
+            stages=[
+                {"id": "application-chat-link-sent", "title": sent_status.name, "description": ""},
+                {"id": "application-joined-chat", "title": joined_status.name, "description": ""},
+            ],
+            triggers=[
+                {
+                    "id": "crm-chat-link-opened",
+                    "stageId": "application-chat-link-sent",
+                    "title": "Legacy chat link trigger",
+                    "description": "",
+                    "eventCode": "notification.chat_link_opened",
+                    "enabled": True,
+                    "settings": {
+                        "runMode": "queue",
+                        "timing": "immediate",
+                        "delayMinutes": 0,
+                        "condition": {"mode": "all", "rules": []},
+                    },
+                    "targetStageId": "application-chat-link-sent",
+                    "allowBackTransition": False,
+                }
+            ],
+            robots=[],
+        )
+
+        run_crm_automation(application, "notification.chat_link_opened", previous_status=sent_status.name)
+
+        application.refresh_from_db()
+        self.assertEqual(application.status.name, joined_status.name)
+
     def test_curator_can_create_notification_for_projectant(self):
         self.client.force_authenticate(user=self.curator)
 

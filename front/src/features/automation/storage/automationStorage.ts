@@ -133,9 +133,13 @@ function normalizeRobot(robot: AutomationRobot, fallbackStageId: string): Automa
 function normalizeTrigger(trigger: AutomationTrigger, fallbackStageId: string): AutomationTrigger {
   const id = String(trigger.id);
   const stageId =
-    (id === "crm-chat-link-opened" || id === "request-chat-link-opened") && trigger.stageId === "application-joined-chat"
-      ? "application-chat-link-sent"
+    (id === "crm-chat-link-opened" || id === "request-chat-link-opened") && trigger.stageId === "application-chat-link-sent"
+      ? "application-joined-chat"
       : String(trigger.stageId || fallbackStageId);
+  const targetStageId =
+    id === "crm-chat-link-opened" || id === "request-chat-link-opened"
+      ? "application-joined-chat"
+      : String(trigger.targetStageId || fallbackStageId);
 
   return {
     id,
@@ -146,7 +150,7 @@ function normalizeTrigger(trigger: AutomationTrigger, fallbackStageId: string): 
     enabled: Boolean(trigger.enabled),
     deleted: Boolean(trigger.deleted),
     settings: normalizeSettings(trigger.settings),
-    targetStageId: String(trigger.targetStageId || fallbackStageId),
+    targetStageId,
     allowBackTransition: Boolean(trigger.allowBackTransition),
   };
 }

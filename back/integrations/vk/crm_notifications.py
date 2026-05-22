@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.core import signing
 from django.urls import reverse
@@ -15,6 +17,7 @@ CHAT_JOINED_STATUS_NAME = "Добавился в орг. чат"
 CHAT_LINK_SALT = "vk-application-chat-link"
 CHAT_LINK_PLACEHOLDER = "{chat_link}"
 VK_CHAT_PEER_OFFSET = 2_000_000_000
+logger = logging.getLogger(__name__)
 
 
 def build_testing_started_message(application: Application) -> str:
@@ -235,15 +238,35 @@ def resolve_application_vk_user_id(application: Application) -> int:
 def mark_application_joined_chat_if_member(application: Application) -> bool:
     peer_id = resolve_application_chat_peer_id(application)
     if not peer_id:
+        logger.warning("VK chat membership check skipped: peer_id is not configured for application_id=%s", application.id)
         return False
 
     vk_user_id = resolve_application_vk_user_id(application)
     try:
         if not is_vk_user_in_conversation(peer_id=peer_id, user_id=vk_user_id):
+            logger.warning(
+                "VK chat membership check: user is not in chat application_id=%s vk_user_id=%s peer_id=%s",
+                application.id,
+                vk_user_id,
+                peer_id,
+            )
             return False
     except VKAPIError:
+        logger.warning(
+            "VK chat membership check failed: application_id=%s vk_user_id=%s peer_id=%s",
+            application.id,
+            vk_user_id,
+            peer_id,
+            exc_info=True,
+        )
         return False
 
+    logger.warning(
+        "VK chat membership check: user already in chat application_id=%s vk_user_id=%s peer_id=%s",
+        application.id,
+        vk_user_id,
+        peer_id,
+    )
     return mark_application_joined_chat_by_vk_user(vk_user_id, peer_id) is not None
 
 

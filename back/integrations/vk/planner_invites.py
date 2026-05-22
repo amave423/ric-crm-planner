@@ -224,14 +224,14 @@ def handle_vk_chat_join_message(message: dict[str, Any]) -> bool:
 
     application = mark_application_joined_chat_by_vk_user(vk_user_id=vk_user_id, peer_id=peer_id)
     if application:
-        logger.info(
+        logger.warning(
             "VK chat join detected: vk_user_id=%s peer_id=%s application_id=%s",
             vk_user_id,
             peer_id,
             application.id,
         )
     else:
-        logger.info(
+        logger.warning(
             "VK chat join ignored: vk_user_id=%s peer_id=%s no matching application",
             vk_user_id,
             peer_id,

@@ -1,6 +1,7 @@
 import hashlib
 import json
 from dataclasses import dataclass
+from copy import deepcopy
 from datetime import timedelta
 from typing import Any
 
@@ -30,6 +31,10 @@ class CRMAutomationEvent:
     request: Any = None
 
 
+CHAT_LINK_ROBOT_IDS = {"crm-send-chat-link", "request-send-chat-link"}
+CHAT_LINK_TRIGGER_IDS = {"crm-chat-link-opened", "request-chat-link-opened"}
+
+
 def to_int(value: Any) -> int | None:
     try:
         if value is None or value == "":
@@ -52,17 +57,47 @@ def stable_fingerprint(value: Any) -> str:
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
 
 
+def normalize_crm_automation_config_dict(config: dict[str, Any]) -> dict[str, Any]:
+    normalized = deepcopy(config)
+
+    robots = normalized.get("robots") if isinstance(normalized.get("robots"), list) else []
+    for robot in robots:
+        if not isinstance(robot, dict):
+            continue
+        robot_id = normalized_text(robot.get("id"))
+        action = normalized_text(robot.get("action"))
+        stage_id = normalized_text(robot.get("stageId"))
+
+        if robot_id in CHAT_LINK_ROBOT_IDS or (action == "chat.link.vk" and stage_id == "application-joined-chat"):
+            robot["stageId"] = "application-chat-link-sent"
+        if robot_id == "crm-send-planner-invite":
+            robot["stageId"] = "application-joined-chat"
+
+    triggers = normalized.get("triggers") if isinstance(normalized.get("triggers"), list) else []
+    for trigger in triggers:
+        if not isinstance(trigger, dict):
+            continue
+        trigger_id = normalized_text(trigger.get("id"))
+        event_code = normalized_text(trigger.get("eventCode"))
+
+        if trigger_id in CHAT_LINK_TRIGGER_IDS or event_code == "notification.chat_link_opened":
+            trigger["stageId"] = "application-joined-chat"
+            trigger["targetStageId"] = "application-joined-chat"
+
+    return normalized
+
+
 def config_model_to_dict(config_model: CRMAutomationConfig) -> dict[str, Any]:
     if not config_model.stages and not config_model.triggers and not config_model.robots:
         return create_default_crm_automation_config(config_model.event_id)
-    return {
+    return normalize_crm_automation_config_dict({
         "scope": config_model.scope,
         "eventId": config_model.event_id,
         "updatedAt": config_model.updated_at.isoformat(),
         "stages": config_model.stages,
         "triggers": config_model.triggers,
         "robots": config_model.robots,
-    }
+    })
 
 
 def get_or_create_config(event_id: int) -> CRMAutomationConfig:

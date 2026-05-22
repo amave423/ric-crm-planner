@@ -929,6 +929,12 @@ class CRMAutomationConfigSerializer(ModelSerializer):
         attrs["scope"] = CRMAutomationConfig.SCOPE_CRM
         return attrs
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        from users.automation_engine import normalize_crm_automation_config_dict
+
+        return normalize_crm_automation_config_dict(data)
+
 
 class CRMAutomationConfigPayloadSerializer(Serializer):
     scope = serializers.CharField(required=False, default=CRMAutomationConfig.SCOPE_CRM)
