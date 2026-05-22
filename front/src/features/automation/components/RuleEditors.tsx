@@ -1,5 +1,6 @@
 ﻿import { DeleteOutlined, RobotOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import { Tooltip } from "antd";
+import { ORGANIZER_REQUEST_STATUSES } from "../../../constants/requestProgress";
 import AppButton from "../../../components/UI/Button";
 import AppInput, { AppTextArea } from "../../../components/UI/Input";
 import AppSelect from "../../../components/UI/Select";
@@ -28,6 +29,14 @@ type RobotEditorProps = {
 };
 
 export function RobotEditor({ robot, stageOptions, onChange, onDelete }: RobotEditorProps) {
+  const isStatusChangeRobot = robot.action === "status.change";
+  const statusOptions = ORGANIZER_REQUEST_STATUSES.map((status) => ({ value: status, label: status }));
+  const targetStatus =
+    robot.targetStatus ||
+    stageOptions.find((option) => option.value === robot.targetStageId)?.label ||
+    stageOptions.find((option) => option.value === robot.stageId)?.label ||
+    "";
+
   return (
     <div className="automation-side__content">
       <EditorHeader
@@ -58,19 +67,38 @@ export function RobotEditor({ robot, stageOptions, onChange, onDelete }: RobotEd
           onChange={(settings) => onChange((item) => ({ ...item, settings }))}
         />
 
-        <label>
-          <span>{TEXT.subject}</span>
-          <AppInput value={robot.subject} onChange={(event) => onChange((item) => ({ ...item, subject: event.target.value }))} />
-        </label>
+        {isStatusChangeRobot ? (
+          <label>
+            <span>Статус для перевода</span>
+            <AppSelect
+              value={targetStatus}
+              options={statusOptions}
+              onChange={(value) =>
+                onChange((item) => ({
+                  ...item,
+                  targetStatus: String(value),
+                  targetStageId: stageOptions.find((option) => option.label === value)?.value || item.targetStageId,
+                }))
+              }
+            />
+          </label>
+        ) : (
+          <>
+            <label>
+              <span>{TEXT.subject}</span>
+              <AppInput value={robot.subject} onChange={(event) => onChange((item) => ({ ...item, subject: event.target.value }))} />
+            </label>
 
-        <label>
-          <span>{TEXT.message}</span>
-          <AppTextArea
-            value={robot.message}
-            autoSize={{ minRows: 3, maxRows: 6 }}
-            onChange={(event) => onChange((item) => ({ ...item, message: event.target.value }))}
-          />
-        </label>
+            <label>
+              <span>{TEXT.message}</span>
+              <AppTextArea
+                value={robot.message}
+                autoSize={{ minRows: 3, maxRows: 6 }}
+                onChange={(event) => onChange((item) => ({ ...item, message: event.target.value }))}
+              />
+            </label>
+          </>
+        )}
 
         <ReadOnlyCode label={TEXT.actionCode} value={robot.action} />
 

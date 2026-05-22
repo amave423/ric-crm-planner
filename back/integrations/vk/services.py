@@ -150,6 +150,25 @@ def send_vk_message(
     return int(data.get("response", 0))
 
 
+def is_vk_user_in_conversation(*, peer_id: int, user_id: int) -> bool:
+    data = call_vk_method("messages.getConversationMembers", {"peer_id": peer_id})
+    response = data.get("response", {})
+    items = response.get("items") if isinstance(response, dict) else []
+    if not isinstance(items, list):
+        return False
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        member_id = item.get("member_id", item.get("id"))
+        try:
+            if int(member_id) == int(user_id):
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
+
+
 def answer_vk_message_event(*, event_id: str, user_id: int, peer_id: int, text: str = "Готово") -> None:
     if not event_id:
         return

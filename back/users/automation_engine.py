@@ -10,6 +10,7 @@ from django.utils import timezone
 from integrations.vk.crm_notifications import (
     CHAT_LINK_PLACEHOLDER,
     inject_application_chat_link,
+    mark_application_joined_chat_if_member,
     notify_organizers_about_vk_error,
     send_application_vk_message,
 )
@@ -373,14 +374,33 @@ def run_robot_action(
         except (VKConfigurationError, VKAPIError, ValueError) as exc:
             notify_organizers_about_vk_error(event.application, str(exc))
             log_message = str(exc)
+    elif action == "status.change":
+        target_stage_id = normalized_text(robot.get("targetStageId"))
+        target_status = normalized_text(robot.get("targetStatus")) or target_status_for_stage(
+            config_model_to_dict(config_model),
+            target_stage_id,
+        )
+        success = update_application_status(event.application, target_status)
+        if success:
+            event.application.refresh_from_db()
+        log_message = (
+            f"Заявка переведена в статус «{target_status}»."
+            if success
+            else "Статус заявки не изменился."
+        )
     elif action in {"message.vk", "chat.link.vk", "message.vk_or_notification"}:
         try:
-            vk_message = message
-            if action in {"chat.link.vk", "message.vk_or_notification"} or CHAT_LINK_PLACEHOLDER in vk_message:
-                vk_message = inject_application_chat_link(vk_message, event.application, event.request)
-            send_application_vk_message(event.application, vk_message)
-            success = True
-            log_message = "VK-сообщение отправлено проектанту."
+            if action == "chat.link.vk" and mark_application_joined_chat_if_member(event.application):
+                event.application.refresh_from_db()
+                success = True
+                log_message = "Проектант уже состоит в орг. чате, отправка ссылки пропущена."
+            else:
+                vk_message = message
+                if action in {"chat.link.vk", "message.vk_or_notification"} or CHAT_LINK_PLACEHOLDER in vk_message:
+                    vk_message = inject_application_chat_link(vk_message, event.application, event.request)
+                send_application_vk_message(event.application, vk_message)
+                success = True
+                log_message = "VK-сообщение отправлено проектанту."
         except (VKConfigurationError, VKAPIError, ValueError) as exc:
             notify_organizers_about_vk_error(event.application, str(exc))
             log_message = str(exc)

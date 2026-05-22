@@ -120,6 +120,8 @@ function normalizeRobot(robot: AutomationRobot, fallbackStageId: string): Automa
     title: String(robot.title || "Робот"),
     description: String(robot.description || ""),
     action: action === "message.vk_interactive" ? "message.vk" : action,
+    targetStageId: String(robot.targetStageId || fallbackStageId),
+    targetStatus: String(robot.targetStatus || ""),
     enabled: Boolean(robot.enabled),
     deleted: Boolean(robot.deleted),
     settings: normalizeSettings(robot.settings),
@@ -183,7 +185,11 @@ function mergeConfigWithDefaults(config: AutomationConfig): AutomationConfig {
 
   const robots = mergeItems(defaults.robots, config.robots || [])
     .map((robot) => normalizeRobot(robot, fallbackStageId))
-    .map((robot) => ({ ...robot, stageId: stageIds.has(robot.stageId) ? robot.stageId : fallbackStageId }));
+    .map((robot) => ({
+      ...robot,
+      stageId: stageIds.has(robot.stageId) ? robot.stageId : fallbackStageId,
+      targetStageId: robot.targetStageId && stageIds.has(robot.targetStageId) ? robot.targetStageId : fallbackStageId,
+    }));
 
   const triggers = mergeItems(defaults.triggers, config.triggers || [])
     .map((trigger) => normalizeTrigger(trigger, fallbackStageId))

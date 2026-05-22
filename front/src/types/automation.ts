@@ -49,6 +49,8 @@ export interface AutomationRobot {
   title: string;
   description: string;
   action: string;
+  targetStageId?: string;
+  targetStatus?: string;
   enabled: boolean;
   deleted?: boolean;
   settings: AutomationCommonSettings;

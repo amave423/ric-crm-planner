@@ -1,10 +1,11 @@
 from django.conf import settings
 from django.core import signing
 from django.urls import reverse
+from urllib.parse import parse_qs, urlparse
 
 from users.models import Application, Notification, Profile, Status
 
-from .services import VKAPIError, VKConfigurationError, send_vk_message
+from .services import VKAPIError, VKConfigurationError, is_vk_user_in_conversation, send_vk_message
 from users.vk_profiles import refresh_profile_vk_user_id
 
 
@@ -13,6 +14,7 @@ CHAT_LINK_SENT_STATUS_NAME = "Отправлена ссылка на орг. ч�
 CHAT_JOINED_STATUS_NAME = "Добавился в орг. чат"
 CHAT_LINK_SALT = "vk-application-chat-link"
 CHAT_LINK_PLACEHOLDER = "{chat_link}"
+VK_CHAT_PEER_OFFSET = 2_000_000_000
 
 
 def build_testing_started_message(application: Application) -> str:
@@ -60,6 +62,49 @@ def notify_organizers_about_chat_join(application: Application) -> None:
             message=f'Проектант {student_name} перешел по ссылке на орг.чат мероприятия "{event_name}".',
             link="/requests",
         )
+
+
+def resolve_vk_chat_peer_id(chat_url: str) -> int | None:
+    if not chat_url:
+        return None
+
+    try:
+        parsed = urlparse(chat_url)
+    except ValueError:
+        return None
+
+    query = parse_qs(parsed.query)
+    raw_peer = None
+    for key in ("peer_id", "peer", "sel"):
+        values = query.get(key)
+        if values:
+            raw_peer = values[0]
+            break
+
+    if not raw_peer:
+        return None
+
+    raw_peer = str(raw_peer).strip()
+    if raw_peer.startswith("c"):
+        raw_peer = raw_peer[1:]
+        try:
+            return VK_CHAT_PEER_OFFSET + int(raw_peer)
+        except ValueError:
+            return None
+
+    try:
+        peer_id = int(raw_peer)
+    except ValueError:
+        return None
+
+    if peer_id > VK_CHAT_PEER_OFFSET:
+        return peer_id
+    return VK_CHAT_PEER_OFFSET + peer_id
+
+
+def resolve_application_chat_peer_id(application: Application) -> int | None:
+    event_chat_url = application.event.org_chat_url if application.event_id and application.event else ""
+    return resolve_vk_chat_peer_id(event_chat_url) or resolve_vk_chat_peer_id(settings.VK_ORG_CHAT_URL)
 
 
 def build_application_chat_link(application: Application, request=None, chat_url: str = "") -> str:
@@ -111,33 +156,80 @@ def mark_application_chat_link_opened(token: str) -> tuple[Application, str]:
     if not redirect_url:
         return application, ""
 
-    if not application.status_id or application.status.name != CHAT_LINK_SENT_STATUS_NAME:
-        return application, redirect_url
-
-    joined_status = resolve_chat_joined_status()
-    if application.status_id != joined_status.id:
-        previous_status = application.status.name if application.status_id else ""
-        application.status = joined_status
-        application.save(update_fields=["status"])
-        notify_organizers_about_chat_join(application)
-        from users.automation_engine import run_crm_automation
-
-        run_crm_automation(
-            application,
-            "notification.chat_link_opened",
-            previous_status=previous_status,
-        )
-
     return application, redirect_url
 
 
-def send_application_vk_message(application: Application, message: str, keyboard: dict | None = None) -> int:
+def mark_application_joined_chat_by_vk_user(vk_user_id: int, peer_id: int | None = None) -> Application | None:
+    profile = Profile.objects.filter(vk_user_id=vk_user_id).select_related("user").first()
+    if not profile:
+        return None
+
+    applications = list(
+        Application.objects.select_related("user", "event", "event__leader", "status")
+        .prefetch_related("event__organizers")
+        .filter(user=profile.user, status__name=CHAT_LINK_SENT_STATUS_NAME)
+        .order_by("-date_sub", "-id")
+    )
+    if not applications:
+        return None
+
+    matched_applications = applications
+    if peer_id:
+        exact_matches = [
+            application
+            for application in applications
+            if resolve_application_chat_peer_id(application) == peer_id
+        ]
+        if exact_matches:
+            matched_applications = exact_matches
+
+    application = matched_applications[0]
+    joined_status = resolve_chat_joined_status()
+    if application.status_id == joined_status.id:
+        return application
+
+    previous_status = application.status.name if application.status_id else ""
+    application.status = joined_status
+    application.save(update_fields=["status"])
+    notify_organizers_about_chat_join(application)
+
+    from users.automation_engine import run_crm_automation
+
+    run_crm_automation(
+        application,
+        "notification.chat_link_opened",
+        previous_status=previous_status,
+    )
+    return application
+
+
+def resolve_application_vk_user_id(application: Application) -> int:
     profile = Profile.objects.filter(user=application.user).only("vk", "vk_user_id", "vk_confirmed_at").first()
     vk_user_id = refresh_profile_vk_user_id(profile) if profile else None
     if not vk_user_id:
         raise ValueError("у проектанта не указан корректный VK")
     if profile and not profile.vk_confirmed_at:
         raise ValueError("проектант не подтвердил VK-бота")
+    return int(vk_user_id)
+
+
+def mark_application_joined_chat_if_member(application: Application) -> bool:
+    peer_id = resolve_application_chat_peer_id(application)
+    if not peer_id:
+        return False
+
+    vk_user_id = resolve_application_vk_user_id(application)
+    try:
+        if not is_vk_user_in_conversation(peer_id=peer_id, user_id=vk_user_id):
+            return False
+    except VKAPIError:
+        return False
+
+    return mark_application_joined_chat_by_vk_user(vk_user_id, peer_id) is not None
+
+
+def send_application_vk_message(application: Application, message: str, keyboard: dict | None = None) -> int:
+    vk_user_id = resolve_application_vk_user_id(application)
 
     return send_vk_message(user_id=vk_user_id, message=message, keyboard=keyboard)
 

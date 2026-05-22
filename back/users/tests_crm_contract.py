@@ -22,7 +22,7 @@ from users.models import (
     Specialization,
     Status,
 )
-from users.automation_engine import run_due_crm_automation
+from users.automation_engine import run_crm_automation, run_due_crm_automation
 
 
 @override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
@@ -291,6 +291,52 @@ class CRMContractTests(TestCase):
         self.assertEqual(result["processed"], 1)
         self.assertEqual(result["changed"], 1)
         self.assertTrue(Notification.objects.filter(user=self.projectant, title="Тестирование").exists())
+
+    def test_crm_robot_can_change_application_status(self):
+        submitted_status = Status.objects.get_or_create(name="Прислал заявку")[0]
+        failed_status = Status.objects.get_or_create(name="Не прошел тестирование")[0]
+        application = Application.objects.create(
+            user=self.projectant,
+            event=self.event,
+            direction=self.direction,
+            message="Ready",
+            date_sub=timezone.now(),
+            date_end=self.event.end_app_date,
+            status=submitted_status,
+        )
+        CRMAutomationConfig.objects.create(
+            scope="crm",
+            event=self.event,
+            stages=[
+                {"id": "application-submitted", "title": submitted_status.name, "description": ""},
+            ],
+            triggers=[],
+            robots=[
+                {
+                    "id": "move-to-failed-testing",
+                    "stageId": "application-submitted",
+                    "targetStatus": failed_status.name,
+                    "title": "Перевести заявку",
+                    "description": "",
+                    "action": "status.change",
+                    "enabled": True,
+                    "settings": {
+                        "runMode": "queue",
+                        "timing": "immediate",
+                        "delayMinutes": 0,
+                        "condition": {"mode": "all", "rules": []},
+                    },
+                    "subject": "",
+                    "message": "",
+                }
+            ],
+        )
+
+        result = run_crm_automation(application, "application.created")
+
+        self.assertEqual(result["changed"], 1)
+        application.refresh_from_db()
+        self.assertEqual(application.status.name, failed_status.name)
 
     def test_curator_can_create_notification_for_projectant(self):
         self.client.force_authenticate(user=self.curator)
