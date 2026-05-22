@@ -14,18 +14,17 @@ export default defineConfig({
             return "planner-vendor";
           }
 
-          if (id.includes("@ant-design/icons")) return "antd-icons";
-          if (id.includes("@ant-design")) return "antd-utils";
-          if (id.includes("rc-") || id.includes("@rc-component")) return "antd-rc";
-          if (id.includes("antd")) return "antd-core";
-
           if (
             id.includes("react") ||
             id.includes("react-dom") ||
             id.includes("react-router-dom") ||
-            id.includes("scheduler")
+            id.includes("scheduler") ||
+            id.includes("antd") ||
+            id.includes("@ant-design") ||
+            id.includes("rc-") ||
+            id.includes("@rc-component")
           ) {
-            return "react-vendor";
+            return "ui-vendor";
           }
 
           return "vendor";
