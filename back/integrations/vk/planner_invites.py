@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Any
 from urllib.parse import urlparse
 
@@ -17,6 +18,8 @@ from .services import (
     send_vk_message,
 )
 
+
+logger = logging.getLogger(__name__)
 
 PLANNER_INVITE_PAYLOAD_TYPE = "planner_invite"
 CHAT_JOIN_ACTION_TYPES = {"chat_invite_user", "chat_invite_user_by_link"}
@@ -219,7 +222,20 @@ def handle_vk_chat_join_message(message: dict[str, Any]) -> bool:
     except (TypeError, ValueError):
         peer_id = None
 
-    mark_application_joined_chat_by_vk_user(vk_user_id=vk_user_id, peer_id=peer_id)
+    application = mark_application_joined_chat_by_vk_user(vk_user_id=vk_user_id, peer_id=peer_id)
+    if application:
+        logger.info(
+            "VK chat join detected: vk_user_id=%s peer_id=%s application_id=%s",
+            vk_user_id,
+            peer_id,
+            application.id,
+        )
+    else:
+        logger.info(
+            "VK chat join ignored: vk_user_id=%s peer_id=%s no matching application",
+            vk_user_id,
+            peer_id,
+        )
     return True
 
 

@@ -104,7 +104,12 @@ def resolve_vk_chat_peer_id(chat_url: str) -> int | None:
 
 def resolve_application_chat_peer_id(application: Application) -> int | None:
     event_chat_url = application.event.org_chat_url if application.event_id and application.event else ""
-    return resolve_vk_chat_peer_id(event_chat_url) or resolve_vk_chat_peer_id(settings.VK_ORG_CHAT_URL)
+    configured_peer_id = getattr(settings, "VK_ORG_CHAT_PEER_ID", 0) or None
+    return (
+        resolve_vk_chat_peer_id(event_chat_url)
+        or resolve_vk_chat_peer_id(settings.VK_ORG_CHAT_URL)
+        or configured_peer_id
+    )
 
 
 def build_application_chat_link(application: Application, request=None, chat_url: str = "") -> str:
