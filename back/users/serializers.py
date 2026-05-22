@@ -434,6 +434,7 @@ class EventSerializer(ModelSerializer):
     archived = serializers.BooleanField(source="is_archived", required=False)
     archivedAt = serializers.DateTimeField(source="archived_at", read_only=True)
     orgChatUrl = serializers.URLField(source="org_chat_url", required=False, allow_blank=True)
+    orgChatPeerId = serializers.IntegerField(source="org_chat_peer_id", required=False, min_value=0)
     applicationFormFields = serializers.JSONField(source="application_form_fields", required=False)
     specializations = serializers.PrimaryKeyRelatedField(
         queryset=Specialization.objects.all(),
@@ -468,6 +469,8 @@ class EventSerializer(ModelSerializer):
             "archivedAt",
             "org_chat_url",
             "orgChatUrl",
+            "org_chat_peer_id",
+            "orgChatPeerId",
             "application_form_fields",
             "applicationFormFields",
         )
@@ -925,6 +928,12 @@ class CRMAutomationConfigSerializer(ModelSerializer):
     def validate(self, attrs):
         attrs["scope"] = CRMAutomationConfig.SCOPE_CRM
         return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        from users.automation_engine import normalize_crm_automation_config_dict
+
+        return normalize_crm_automation_config_dict(data)
 
 
 class CRMAutomationConfigPayloadSerializer(Serializer):

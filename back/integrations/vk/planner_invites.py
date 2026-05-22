@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Any
 from urllib.parse import urlparse
 
@@ -8,7 +9,7 @@ from django.db import transaction
 from users.models import Application, Profile, Status
 from users.vk_profiles import confirm_profile_by_vk_user_id, refresh_profile_vk_user_id
 
-from .crm_notifications import notify_organizers_about_vk_error
+from .crm_notifications import mark_application_joined_chat_by_vk_user, notify_organizers_about_vk_error
 from .services import (
     VKAPIError,
     VKConfigurationError,
@@ -18,12 +19,16 @@ from .services import (
 )
 
 
+logger = logging.getLogger(__name__)
+
 PLANNER_INVITE_PAYLOAD_TYPE = "planner_invite"
+CHAT_JOIN_ACTION_TYPES = {"chat_invite_user", "chat_invite_user_by_link"}
 JOINED_CHAT_STATUS_NAME = "Добавился в орг. чат"
 STARTED_PSH_STATUS_NAME = "Приступил к ПШ"
 REMOVED_FROM_PSH_STATUS_NAME = "Удален с ПШ"
 PLANNER_INVITE_ACCEPT_ALLOWED_STATUSES = {JOINED_CHAT_STATUS_NAME, REMOVED_FROM_PSH_STATUS_NAME}
 START_COMMANDS = {"начать", "start", "/start", "старт"}
+PEER_COMMANDS = {"peer", "/peer", "peer_id", "/peer_id"}
 
 
 def resolve_application_status(name: str, *, description: str = "", is_positive: bool = True) -> Status:
@@ -198,6 +203,64 @@ def is_vk_start_message(message: dict[str, Any]) -> bool:
     return bool(payload_values & START_COMMANDS)
 
 
+def handle_vk_peer_debug_message(message: dict[str, Any]) -> bool:
+    raw_text = str(message.get("text") or "").strip().lower()
+    if raw_text not in PEER_COMMANDS:
+        return False
+
+    try:
+        peer_id = int(message.get("peer_id"))
+    except (TypeError, ValueError):
+        return True
+
+    if peer_id < 2_000_000_000:
+        return False
+
+    send_vk_message(
+        peer_id=peer_id,
+        message=f"ID этой беседы для CRM: {peer_id}",
+    )
+    logger.warning("VK peer debug command handled: peer_id=%s", peer_id)
+    return True
+
+
+def handle_vk_chat_join_message(message: dict[str, Any]) -> bool:
+    action = message.get("action")
+    if not isinstance(action, dict):
+        return False
+
+    action_type = str(action.get("type") or "").strip()
+    if action_type not in CHAT_JOIN_ACTION_TYPES:
+        return False
+
+    member_id = action.get("member_id") or message.get("from_id")
+    try:
+        vk_user_id = int(member_id)
+    except (TypeError, ValueError):
+        return True
+
+    try:
+        peer_id = int(message.get("peer_id") or 0) or None
+    except (TypeError, ValueError):
+        peer_id = None
+
+    application = mark_application_joined_chat_by_vk_user(vk_user_id=vk_user_id, peer_id=peer_id)
+    if application:
+        logger.warning(
+            "VK chat join detected: vk_user_id=%s peer_id=%s application_id=%s",
+            vk_user_id,
+            peer_id,
+            application.id,
+        )
+    else:
+        logger.warning(
+            "VK chat join ignored: vk_user_id=%s peer_id=%s no matching application",
+            vk_user_id,
+            peer_id,
+        )
+    return True
+
+
 def handle_vk_message_new_event(callback_payload: dict[str, Any]) -> bool:
     vk_object = callback_payload.get("object")
     if not isinstance(vk_object, dict):
@@ -206,6 +269,12 @@ def handle_vk_message_new_event(callback_payload: dict[str, Any]) -> bool:
     message = vk_object.get("message")
     if not isinstance(message, dict):
         return False
+
+    if handle_vk_chat_join_message(message):
+        return True
+
+    if handle_vk_peer_debug_message(message):
+        return True
 
     button_payload = parse_vk_button_payload(message.get("payload"))
     if not button_payload or button_payload.get("type") != PLANNER_INVITE_PAYLOAD_TYPE:

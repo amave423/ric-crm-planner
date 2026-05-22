@@ -30,5 +30,6 @@ export interface Event {
   archived?: boolean;
   archivedAt?: string;
   orgChatUrl?: string;
+  orgChatPeerId?: number | string;
   applicationFormFields?: ApplicationFormField[];
 }

@@ -113,7 +113,7 @@ CRM_TRIGGERS = [
     },
     {
         "id": "crm-chat-link-opened",
-        "stageId": "application-chat-link-sent",
+        "stageId": "application-joined-chat",
         "title": "Переход по ссылке на орг.чат",
         "description": "Срабатывает, когда проектант переходит по индивидуальной ссылке на орг.чат.",
         "eventCode": "notification.chat_link_opened",

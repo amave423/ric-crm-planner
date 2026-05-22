@@ -82,7 +82,7 @@ from users.models import (
     TrueAnswer,
 )
 from users.automation_defaults import create_default_crm_automation_config
-from users.automation_engine import run_crm_automation, run_due_crm_automation
+from users.automation_engine import normalize_crm_automation_config_dict, run_crm_automation, run_due_crm_automation
 
 TAG_AUTH = "Auth"
 TAG_USERS = "Users"
@@ -1152,6 +1152,18 @@ class CRMAutomationConfigView(RetrieveUpdateAPIView):
             config.triggers = data["triggers"]
         if "robots" in data:
             config.robots = data["robots"]
+        normalized = normalize_crm_automation_config_dict(
+            {
+                "scope": config.scope,
+                "eventId": event_id,
+                "stages": config.stages,
+                "triggers": config.triggers,
+                "robots": config.robots,
+            }
+        )
+        config.stages = normalized["stages"]
+        config.triggers = normalized["triggers"]
+        config.robots = normalized["robots"]
         config.save()
         return Response(CRMAutomationConfigSerializer(config).data)
 

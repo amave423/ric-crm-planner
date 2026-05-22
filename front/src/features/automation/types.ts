@@ -31,6 +31,8 @@ export type CatalogItem = {
   code: string;
   title: string;
   description: string;
+  targetStageId?: string;
+  targetStatus?: string;
   subject?: string;
   message?: string;
 };

@@ -1,6 +1,7 @@
 import hashlib
 import json
 from dataclasses import dataclass
+from copy import deepcopy
 from datetime import timedelta
 from typing import Any
 
@@ -10,7 +11,9 @@ from django.utils import timezone
 from integrations.vk.crm_notifications import (
     CHAT_LINK_PLACEHOLDER,
     inject_application_chat_link,
+    mark_application_joined_chat_if_member,
     notify_organizers_about_vk_error,
+    scan_chat_membership_for_sent_applications,
     send_application_vk_message,
 )
 from integrations.vk.planner_invites import send_planner_invite
@@ -27,6 +30,10 @@ class CRMAutomationEvent:
     event_id: int
     fingerprint: str
     request: Any = None
+
+
+CHAT_LINK_ROBOT_IDS = {"crm-send-chat-link", "request-send-chat-link"}
+CHAT_LINK_TRIGGER_IDS = {"crm-chat-link-opened", "request-chat-link-opened"}
 
 
 def to_int(value: Any) -> int | None:
@@ -51,17 +58,47 @@ def stable_fingerprint(value: Any) -> str:
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
 
 
+def normalize_crm_automation_config_dict(config: dict[str, Any]) -> dict[str, Any]:
+    normalized = deepcopy(config)
+
+    robots = normalized.get("robots") if isinstance(normalized.get("robots"), list) else []
+    for robot in robots:
+        if not isinstance(robot, dict):
+            continue
+        robot_id = normalized_text(robot.get("id"))
+        action = normalized_text(robot.get("action"))
+        stage_id = normalized_text(robot.get("stageId"))
+
+        if robot_id in CHAT_LINK_ROBOT_IDS or (action == "chat.link.vk" and stage_id == "application-joined-chat"):
+            robot["stageId"] = "application-chat-link-sent"
+        if robot_id == "crm-send-planner-invite":
+            robot["stageId"] = "application-joined-chat"
+
+    triggers = normalized.get("triggers") if isinstance(normalized.get("triggers"), list) else []
+    for trigger in triggers:
+        if not isinstance(trigger, dict):
+            continue
+        trigger_id = normalized_text(trigger.get("id"))
+        event_code = normalized_text(trigger.get("eventCode"))
+
+        if trigger_id in CHAT_LINK_TRIGGER_IDS or event_code == "notification.chat_link_opened":
+            trigger["stageId"] = "application-joined-chat"
+            trigger["targetStageId"] = "application-joined-chat"
+
+    return normalized
+
+
 def config_model_to_dict(config_model: CRMAutomationConfig) -> dict[str, Any]:
     if not config_model.stages and not config_model.triggers and not config_model.robots:
         return create_default_crm_automation_config(config_model.event_id)
-    return {
+    return normalize_crm_automation_config_dict({
         "scope": config_model.scope,
         "eventId": config_model.event_id,
         "updatedAt": config_model.updated_at.isoformat(),
         "stages": config_model.stages,
         "triggers": config_model.triggers,
         "robots": config_model.robots,
-    }
+    })
 
 
 def get_or_create_config(event_id: int) -> CRMAutomationConfig:
@@ -263,7 +300,7 @@ def create_log(
     scheduled_for=None,
 ) -> CRMAutomationExecutionLog:
     rule_id = normalized_text(rule.get("id")) or normalized_text(rule.get("action") or rule.get("eventCode"))
-    log, _ = CRMAutomationExecutionLog.objects.get_or_create(
+    log, _ = CRMAutomationExecutionLog.objects.update_or_create(
         run_key=rule_run_key(config_model, event, rule, rule_kind),
         defaults={
             "config": config_model,
@@ -286,7 +323,11 @@ def create_log(
 
 def log_exists(config_model: CRMAutomationConfig, event: CRMAutomationEvent, rule: dict[str, Any], rule_kind: str) -> bool:
     return CRMAutomationExecutionLog.objects.filter(
-        run_key=rule_run_key(config_model, event, rule, rule_kind)
+        run_key=rule_run_key(config_model, event, rule, rule_kind),
+        status__in=[
+            CRMAutomationExecutionLog.STATUS_PENDING,
+            CRMAutomationExecutionLog.STATUS_SUCCESS,
+        ],
     ).exists()
 
 
@@ -369,14 +410,33 @@ def run_robot_action(
         except (VKConfigurationError, VKAPIError, ValueError) as exc:
             notify_organizers_about_vk_error(event.application, str(exc))
             log_message = str(exc)
+    elif action == "status.change":
+        target_stage_id = normalized_text(robot.get("targetStageId"))
+        target_status = normalized_text(robot.get("targetStatus")) or target_status_for_stage(
+            config_model_to_dict(config_model),
+            target_stage_id,
+        )
+        success = update_application_status(event.application, target_status)
+        if success:
+            event.application.refresh_from_db()
+        log_message = (
+            f"Заявка переведена в статус «{target_status}»."
+            if success
+            else "Статус заявки не изменился."
+        )
     elif action in {"message.vk", "chat.link.vk", "message.vk_or_notification"}:
         try:
-            vk_message = message
-            if action in {"chat.link.vk", "message.vk_or_notification"} or CHAT_LINK_PLACEHOLDER in vk_message:
-                vk_message = inject_application_chat_link(vk_message, event.application, event.request)
-            send_application_vk_message(event.application, vk_message)
-            success = True
-            log_message = "VK-сообщение отправлено проектанту."
+            if action == "chat.link.vk" and mark_application_joined_chat_if_member(event.application):
+                event.application.refresh_from_db()
+                success = True
+                log_message = "Проектант уже состоит в орг. чате, отправка ссылки пропущена."
+            else:
+                vk_message = message
+                if action in {"chat.link.vk", "message.vk_or_notification"} or CHAT_LINK_PLACEHOLDER in vk_message:
+                    vk_message = inject_application_chat_link(vk_message, event.application, event.request)
+                send_application_vk_message(event.application, vk_message)
+                success = True
+                log_message = "VK-сообщение отправлено проектанту."
         except (VKConfigurationError, VKAPIError, ValueError) as exc:
             notify_organizers_about_vk_error(event.application, str(exc))
             log_message = str(exc)
@@ -431,7 +491,21 @@ def run_trigger(config_model: CRMAutomationConfig, config: dict[str, Any], trigg
         )
         return ""
 
-    target_stage_id = normalized_text(trigger.get("targetStageId")) or normalized_text(trigger.get("stageId"))
+    source_stage_id = normalized_text(trigger.get("stageId"))
+    target_stage_id = source_stage_id
+    if event.code == "request.status_changed":
+        source_status = target_status_for_stage(config, source_stage_id)
+        if source_status and application_status(event.application) != source_status:
+            create_log(
+                config_model=config_model,
+                event=event,
+                rule=trigger,
+                rule_kind="trigger",
+                status=CRMAutomationExecutionLog.STATUS_SKIPPED,
+                message="Триггер смены статуса пропущен: заявка находится не на стадии этого триггера.",
+            )
+            return ""
+
     current_stage_id = status_stage_id(config, application_status(event.application))
     stage_ids = [stage.get("id") for stage in config.get("stages", []) if isinstance(stage, dict)]
     target_index = stage_ids.index(target_stage_id) if target_stage_id in stage_ids else -1
@@ -575,7 +649,17 @@ def execute_pending_log(log: CRMAutomationExecutionLog) -> bool:
 
     changed = False
     if log.rule_kind == "trigger":
-        target_stage_id = normalized_text(rule.get("targetStageId")) or normalized_text(rule.get("stageId"))
+        source_stage_id = normalized_text(rule.get("stageId"))
+        target_stage_id = source_stage_id
+        if log.event_code == "request.status_changed":
+            source_status = target_status_for_stage(config, source_stage_id)
+            if source_status and application_status(application) != source_status:
+                log.status = CRMAutomationExecutionLog.STATUS_SKIPPED
+                log.message = "Отложенный триггер смены статуса пропущен: заявка находится не на стадии этого триггера."
+                log.executed_at = timezone.now()
+                log.save(update_fields=["status", "message", "executed_at"])
+                return False
+
         changed = update_application_status(application, target_status_for_stage(config, target_stage_id))
         if changed:
             application.refresh_from_db()
@@ -592,11 +676,17 @@ def execute_pending_log(log: CRMAutomationExecutionLog) -> bool:
 
 
 def run_due_crm_automation() -> dict[str, int]:
+    chat_membership_result = scan_chat_membership_for_sent_applications()
     logs = CRMAutomationExecutionLog.objects.filter(
         status=CRMAutomationExecutionLog.STATUS_PENDING,
         scheduled_for__lte=timezone.now(),
     ).select_related("config").order_by("scheduled_for", "id")
-    result = {"processed": 0, "changed": 0}
+    result = {
+        "processed": 0,
+        "changed": 0,
+        "chat_membership_scanned": chat_membership_result["scanned"],
+        "chat_membership_changed": chat_membership_result["changed"],
+    }
     for log in logs:
         result["processed"] += 1
         if execute_pending_log(log):

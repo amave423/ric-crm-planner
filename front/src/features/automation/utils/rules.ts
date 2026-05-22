@@ -46,6 +46,8 @@ export function makeRobot(stageId: string, item: CatalogItem): AutomationRobot {
     title: item.title,
     description: item.description,
     action: item.code,
+    targetStageId: item.targetStageId || stageId,
+    targetStatus: item.targetStatus || "",
     enabled: true,
     settings: cloneDefaultSettings(),
     subject: item.subject || item.title,

@@ -47,6 +47,8 @@ type BackendEvent = {
   is_archived?: boolean;
   orgChatUrl?: string;
   org_chat_url?: string;
+  orgChatPeerId?: number | string;
+  org_chat_peer_id?: number | string;
   stage?: string;
   specializations?: unknown[];
   specialization?: number | string;
@@ -65,6 +67,7 @@ type BackendEventPayload = {
   leader?: number;
   organizerIds?: number[];
   orgChatUrl?: string;
+  orgChatPeerId?: number;
   specialization?: number;
   specializations?: number[];
   applicationFormFields?: ApplicationFormField[];
@@ -191,6 +194,10 @@ function normalizeBackendEvent(data: unknown): BackendEvent {
     is_archived: Boolean(obj.is_archived),
     orgChatUrl: toStringValue(obj.orgChatUrl),
     org_chat_url: toStringValue(obj.org_chat_url),
+    orgChatPeerId:
+      typeof obj.orgChatPeerId === "number" || typeof obj.orgChatPeerId === "string" ? obj.orgChatPeerId : undefined,
+    org_chat_peer_id:
+      typeof obj.org_chat_peer_id === "number" || typeof obj.org_chat_peer_id === "string" ? obj.org_chat_peer_id : undefined,
     stage: toStringValue(obj.stage),
     specializations: Array.isArray(obj.specializations) ? obj.specializations : undefined,
     specialization:
@@ -327,6 +334,7 @@ async function mapEventToUi(data: unknown): Promise<Event> {
     organizer: await resolveOrganizer({ ...event, organizerIds }),
     archived: event.archived || event.is_archived || archivedIds.has(eventId),
     orgChatUrl: event.orgChatUrl ?? event.org_chat_url,
+    orgChatPeerId: event.orgChatPeerId ?? event.org_chat_peer_id,
     applicationFormFields: event.applicationFormFields ?? event.application_form_fields,
   };
 
@@ -340,6 +348,7 @@ async function mapEventToUi(data: unknown): Promise<Event> {
     organizerIds: extension.organizerIds ?? baseEvent.organizerIds,
     organizer: extension.organizer ?? baseEvent.organizer,
     orgChatUrl: extension.orgChatUrl ?? baseEvent.orgChatUrl,
+    orgChatPeerId: extension.orgChatPeerId ?? baseEvent.orgChatPeerId,
     applicationFormFields: extension.applicationFormFields ?? baseEvent.applicationFormFields,
   };
 }
@@ -453,6 +462,8 @@ async function toBackendEvent(data: Event): Promise<BackendEventPayload> {
     .filter((id): id is number => typeof id === "number");
   if (organizerIds.length > 0) payload.organizerIds = organizerIds;
   if (typeof data.orgChatUrl === "string") payload.orgChatUrl = data.orgChatUrl.trim();
+  const orgChatPeerId = toNumber(data.orgChatPeerId);
+  if (typeof orgChatPeerId !== "undefined") payload.orgChatPeerId = orgChatPeerId;
   if (data.applicationFormFields) payload.applicationFormFields = data.applicationFormFields;
 
   const specializationIds = await resolveSpecializationIds(data);
@@ -476,6 +487,7 @@ export async function saveEvent(data: Event): Promise<Event> {
     organizerIds: data.organizerIds ?? mapped.organizerIds,
     organizer: data.organizer ?? mapped.organizer,
     orgChatUrl: data.orgChatUrl ?? mapped.orgChatUrl,
+    orgChatPeerId: data.orgChatPeerId ?? mapped.orgChatPeerId,
     applicationFormFields: data.applicationFormFields ?? mapped.applicationFormFields,
   };
   writeEventExtension(Number(mapped.id), extension);
@@ -523,4 +535,3 @@ export async function restoreEvent(id: number): Promise<Event | undefined> {
     return mapEventToUi({ ...extension, id: eventId, archived: false, archivedAt: undefined });
   }
 }
-

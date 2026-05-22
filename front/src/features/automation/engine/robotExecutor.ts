@@ -7,9 +7,11 @@ import type { Event } from "../../../types/event";
 import type { CreateNotificationInput } from "../../../types/notification";
 import type { Request as ReqType } from "../../../types/request";
 import type { User } from "../../../types/user";
+import { updateRequestStatus as updateStoredRequestStatus } from "../../requests/storage/requests";
 import type { AutomationConfig, AutomationRobot } from "../types";
 import { rememberExecution, wasExecuted } from "./executionLog";
 import type { RequestAutomationEvent } from "./requestAutomationTypes";
+import { getStageStatus } from "./stageResolver";
 
 function renderTemplate(template: string, request: ReqType, event?: Event) {
   const values: Record<string, string> = {
@@ -175,6 +177,15 @@ export async function executeRobot(
   rememberExecution(key);
 
   await runWithTiming(robot, async () => {
+    if (robot.action === "status.change") {
+      const targetStatus = robot.targetStatus || getStageStatus(config, robot.targetStageId || robot.stageId);
+      if (targetStatus) {
+        const updated = await updateStoredRequestStatus(eventItem.request.id, targetStatus);
+        if (updated) eventItem.request = updated;
+      }
+      return;
+    }
+
     if (isBackendVkAction(robot) && !client.USE_MOCK) {
       try {
         await sendBackendApplicationVkMessage(robot, eventItem.request, event);

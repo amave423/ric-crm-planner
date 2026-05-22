@@ -167,6 +167,7 @@ class Event(models.Model):
     is_archived = models.BooleanField(default=False)
     archived_at = models.DateTimeField(blank=True, null=True)
     org_chat_url = models.URLField(max_length=500, blank=True)
+    org_chat_peer_id = models.PositiveBigIntegerField(default=0, blank=True)
     application_form_fields = models.JSONField(default=list, blank=True)
 
     class Meta:

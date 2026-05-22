@@ -8,15 +8,21 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from integrations.vk.crm_notifications import CHAT_LINK_SALT, notify_application_testing_started
+from integrations.vk.crm_notifications import (
+    CHAT_LINK_SALT,
+    notify_application_testing_started,
+    scan_chat_membership_for_sent_applications,
+)
 from integrations.vk.planner_invites import (
     build_welcome_keyboard,
     handle_planner_invite_payload,
+    handle_vk_message_new_event,
     handle_vk_start_message,
     send_planner_invites_for_event,
 )
 from integrations.vk.services import VKAPIError, extract_vk_screen_name, normalize_vk_group_id, send_vk_message
-from users.models import Application, Event, Profile, Status
+from users.automation_engine import run_crm_automation
+from users.models import Application, CRMAutomationConfig, Event, Profile, Status
 
 
 class VKCallbackTests(TestCase):
@@ -157,7 +163,7 @@ class VKCRMNotificationTests(TestCase):
         send_vk_message_mock.assert_not_called()
 
     @override_settings(VK_ORG_CHAT_URL="https://vk.com/im?sel=c1", VK_CHAT_LINK_MAX_AGE_SECONDS=3600)
-    def test_chat_link_redirect_updates_application_status(self):
+    def test_chat_link_redirect_does_not_update_application_status(self):
         self.application.status = self.chat_link_sent_status
         self.application.save(update_fields=["status"])
         token = signing.dumps({"application_id": self.application.id}, salt=CHAT_LINK_SALT)
@@ -167,7 +173,114 @@ class VKCRMNotificationTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_302_FOUND)
         self.assertEqual(response["Location"], "https://vk.com/im?sel=c1")
         self.application.refresh_from_db()
-        self.assertEqual(self.application.status.name, "Добавился в орг. чат")
+        self.assertEqual(self.application.status.name, self.chat_link_sent_status.name)
+
+    @override_settings(VK_ENABLED=True)
+    def test_vk_chat_join_service_message_updates_application_status(self):
+        self.application.status = self.chat_link_sent_status
+        self.application.save(update_fields=["status"])
+
+        handled = handle_vk_message_new_event(
+            {
+                "type": "message_new",
+                "object": {
+                    "message": {
+                        "from_id": 123456,
+                        "peer_id": 2000000001,
+                        "text": "",
+                        "action": {"type": "chat_invite_user_by_link", "member_id": 123456},
+                    }
+                },
+            }
+        )
+
+        self.assertTrue(handled)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status.name, self.chat_joined_status.name)
+
+    @override_settings(VK_ENABLED=True)
+    @patch("integrations.vk.planner_invites.send_vk_message")
+    def test_vk_peer_debug_message_replies_with_chat_peer_id(self, send_vk_message_mock):
+        handled = handle_vk_message_new_event(
+            {
+                "type": "message_new",
+                "object": {
+                    "message": {
+                        "from_id": 123456,
+                        "peer_id": 2000000223,
+                        "text": "/peer",
+                    }
+                },
+            }
+        )
+
+        self.assertTrue(handled)
+        send_vk_message_mock.assert_called_once_with(
+            peer_id=2000000223,
+            message="ID этой беседы для CRM: 2000000223",
+        )
+
+    @override_settings(VK_ENABLED=True, VK_ORG_CHAT_URL="https://vk.com/im?sel=c1")
+    @patch("integrations.vk.crm_notifications.send_vk_message")
+    @patch("integrations.vk.crm_notifications.is_vk_user_in_conversation", return_value=True)
+    def test_chat_link_robot_skips_message_when_user_already_in_chat(self, member_check_mock, send_vk_message_mock):
+        self.application.status = self.chat_link_sent_status
+        self.application.save(update_fields=["status"])
+        CRMAutomationConfig.objects.create(
+            scope="crm",
+            event=self.event,
+            stages=[
+                {"id": "application-chat-link-sent", "title": self.chat_link_sent_status.name, "description": ""},
+                {"id": "application-joined-chat", "title": self.chat_joined_status.name, "description": ""},
+            ],
+            triggers=[],
+            robots=[
+                {
+                    "id": "chat-link",
+                    "stageId": "application-chat-link-sent",
+                    "title": "Chat link",
+                    "description": "",
+                    "action": "chat.link.vk",
+                    "enabled": True,
+                    "settings": {"runMode": "queue", "timing": "immediate", "delayMinutes": 0, "condition": {"mode": "all", "rules": []}},
+                    "subject": "Chat",
+                    "message": "Join {chat_link}",
+                },
+                {
+                    "id": "chat-link-copy",
+                    "stageId": "application-chat-link-sent",
+                    "title": "Chat link copy",
+                    "description": "",
+                    "action": "chat.link.vk",
+                    "enabled": True,
+                    "settings": {"runMode": "queue", "timing": "immediate", "delayMinutes": 0, "condition": {"mode": "all", "rules": []}},
+                    "subject": "Chat copy",
+                    "message": "Join again {chat_link}",
+                }
+            ],
+        )
+
+        run_crm_automation(self.application, "request.status_changed", previous_status=self.testing_status.name)
+
+        self.assertEqual(member_check_mock.call_count, 2)
+        member_check_mock.assert_any_call(peer_id=2000000001, user_id=123456)
+        send_vk_message_mock.assert_not_called()
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status.name, self.chat_joined_status.name)
+
+    @override_settings(VK_ENABLED=True, VK_ORG_CHAT_URL="https://vk.com/im?sel=c1")
+    @patch("integrations.vk.crm_notifications.is_vk_user_in_conversation", return_value=True)
+    def test_chat_membership_scan_updates_application_when_vk_event_is_missing(self, member_check_mock):
+        self.application.status = self.chat_link_sent_status
+        self.application.save(update_fields=["status"])
+
+        result = scan_chat_membership_for_sent_applications()
+
+        self.assertEqual(result["scanned"], 1)
+        self.assertEqual(result["changed"], 1)
+        member_check_mock.assert_called_once_with(peer_id=2000000001, user_id=123456)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status.name, self.chat_joined_status.name)
 
     @override_settings(VK_ORG_CHAT_URL="", VK_CHAT_LINK_MAX_AGE_SECONDS=3600)
     def test_chat_link_redirect_uses_event_org_chat_url(self):

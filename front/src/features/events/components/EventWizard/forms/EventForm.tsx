@@ -16,6 +16,7 @@ import { useWizard } from "../EventWizardModal";
 import {
   CREATE_DRAFT_KEY,
   FieldWrap,
+  extractVkPeerId,
   extractErrorMessage,
   getUserLabel,
   normalizeDateFieldValue,
@@ -37,10 +38,11 @@ export default function EventForm() {
   const [endDate, setEndDate] = useState("");
   const [applyDeadline, setApplyDeadline] = useState("");
   const [orgChatUrl, setOrgChatUrl] = useState("");
+  const [orgChatPeerId, setOrgChatPeerId] = useState("");
   const [selectedOrganizerIds, setSelectedOrganizerIds] = useState<string[]>([]);
   const [selectedOrganizerId, setSelectedOrganizerId] = useState("");
   const [specializations, setSpecializations] = useState<SpecializationOption[]>([]);
-  const [selectedSpecializationId, setSelectedSpecializationId] = useState("");
+  const [selectedSpecializationIds, setSelectedSpecializationIds] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [usersList, setUsersList] = useState<User[]>([]);
@@ -72,10 +74,11 @@ export default function EventForm() {
         endDate,
         applyDeadline,
         orgChatUrl,
+        orgChatPeerId,
         selectedOrganizerIds,
         specializations,
       }),
-    [applyDeadline, description, endDate, orgChatUrl, selectedOrganizerIds, specializations, startDate, title]
+    [applyDeadline, description, endDate, orgChatPeerId, orgChatUrl, selectedOrganizerIds, specializations, startDate, title]
   );
 
   useEffect(() => {
@@ -144,10 +147,11 @@ export default function EventForm() {
       setEndDate(normalizeDateFieldValue(event.endDate));
       setApplyDeadline(normalizeDateFieldValue(event.applyDeadline));
       setOrgChatUrl(event.orgChatUrl || "");
+      setOrgChatPeerId(event.orgChatPeerId ? String(event.orgChatPeerId) : "");
       setSelectedOrganizerIds((event.organizerIds?.length ? event.organizerIds : event.leader ? [event.leader] : []).map(String));
       setSelectedOrganizerId("");
       setSpecializations((event.specializations || []).map((item) => ({ id: item.id, title: item.title })));
-      setSelectedSpecializationId("");
+      setSelectedSpecializationIds((event.specializations || []).map((item) => String(item.id)));
       setSaveState("idle");
       setSavedSnapshot("");
       setInitialized(true);
@@ -179,10 +183,11 @@ export default function EventForm() {
         setEndDate(draft?.endDate ?? "");
         setApplyDeadline(draft?.applyDeadline ?? "");
         setOrgChatUrl(draft?.orgChatUrl ?? "");
+        setOrgChatPeerId(draft?.orgChatPeerId ?? "");
         setSelectedOrganizerIds(draft?.organizerIds ?? []);
         setSelectedOrganizerId("");
         setSpecializations(draft?.specializations ?? []);
-        setSelectedSpecializationId("");
+        setSelectedSpecializationIds((draft?.specializations ?? []).map((item) => String(item.id)));
         setSaveState("idle");
         setSavedSnapshot("");
         setInitialized(true);
@@ -204,12 +209,13 @@ export default function EventForm() {
       endDate,
       applyDeadline,
       orgChatUrl,
+      orgChatPeerId,
       organizerIds: selectedOrganizerIds,
       specializations,
     };
 
     localStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify(draft));
-  }, [applyDeadline, description, endDate, initialized, mode, orgChatUrl, selectedOrganizerIds, specializations, startDate, title]);
+  }, [applyDeadline, description, endDate, initialized, mode, orgChatPeerId, orgChatUrl, selectedOrganizerIds, specializations, startDate, title]);
 
   useEffect(() => {
     if (saveState !== "idle" && savedSnapshot && savedSnapshot !== formSnapshot) {
@@ -217,24 +223,19 @@ export default function EventForm() {
     }
   }, [formSnapshot, saveState, savedSnapshot]);
 
-  const addSpecialization = () => {
-    const selected = SPECIALIZATION_OPTIONS.find((item) => String(item.id) === String(selectedSpecializationId));
-    if (!selected) return;
+  const handleSpecializationSelect = (value: string | number) => {
+    const selectedId = String(value);
+    const option = SPECIALIZATION_OPTIONS.find((item) => Number(item.id) === Number(selectedId));
+    if (!option) return;
 
-    setSpecializations((prev) => {
-      if (
-        prev.some(
-          (item) =>
-            Number(item.id) === Number(selected.id) || item.title.trim().toLowerCase() === selected.title.trim().toLowerCase()
-        )
-      ) {
-        return prev;
-      }
-
-      return [...prev, selected];
-    });
-
-    setSelectedSpecializationId("");
+    setSelectedSpecializationIds((prev) =>
+      prev.some((id) => Number(id) === Number(selectedId)) ? prev : [...prev, selectedId]
+    );
+    setSpecializations((prev) =>
+      prev.some((item) => Number(item.id) === Number(selectedId))
+        ? prev
+        : [...prev, { id: option.id, title: option.title }]
+    );
     setErrors((prev) => {
       const next = { ...prev };
       delete next.specializations;
@@ -264,6 +265,7 @@ export default function EventForm() {
 
   const removeSpecialization = (id: number) => {
     setSpecializations((prev) => prev.filter((item) => Number(item.id) !== Number(id)));
+    setSelectedSpecializationIds((prev) => prev.filter((itemId) => Number(itemId) !== Number(id)));
   };
 
   const validate = () => {
@@ -294,6 +296,7 @@ export default function EventForm() {
       endDate,
       applyDeadline,
       orgChatUrl: orgChatUrl.trim(),
+      orgChatPeerId: orgChatPeerId ? Number(orgChatPeerId) : 0,
       leader: selectedOrganizerIds[0],
       organizerIds: selectedOrganizerIds,
       organizer: selectedOrganizerIds
@@ -372,6 +375,17 @@ export default function EventForm() {
         />
       </label>
 
+      <label className="text-small">
+        <span className="wizard-field-label">ID беседы VK для проверки вступления</span>
+        <AppInput
+          value={orgChatPeerId}
+          onChange={(event) => setOrgChatPeerId(extractVkPeerId(event.target.value))}
+          placeholder="2000000223 или ссылка из адресной строки беседы"
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </label>
+
       <div className="date-row">
         <div className={`field-wrap ${errors.startDate || errors.endDate ? "error" : ""}`}>
           <DateRangeField
@@ -445,28 +459,22 @@ export default function EventForm() {
       <FieldWrap name="specializations" errors={errors}>
         <label className="text-small">
           <span className="wizard-field-label">Специализации</span>
-          <div className="wizard-inline-add-row wizard-inline-add-row--specializations">
-            <AppSelect
-              tone="event"
-              value={selectedSpecializationId}
-              onChange={(value) => setSelectedSpecializationId(String(value))}
-              options={[
-                { value: "", label: "Выберите специализацию" },
-                ...SPECIALIZATION_OPTIONS.map((specialization) => ({
-                  value: String(specialization.id),
-                  label: specialization.title,
-                })),
-              ]}
-            />
-            <AppButton
-              className="primary wizard-inline-add-button wizard-inline-add-button--event"
-              type="button"
-              onClick={addSpecialization}
-              disabled={!selectedSpecializationId}
-            >
-              Добавить
-            </AppButton>
-          </div>
+          <AppSelect
+            tone="event"
+            value={undefined}
+            onSelect={(value) => {
+              if (Array.isArray(value)) return;
+              handleSpecializationSelect(value);
+            }}
+            placeholder={specializations.length ? "Добавить специализацию" : "Выберите специализации"}
+            showSearch
+            optionFilterProp="label"
+            options={SPECIALIZATION_OPTIONS.map((specialization) => ({
+              value: String(specialization.id),
+              label: specialization.title,
+              disabled: selectedSpecializationIds.some((id) => Number(id) === Number(specialization.id)),
+            }))}
+          />
         </label>
       </FieldWrap>
 

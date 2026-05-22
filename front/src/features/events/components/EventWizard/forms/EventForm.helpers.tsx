@@ -15,6 +15,7 @@ export type EventDraft = {
   endDate: string;
   applyDeadline: string;
   orgChatUrl: string;
+  orgChatPeerId: string;
   organizerIds: string[];
   specializations: SpecializationOption[];
 };
@@ -33,6 +34,25 @@ export function FieldWrap({ name, errors, children }: { name: string; errors: Re
 export function normalizeDateFieldValue(value?: string) {
   if (!value) return "";
   return value.includes("T") ? value.slice(0, 10) : value;
+}
+
+export function extractVkPeerId(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  const convoMatch = trimmed.match(/\/im\/convo\/(200000\d+)/i);
+  if (convoMatch) return convoMatch[1];
+
+  const peerMatch = trimmed.match(/[?&](?:peer_id|peer)=(200000\d+)/i);
+  if (peerMatch) return peerMatch[1];
+
+  const selChatMatch = trimmed.match(/[?&]sel=c(\d+)/i);
+  if (selChatMatch) return String(2_000_000_000 + Number(selChatMatch[1]));
+
+  const directMatch = trimmed.match(/^200000\d+$/);
+  if (directMatch) return trimmed;
+
+  return trimmed;
 }
 
 export function readCreateDraft(): EventDraft | null {

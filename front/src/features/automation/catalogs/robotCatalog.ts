@@ -48,6 +48,19 @@ export const ROBOT_CATALOG: Record<AutomationScope, CatalogGroup[]> = {
       ],
     },
     {
+      title: "Статусы",
+      items: [
+        {
+          code: "status.change",
+          title: "Перевести заявку в статус",
+          description: "Меняет статус заявки на выбранный в настройках робота.",
+          targetStatus: "Приступил к ПШ",
+          subject: "Смена статуса",
+          message: "",
+        },
+      ],
+    },
+    {
       title: "Интеграции",
       items: [
         {
@@ -150,6 +163,14 @@ export const ROBOT_CATALOG: Record<AutomationScope, CatalogGroup[]> = {
           description: "Отправляет ссылку на тестирование.",
           subject: "Тестирование по заявке",
           message: "Откройте ссылку и выполните тестовое задание.",
+        },
+        {
+          code: "status.change",
+          title: "Перевести заявку в статус",
+          description: "Меняет статус заявки на выбранный в настройках робота.",
+          targetStatus: "Прохождение тестирования",
+          subject: "Смена статуса",
+          message: "",
         },
       ],
     },
