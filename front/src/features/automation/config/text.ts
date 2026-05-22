@@ -51,6 +51,7 @@ export const TEXT = {
   subject: "Тема",
   message: "Текст сообщения",
   targetStage: "Переместить на стадию",
+  triggerStage: "Статус триггера",
   allowBack: "Разрешить переходить на предыдущий статус",
   delete: "Удалить",
   settings: "Настройки",

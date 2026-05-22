@@ -262,6 +262,12 @@ const AutomationPanel = forwardRef<AutomationPanelHandle, AutomationPanelProps>(
     setCatalogState(null);
   };
 
+  const selectStage = (stageId: string) => {
+    setSelectedStageId(stageId);
+    setSelectedRule(null);
+    setCatalogState(null);
+  };
+
   const scopeText = SCOPE_TEXT[scope];
 
   return (
@@ -341,7 +347,7 @@ const AutomationPanel = forwardRef<AutomationPanelHandle, AutomationPanelProps>(
             <span>Выберите статус</span>
             <AppSelect
               value={selectedStageId}
-              onChange={(value) => setSelectedStageId(String(value))}
+              onChange={(value) => selectStage(String(value))}
               options={config.stages.map((stage) => ({ value: stage.id, label: stage.title }))}
               showSearch
               optionFilterProp="label"
@@ -353,7 +359,7 @@ const AutomationPanel = forwardRef<AutomationPanelHandle, AutomationPanelProps>(
               config={config}
               selectedStageId={selectedStageId}
               selectedRule={selectedRule}
-              onStageSelect={setSelectedStageId}
+              onStageSelect={selectStage}
               onAdd={openCatalog}
               onRuleSelect={openRule}
             />

@@ -263,7 +263,7 @@ def create_log(
     scheduled_for=None,
 ) -> CRMAutomationExecutionLog:
     rule_id = normalized_text(rule.get("id")) or normalized_text(rule.get("action") or rule.get("eventCode"))
-    log, _ = CRMAutomationExecutionLog.objects.get_or_create(
+    log, _ = CRMAutomationExecutionLog.objects.update_or_create(
         run_key=rule_run_key(config_model, event, rule, rule_kind),
         defaults={
             "config": config_model,
@@ -286,7 +286,11 @@ def create_log(
 
 def log_exists(config_model: CRMAutomationConfig, event: CRMAutomationEvent, rule: dict[str, Any], rule_kind: str) -> bool:
     return CRMAutomationExecutionLog.objects.filter(
-        run_key=rule_run_key(config_model, event, rule, rule_kind)
+        run_key=rule_run_key(config_model, event, rule, rule_kind),
+        status__in=[
+            CRMAutomationExecutionLog.STATUS_PENDING,
+            CRMAutomationExecutionLog.STATUS_SUCCESS,
+        ],
     ).exists()
 
 
@@ -431,7 +435,21 @@ def run_trigger(config_model: CRMAutomationConfig, config: dict[str, Any], trigg
         )
         return ""
 
-    target_stage_id = normalized_text(trigger.get("targetStageId")) or normalized_text(trigger.get("stageId"))
+    source_stage_id = normalized_text(trigger.get("stageId"))
+    target_stage_id = source_stage_id
+    if event.code == "request.status_changed":
+        source_status = target_status_for_stage(config, source_stage_id)
+        if source_status and application_status(event.application) != source_status:
+            create_log(
+                config_model=config_model,
+                event=event,
+                rule=trigger,
+                rule_kind="trigger",
+                status=CRMAutomationExecutionLog.STATUS_SKIPPED,
+                message="Триггер смены статуса пропущен: заявка находится не на стадии этого триггера.",
+            )
+            return ""
+
     current_stage_id = status_stage_id(config, application_status(event.application))
     stage_ids = [stage.get("id") for stage in config.get("stages", []) if isinstance(stage, dict)]
     target_index = stage_ids.index(target_stage_id) if target_stage_id in stage_ids else -1
@@ -575,7 +593,17 @@ def execute_pending_log(log: CRMAutomationExecutionLog) -> bool:
 
     changed = False
     if log.rule_kind == "trigger":
-        target_stage_id = normalized_text(rule.get("targetStageId")) or normalized_text(rule.get("stageId"))
+        source_stage_id = normalized_text(rule.get("stageId"))
+        target_stage_id = source_stage_id
+        if log.event_code == "request.status_changed":
+            source_status = target_status_for_stage(config, source_stage_id)
+            if source_status and application_status(application) != source_status:
+                log.status = CRMAutomationExecutionLog.STATUS_SKIPPED
+                log.message = "Отложенный триггер смены статуса пропущен: заявка находится не на стадии этого триггера."
+                log.executed_at = timezone.now()
+                log.save(update_fields=["status", "message", "executed_at"])
+                return False
+
         changed = update_application_status(application, target_status_for_stage(config, target_stage_id))
         if changed:
             application.refresh_from_db()

@@ -204,7 +204,7 @@ export const TRIGGER_TEMPLATES: Record<
     },
     {
       id: "crm-chat-link-opened",
-      stageId: "application-chat-link-sent",
+      stageId: "application-joined-chat",
       title: "Переход по ссылке на орг.чат",
       description: "Срабатывает, когда проектант переходит по индивидуальной ссылке на орг.чат.",
       eventCode: "notification.chat_link_opened",
@@ -272,7 +272,7 @@ export const TRIGGER_TEMPLATES: Record<
     },
     {
       id: "request-chat-link-opened",
-      stageId: "application-chat-link-sent",
+      stageId: "application-joined-chat",
       title: "Переход по ссылке на орг.чат",
       description: "Когда проектант открыл ссылку на орг.чат, карточка переходит на стадию подтверждения.",
       eventCode: "notification.chat_link_opened",

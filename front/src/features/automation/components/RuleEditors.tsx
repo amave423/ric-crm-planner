@@ -92,6 +92,8 @@ type TriggerEditorProps = {
 };
 
 export function TriggerEditor({ trigger, config, stageOptions, onChange, onDelete }: TriggerEditorProps) {
+  const currentStageTitle = getStageTitle(config, trigger.stageId);
+
   return (
     <div className="automation-side__content">
       <EditorHeader
@@ -122,25 +124,8 @@ export function TriggerEditor({ trigger, config, stageOptions, onChange, onDelet
           onChange={(settings) => onChange((item) => ({ ...item, settings }))}
         />
 
-        <label>
-          <span>{TEXT.targetStage}</span>
-          <AppSelect
-            value={trigger.targetStageId}
-            options={stageOptions}
-            onChange={(value) => onChange((item) => ({ ...item, targetStageId: String(value) }))}
-          />
-        </label>
-
-        <label className="automation-form__switch">
-          <span>{TEXT.allowBack}</span>
-          <AppSwitch
-            checked={trigger.allowBackTransition}
-            onChange={(allowBackTransition) => onChange((item) => ({ ...item, allowBackTransition }))}
-          />
-        </label>
-
         <ReadOnlyCode label={TEXT.eventCode} value={trigger.eventCode} />
-        <ReadOnlyCode label={TEXT.targetStage} value={getStageTitle(config, trigger.targetStageId)} />
+        <ReadOnlyCode label={TEXT.triggerStage} value={currentStageTitle} />
 
         <AppButton className="automation-form__delete" onClick={onDelete}>
           <DeleteOutlined />
@@ -166,7 +151,7 @@ function EditorHeader({ kind, title, enabled, onEnabledChange }: EditorHeaderPro
       </span>
       <div>
         <h3>{title}</h3>
-        <p>{kind === "robot" ? "Робот выполнит действие на стадии" : "Триггер проверит событие и переместит карточку"}</p>
+        <p>{kind === "robot" ? "Робот выполнит действие на стадии" : "Триггер проверит событие на выбранном статусе"}</p>
       </div>
       <Tooltip title={enabled ? "Выключить" : "Включить"}>
         <AppSwitch compact checked={enabled} onChange={onEnabledChange} />
