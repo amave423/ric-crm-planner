@@ -8,7 +8,11 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from integrations.vk.crm_notifications import CHAT_LINK_SALT, notify_application_testing_started
+from integrations.vk.crm_notifications import (
+    CHAT_LINK_SALT,
+    notify_application_testing_started,
+    scan_chat_membership_for_sent_applications,
+)
 from integrations.vk.planner_invites import (
     build_welcome_keyboard,
     handle_planner_invite_payload,
@@ -241,14 +245,40 @@ class VKCRMNotificationTests(TestCase):
                     "settings": {"runMode": "queue", "timing": "immediate", "delayMinutes": 0, "condition": {"mode": "all", "rules": []}},
                     "subject": "Chat",
                     "message": "Join {chat_link}",
+                },
+                {
+                    "id": "chat-link-copy",
+                    "stageId": "application-chat-link-sent",
+                    "title": "Chat link copy",
+                    "description": "",
+                    "action": "chat.link.vk",
+                    "enabled": True,
+                    "settings": {"runMode": "queue", "timing": "immediate", "delayMinutes": 0, "condition": {"mode": "all", "rules": []}},
+                    "subject": "Chat copy",
+                    "message": "Join again {chat_link}",
                 }
             ],
         )
 
         run_crm_automation(self.application, "request.status_changed", previous_status=self.testing_status.name)
 
-        member_check_mock.assert_called_once_with(peer_id=2000000001, user_id=123456)
+        self.assertEqual(member_check_mock.call_count, 2)
+        member_check_mock.assert_any_call(peer_id=2000000001, user_id=123456)
         send_vk_message_mock.assert_not_called()
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status.name, self.chat_joined_status.name)
+
+    @override_settings(VK_ENABLED=True, VK_ORG_CHAT_URL="https://vk.com/im?sel=c1")
+    @patch("integrations.vk.crm_notifications.is_vk_user_in_conversation", return_value=True)
+    def test_chat_membership_scan_updates_application_when_vk_event_is_missing(self, member_check_mock):
+        self.application.status = self.chat_link_sent_status
+        self.application.save(update_fields=["status"])
+
+        result = scan_chat_membership_for_sent_applications()
+
+        self.assertEqual(result["scanned"], 1)
+        self.assertEqual(result["changed"], 1)
+        member_check_mock.assert_called_once_with(peer_id=2000000001, user_id=123456)
         self.application.refresh_from_db()
         self.assertEqual(self.application.status.name, self.chat_joined_status.name)
 

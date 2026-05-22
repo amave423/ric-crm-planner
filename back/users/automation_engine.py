@@ -13,6 +13,7 @@ from integrations.vk.crm_notifications import (
     inject_application_chat_link,
     mark_application_joined_chat_if_member,
     notify_organizers_about_vk_error,
+    scan_chat_membership_for_sent_applications,
     send_application_vk_message,
 )
 from integrations.vk.planner_invites import send_planner_invite
@@ -675,11 +676,17 @@ def execute_pending_log(log: CRMAutomationExecutionLog) -> bool:
 
 
 def run_due_crm_automation() -> dict[str, int]:
+    chat_membership_result = scan_chat_membership_for_sent_applications()
     logs = CRMAutomationExecutionLog.objects.filter(
         status=CRMAutomationExecutionLog.STATUS_PENDING,
         scheduled_for__lte=timezone.now(),
     ).select_related("config").order_by("scheduled_for", "id")
-    result = {"processed": 0, "changed": 0}
+    result = {
+        "processed": 0,
+        "changed": 0,
+        "chat_membership_scanned": chat_membership_result["scanned"],
+        "chat_membership_changed": chat_membership_result["changed"],
+    }
     for log in logs:
         result["processed"] += 1
         if execute_pending_log(log):

@@ -235,10 +235,11 @@ def resolve_application_vk_user_id(application: Application) -> int:
     return int(vk_user_id)
 
 
-def mark_application_joined_chat_if_member(application: Application) -> bool:
+def mark_application_joined_chat_if_member(application: Application, *, log_missing_peer: bool = True) -> bool:
     peer_id = resolve_application_chat_peer_id(application)
     if not peer_id:
-        logger.warning("VK chat membership check skipped: peer_id is not configured for application_id=%s", application.id)
+        if log_missing_peer:
+            logger.warning("VK chat membership check skipped: peer_id is not configured for application_id=%s", application.id)
         return False
 
     vk_user_id = resolve_application_vk_user_id(application)
@@ -267,7 +268,48 @@ def mark_application_joined_chat_if_member(application: Application) -> bool:
         vk_user_id,
         peer_id,
     )
-    return mark_application_joined_chat_by_vk_user(vk_user_id, peer_id) is not None
+
+    joined_status = resolve_chat_joined_status()
+    if application.status_id == joined_status.id:
+        return True
+
+    previous_status = application.status.name if application.status_id else ""
+    application.status = joined_status
+    application.save(update_fields=["status"])
+    notify_organizers_about_chat_join(application)
+
+    from users.automation_engine import run_crm_automation
+
+    run_crm_automation(
+        application,
+        "notification.chat_link_opened",
+        previous_status=previous_status,
+    )
+    return True
+
+
+def scan_chat_membership_for_sent_applications(limit: int = 50) -> dict[str, int]:
+    applications = list(
+        Application.objects.select_related("user", "event", "event__leader", "status")
+        .prefetch_related("event__organizers")
+        .filter(status__name=CHAT_LINK_SENT_STATUS_NAME)
+        .order_by("-date_sub", "-id")[:limit]
+    )
+
+    result = {"scanned": 0, "changed": 0}
+    for application in applications:
+        result["scanned"] += 1
+        try:
+            if mark_application_joined_chat_if_member(application, log_missing_peer=False):
+                result["changed"] += 1
+        except (ValueError, VKConfigurationError) as exc:
+            logger.warning(
+                "VK chat membership scan skipped: application_id=%s error=%s",
+                application.id,
+                exc,
+            )
+
+    return result
 
 
 def send_application_vk_message(application: Application, message: str, keyboard: dict | None = None) -> int:
