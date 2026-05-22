@@ -28,6 +28,7 @@ STARTED_PSH_STATUS_NAME = "Приступил к ПШ"
 REMOVED_FROM_PSH_STATUS_NAME = "Удален с ПШ"
 PLANNER_INVITE_ACCEPT_ALLOWED_STATUSES = {JOINED_CHAT_STATUS_NAME, REMOVED_FROM_PSH_STATUS_NAME}
 START_COMMANDS = {"начать", "start", "/start", "старт"}
+PEER_COMMANDS = {"peer", "/peer", "peer_id", "/peer_id"}
 
 
 def resolve_application_status(name: str, *, description: str = "", is_positive: bool = True) -> Status:
@@ -202,6 +203,27 @@ def is_vk_start_message(message: dict[str, Any]) -> bool:
     return bool(payload_values & START_COMMANDS)
 
 
+def handle_vk_peer_debug_message(message: dict[str, Any]) -> bool:
+    raw_text = str(message.get("text") or "").strip().lower()
+    if raw_text not in PEER_COMMANDS:
+        return False
+
+    try:
+        peer_id = int(message.get("peer_id"))
+    except (TypeError, ValueError):
+        return True
+
+    if peer_id < 2_000_000_000:
+        return False
+
+    send_vk_message(
+        peer_id=peer_id,
+        message=f"ID этой беседы для CRM: {peer_id}",
+    )
+    logger.warning("VK peer debug command handled: peer_id=%s", peer_id)
+    return True
+
+
 def handle_vk_chat_join_message(message: dict[str, Any]) -> bool:
     action = message.get("action")
     if not isinstance(action, dict):
@@ -249,6 +271,9 @@ def handle_vk_message_new_event(callback_payload: dict[str, Any]) -> bool:
         return False
 
     if handle_vk_chat_join_message(message):
+        return True
+
+    if handle_vk_peer_debug_message(message):
         return True
 
     button_payload = parse_vk_button_payload(message.get("payload"))

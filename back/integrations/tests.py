@@ -194,6 +194,28 @@ class VKCRMNotificationTests(TestCase):
         self.application.refresh_from_db()
         self.assertEqual(self.application.status.name, self.chat_joined_status.name)
 
+    @override_settings(VK_ENABLED=True)
+    @patch("integrations.vk.planner_invites.send_vk_message")
+    def test_vk_peer_debug_message_replies_with_chat_peer_id(self, send_vk_message_mock):
+        handled = handle_vk_message_new_event(
+            {
+                "type": "message_new",
+                "object": {
+                    "message": {
+                        "from_id": 123456,
+                        "peer_id": 2000000223,
+                        "text": "/peer",
+                    }
+                },
+            }
+        )
+
+        self.assertTrue(handled)
+        send_vk_message_mock.assert_called_once_with(
+            peer_id=2000000223,
+            message="ID этой беседы для CRM: 2000000223",
+        )
+
     @override_settings(VK_ENABLED=True, VK_ORG_CHAT_URL="https://vk.com/im?sel=c1")
     @patch("integrations.vk.crm_notifications.send_vk_message")
     @patch("integrations.vk.crm_notifications.is_vk_user_in_conversation", return_value=True)
