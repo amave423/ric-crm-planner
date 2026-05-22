@@ -68,8 +68,13 @@ def resolve_vk_chat_peer_id(chat_url: str) -> int | None:
     if not chat_url:
         return None
 
+    raw_value = str(chat_url).strip()
+    if raw_value.isdigit():
+        peer_id = int(raw_value)
+        return peer_id if peer_id > VK_CHAT_PEER_OFFSET else VK_CHAT_PEER_OFFSET + peer_id
+
     try:
-        parsed = urlparse(chat_url)
+        parsed = urlparse(raw_value)
     except ValueError:
         return None
 
@@ -80,6 +85,11 @@ def resolve_vk_chat_peer_id(chat_url: str) -> int | None:
         if values:
             raw_peer = values[0]
             break
+
+    if not raw_peer:
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if len(path_parts) >= 3 and path_parts[0] == "im" and path_parts[1] == "convo":
+            raw_peer = path_parts[2]
 
     if not raw_peer:
         return None
@@ -103,6 +113,10 @@ def resolve_vk_chat_peer_id(chat_url: str) -> int | None:
 
 
 def resolve_application_chat_peer_id(application: Application) -> int | None:
+    event_peer_id = application.event.org_chat_peer_id if application.event_id and application.event else 0
+    if event_peer_id:
+        return int(event_peer_id)
+
     event_chat_url = application.event.org_chat_url if application.event_id and application.event else ""
     configured_peer_id = getattr(settings, "VK_ORG_CHAT_PEER_ID", 0) or None
     return (

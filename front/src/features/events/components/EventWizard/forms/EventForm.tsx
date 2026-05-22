@@ -16,6 +16,7 @@ import { useWizard } from "../EventWizardModal";
 import {
   CREATE_DRAFT_KEY,
   FieldWrap,
+  extractVkPeerId,
   extractErrorMessage,
   getUserLabel,
   normalizeDateFieldValue,
@@ -37,6 +38,7 @@ export default function EventForm() {
   const [endDate, setEndDate] = useState("");
   const [applyDeadline, setApplyDeadline] = useState("");
   const [orgChatUrl, setOrgChatUrl] = useState("");
+  const [orgChatPeerId, setOrgChatPeerId] = useState("");
   const [selectedOrganizerIds, setSelectedOrganizerIds] = useState<string[]>([]);
   const [selectedOrganizerId, setSelectedOrganizerId] = useState("");
   const [specializations, setSpecializations] = useState<SpecializationOption[]>([]);
@@ -72,10 +74,11 @@ export default function EventForm() {
         endDate,
         applyDeadline,
         orgChatUrl,
+        orgChatPeerId,
         selectedOrganizerIds,
         specializations,
       }),
-    [applyDeadline, description, endDate, orgChatUrl, selectedOrganizerIds, specializations, startDate, title]
+    [applyDeadline, description, endDate, orgChatPeerId, orgChatUrl, selectedOrganizerIds, specializations, startDate, title]
   );
 
   useEffect(() => {
@@ -144,6 +147,7 @@ export default function EventForm() {
       setEndDate(normalizeDateFieldValue(event.endDate));
       setApplyDeadline(normalizeDateFieldValue(event.applyDeadline));
       setOrgChatUrl(event.orgChatUrl || "");
+      setOrgChatPeerId(event.orgChatPeerId ? String(event.orgChatPeerId) : "");
       setSelectedOrganizerIds((event.organizerIds?.length ? event.organizerIds : event.leader ? [event.leader] : []).map(String));
       setSelectedOrganizerId("");
       setSpecializations((event.specializations || []).map((item) => ({ id: item.id, title: item.title })));
@@ -179,6 +183,7 @@ export default function EventForm() {
         setEndDate(draft?.endDate ?? "");
         setApplyDeadline(draft?.applyDeadline ?? "");
         setOrgChatUrl(draft?.orgChatUrl ?? "");
+        setOrgChatPeerId(draft?.orgChatPeerId ?? "");
         setSelectedOrganizerIds(draft?.organizerIds ?? []);
         setSelectedOrganizerId("");
         setSpecializations(draft?.specializations ?? []);
@@ -204,12 +209,13 @@ export default function EventForm() {
       endDate,
       applyDeadline,
       orgChatUrl,
+      orgChatPeerId,
       organizerIds: selectedOrganizerIds,
       specializations,
     };
 
     localStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify(draft));
-  }, [applyDeadline, description, endDate, initialized, mode, orgChatUrl, selectedOrganizerIds, specializations, startDate, title]);
+  }, [applyDeadline, description, endDate, initialized, mode, orgChatPeerId, orgChatUrl, selectedOrganizerIds, specializations, startDate, title]);
 
   useEffect(() => {
     if (saveState !== "idle" && savedSnapshot && savedSnapshot !== formSnapshot) {
@@ -290,6 +296,7 @@ export default function EventForm() {
       endDate,
       applyDeadline,
       orgChatUrl: orgChatUrl.trim(),
+      orgChatPeerId: orgChatPeerId ? Number(orgChatPeerId) : 0,
       leader: selectedOrganizerIds[0],
       organizerIds: selectedOrganizerIds,
       organizer: selectedOrganizerIds
@@ -363,6 +370,17 @@ export default function EventForm() {
           value={orgChatUrl}
           onChange={(event) => setOrgChatUrl(event.target.value)}
           placeholder="https://vk.me/join/..."
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </label>
+
+      <label className="text-small">
+        <span className="wizard-field-label">ID беседы VK для проверки вступления</span>
+        <AppInput
+          value={orgChatPeerId}
+          onChange={(event) => setOrgChatPeerId(extractVkPeerId(event.target.value))}
+          placeholder="2000000223 или ссылка из адресной строки беседы"
           autoComplete="off"
           spellCheck={false}
         />
